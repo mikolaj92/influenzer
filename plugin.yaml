@@ -1,0 +1,8 @@
+manifest_version: 1
+name: build-in-public
+version: 0.1.0
+description: Draft-only build-in-public cards and narrative artifacts for Hermes.
+author: mikolaj92
+kind: standalone
+provides_hooks:
+  - kanban_task_completed
