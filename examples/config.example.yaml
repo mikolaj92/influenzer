@@ -1,0 +1,19 @@
+version: 1
+output_mode: draft-only
+output_dir: ./build-in-public-output
+maintainer: mikolaj92
+audience: OSS maintainers and builders
+sources:
+  github:
+    enabled: false
+    repos:
+      - owner/example-repo
+  kanban:
+    enabled: false
+  manual:
+    enabled: true
+    path: ./notes
+redaction:
+  enabled: true
+publish:
+  enabled: false
