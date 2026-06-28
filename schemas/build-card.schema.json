@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hermes build-in-public build card",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "project",
+    "event",
+    "post_type",
+    "problem",
+    "decision",
+    "tradeoff",
+    "audience",
+    "status",
+    "created_at",
+    "source",
+    "drafts"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "event": { "type": "string", "minLength": 1 },
+    "post_type": { "type": "string", "minLength": 1 },
+    "problem": { "type": "string" },
+    "decision": { "type": "string" },
+    "tradeoff": { "type": "string" },
+    "before": { "type": ["string", "null"] },
+    "after": { "type": ["string", "null"] },
+    "open_question": { "type": ["string", "null"] },
+    "audience": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "reviewed", "published-manual", "archived"]
+    },
+    "created_at": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repo", "number", "url", "event_id"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "repo": { "type": ["string", "null"] },
+        "number": { "type": ["integer", "null"] },
+        "url": { "type": ["string", "null"] },
+        "event_id": { "type": ["string", "null"] }
+      }
+    },
+    "drafts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x_short", "x_thread", "weekly_recap_item"],
+      "properties": {
+        "x_short": { "type": "string" },
+        "x_thread": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "weekly_recap_item": { "type": "string" }
+      }
+    }
+  }
+}
