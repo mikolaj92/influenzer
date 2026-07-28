@@ -1,6 +1,8 @@
 # build-in-public Hermes plugin
 
-`build-in-public` turns project activity into local draft artifacts: build cards, short post drafts, thread drafts, and weekly recap notes. It is intentionally separate from repo automation and never publishes to social networks in v0.
+Local draft generator for build-in-public notes.
+
+`build-in-public` turns a local Markdown note into build-card JSON, draft Markdown, and a weekly recap. It is intentionally separate from repo automation and never publishes to social networks in v0.
 
 ## Install
 
@@ -10,6 +12,20 @@ hermes plugins install mikolaj92/hermes-plugin-build-in-public --enable
 
 This repository is a standalone Hermes plugin: `plugin.yaml` and `__init__.py`
 live at the repository root.
+
+After install, Hermes may show [`after-install.md`](after-install.md). The short version is: create the sample config and note, collect the note, render drafts, then read the generated local files.
+
+## 3-minute local demo
+
+```bash
+hermes build-in-public --config config.yaml init
+hermes build-in-public --config config.yaml validate
+hermes build-in-public --config config.yaml collect --source manual --live
+hermes build-in-public --config config.yaml render --format all --live
+hermes build-in-public --config config.yaml weekly-recap --live
+```
+
+`--live` means local file writes only for this plugin. It does not publish anywhere.
 
 ## Configure
 
@@ -21,16 +37,17 @@ Default config path:
 
 Override it with `--config PATH` or `HERMES_BUILD_IN_PUBLIC_CONFIG`.
 
-Start from `examples/config.example.yaml`. Keep real notes and generated output outside the repository you publish.
+Start from `config.example.yaml`, or run `init` to create `config.yaml` and `notes/demo.md`. Keep real notes and generated output outside the repository you publish.
 
 ## Commands
 
 ```bash
-hermes build-in-public validate --config config.yaml
-hermes build-in-public collect --config config.yaml --source manual
-hermes build-in-public collect --config config.yaml --source manual --live
-hermes build-in-public render --config config.yaml --format all --live
-hermes build-in-public weekly-recap --config config.yaml --live
+hermes build-in-public --config config.yaml init
+hermes build-in-public --config config.yaml validate
+hermes build-in-public --config config.yaml collect --source manual
+hermes build-in-public --config config.yaml collect --source manual --live
+hermes build-in-public --config config.yaml render --format all --live
+hermes build-in-public --config config.yaml weekly-recap --live
 ```
 
 Without `--live`, commands plan work and do not write files. With `--live`, v0 still writes only local files under the configured `output_dir`.
