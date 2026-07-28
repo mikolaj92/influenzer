@@ -118,15 +118,128 @@ def reject_social_keys(value: Any) -> None:
             reject_social_keys(child)
 
 
+def _parse_scalar(value: str) -> Any:
+    text = value.strip()
+    if text == "":
+        return ""
+    if text.startswith("[") and text.endswith("]"):
+        inner = text[1:-1].strip()
+        if not inner:
+            return []
+        return [_parse_scalar(part.strip()) for part in inner.split(",")]
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1]
+    lowered = text.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    if lowered in {"null", "none", "~"}:
+        return None
+    if text.isdigit() or (text.startswith("-") and text[1:].isdigit()):
+        return int(text)
+    return text
+
+
+def _parse_yaml_block(lines: list[tuple[int, str]], index: int, indent: int) -> tuple[Any, int]:
+    if index >= len(lines):
+        return {}, index
+    current_indent, content = lines[index]
+    if current_indent < indent:
+        return {}, index
+    if content.startswith("- "):
+        return _parse_yaml_list(lines, index, indent)
+    return _parse_yaml_map(lines, index, indent)
+
+
+def _parse_yaml_map(lines: list[tuple[int, str]], index: int, indent: int) -> tuple[dict[str, Any], int]:
+    data: dict[str, Any] = {}
+    while index < len(lines):
+        current_indent, content = lines[index]
+        if current_indent < indent:
+            break
+        if current_indent > indent:
+            raise ConfigError(f"unexpected indentation near: {content}")
+        if content.startswith("- "):
+            break
+        if ":" not in content:
+            raise ConfigError(f"invalid YAML line: {content}")
+        key, raw_value = content.split(":", 1)
+        key = key.strip()
+        raw_value = raw_value.strip()
+        if not key:
+            raise ConfigError("empty YAML key")
+        index += 1
+        if raw_value:
+            data[key] = _parse_scalar(raw_value)
+        else:
+            value, index = _parse_yaml_block(lines, index, indent + 2)
+            data[key] = value
+    return data, index
+
+
+def _parse_yaml_list(lines: list[tuple[int, str]], index: int, indent: int) -> tuple[list[Any], int]:
+    items: list[Any] = []
+    while index < len(lines):
+        current_indent, content = lines[index]
+        if current_indent < indent:
+            break
+        if current_indent != indent or not content.startswith("- "):
+            break
+        item = content[2:].strip()
+        index += 1
+        if item == "":
+            value, index = _parse_yaml_block(lines, index, indent + 2)
+            items.append(value)
+        elif ":" in item:
+            key, raw_value = item.split(":", 1)
+            entry: dict[str, Any] = {}
+            key = key.strip()
+            raw_value = raw_value.strip()
+            if raw_value:
+                entry[key] = _parse_scalar(raw_value)
+            else:
+                value, index = _parse_yaml_block(lines, index, indent + 2)
+                entry[key] = value
+            if index < len(lines) and lines[index][0] == indent + 2 and not lines[index][1].startswith("- "):
+                extra, index = _parse_yaml_map(lines, index, indent + 2)
+                entry.update(extra)
+            items.append(entry)
+        else:
+            items.append(_parse_scalar(item))
+    return items, index
+
+
+def _load_simple_yaml(text: str) -> dict[str, Any]:
+    lines: list[tuple[int, str]] = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if indent % 2 != 0:
+            raise ConfigError(f"YAML indentation must use two spaces: {raw}")
+        lines.append((indent, stripped))
+    if not lines:
+        return {}
+    data, index = _parse_yaml_block(lines, 0, lines[0][0])
+    if index != len(lines):
+        raise ConfigError("could not parse complete YAML document")
+    if not isinstance(data, dict):
+        raise ConfigError("config file must contain an object")
+    return data
+
+
 def load_mapping(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
     if path.suffix.lower() == ".json":
         return json.loads(text)
     try:
         import yaml
-    except Exception as exc:
-        raise ConfigError("YAML config requires PyYAML; use JSON or install PyYAML") from exc
-    loaded = yaml.safe_load(text) or {}
+    except Exception:
+        loaded = _load_simple_yaml(text)
+    else:
+        loaded = yaml.safe_load(text) or {}
     if not isinstance(loaded, dict):
         raise ConfigError("config file must contain an object")
     return loaded

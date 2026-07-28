@@ -1,0 +1,18 @@
+version: 1
+output_mode: draft-only
+output_dir: ./output
+maintainer: maintainer
+audience: OSS maintainers and builders
+sources:
+  github:
+    enabled: false
+    repos: []
+  kanban:
+    enabled: false
+  manual:
+    enabled: true
+    path: ./notes
+redaction:
+  enabled: true
+publish:
+  enabled: false

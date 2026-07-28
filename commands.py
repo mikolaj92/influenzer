@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 from argparse import ArgumentParser, Namespace
+from pathlib import Path
 from typing import Any
 
 from .collector import collect_cards
-from .config import BuildInPublicConfig, ConfigError, load_config
+from .config import BuildInPublicConfig, ConfigError, load_config, resolve_config_path
 from .renderer import draft_for_card
 from .storage import load_cards, write_card, write_draft, write_weekly
 
@@ -24,6 +25,11 @@ def setup_parser(parser: ArgumentParser) -> None:
     parser.add_argument("--config", default=None)
     subparsers = parser.add_subparsers(dest="build_in_public_command")
     subparsers.required = True
+    init = subparsers.add_parser("init")
+    init.add_argument("--force", action="store_true")
+    init.add_argument("--notes-dir", default="./notes")
+    init.add_argument("--output-dir", default="./output")
+    init.add_argument("--no-sample", action="store_true")
     subparsers.add_parser("validate")
     collect = subparsers.add_parser("collect")
     collect.add_argument("--live", action="store_true")
@@ -49,8 +55,16 @@ def handle_cli(args: Namespace) -> int:
 
 
 def run_from_args(args: Namespace) -> dict[str, Any]:
-    cfg = load_config(getattr(args, "config", None))
     command = getattr(args, "build_in_public_command")
+    if command == "init":
+        return init_project(
+            getattr(args, "config", None),
+            str(getattr(args, "notes_dir", "./notes")),
+            str(getattr(args, "output_dir", "./output")),
+            bool(getattr(args, "force", False)),
+            not bool(getattr(args, "no_sample", False)),
+        )
+    cfg = load_config(getattr(args, "config", None))
     if command == "validate":
         return validate(cfg)
     if command == "collect":
@@ -60,6 +74,76 @@ def run_from_args(args: Namespace) -> dict[str, Any]:
     if command == "weekly-recap":
         return weekly_recap(cfg, bool(getattr(args, "live", False)), getattr(args, "week", None))
     raise ConfigError(f"unknown command: {command}")
+
+
+def init_project(config_path: str | None, notes_dir: str, output_dir: str, force: bool, sample: bool) -> dict[str, Any]:
+    target = resolve_config_path(config_path)
+    if target.exists() and not force:
+        raise ConfigError(f"config already exists: {target}; pass --force to overwrite")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(starter_config(notes_dir, output_dir), encoding="utf-8")
+    created = [str(target)]
+    if sample:
+        note_path = Path(notes_dir).expanduser() / "demo.md"
+        note_path.mkdir(parents=True, exist_ok=True) if note_path.suffix == "" else note_path.parent.mkdir(parents=True, exist_ok=True)
+        if force or not note_path.exists():
+            note_path.write_text(sample_note(), encoding="utf-8")
+        created.append(str(note_path))
+    config_arg = str(target)
+    return {
+        "ok": True,
+        "config": config_arg,
+        "created": created,
+        "next_commands": [
+            f"hermes build-in-public --config {config_arg} validate",
+            f"hermes build-in-public --config {config_arg} collect --source manual --live",
+            f"hermes build-in-public --config {config_arg} render --format all --live",
+            f"hermes build-in-public --config {config_arg} weekly-recap --live",
+        ],
+        "safety": [
+            "draft-only output",
+            "local files only",
+            "no social publishing",
+            "social credential keys are rejected",
+        ],
+    }
+
+
+def starter_config(notes_dir: str, output_dir: str) -> str:
+    return "\n".join([
+        "version: 1",
+        "output_mode: draft-only",
+        f"output_dir: {output_dir}",
+        "maintainer: maintainer",
+        "audience: OSS maintainers and builders",
+        "sources:",
+        "  github:",
+        "    enabled: false",
+        "    repos: []",
+        "  kanban:",
+        "    enabled: false",
+        "  manual:",
+        "    enabled: true",
+        f"    path: {notes_dir}",
+        "redaction:",
+        "  enabled: true",
+        "publish:",
+        "  enabled: false",
+        "",
+    ])
+
+
+def sample_note() -> str:
+    return "\n".join([
+        "# Demo Project",
+        "",
+        "Shipped a smaller onboarding path for a local-only build-in-public workflow.",
+        "",
+        "Problem: new users could not see value without setting up real integrations.",
+        "Decision: start with one manual note and render local draft artifacts.",
+        "Tradeoff: this demo is intentionally draft-only and should be reviewed before posting anywhere.",
+        "",
+    ])
 
 
 def validate(cfg: BuildInPublicConfig) -> dict[str, Any]:
