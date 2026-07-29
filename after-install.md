@@ -1,30 +1,16 @@
-# Start here
+# After install — Influenzer
 
-Run the local demo first. It needs no API keys and never posts to social networks.
-
-```bash
-hermes build-in-public --config config.yaml init
-hermes build-in-public --config config.yaml validate
-hermes build-in-public --config config.yaml collect --source manual --live
-hermes build-in-public --config config.yaml render --format all --live
-hermes build-in-public --config config.yaml weekly-recap --live
-```
-
-The first command writes `config.yaml` and a safe `notes/demo.md` sample. The live flags write local draft files only.
-
-Expected output:
-
-```text
-output/cards/<stable-id>.json
-output/drafts/<stable-id>.md
-output/weekly/YYYY-WW.md
-```
-
-Replace `notes/demo.md` with your own local notes when the demo is clear. Generated drafts are review material, not publishing instructions.
-
-CI-style checks:
-
-```bash
-python3 -m unittest discover -s tests
-python3 tools/hygiene_check.py .
-```
+1. Initialize a workspace:
+   ```bash
+   python -m influenzer.cli init
+   ```
+2. Create an **app** project and a **builder** project (separate BrandProfiles):
+   ```bash
+   python -m influenzer.cli project create --id app-1 --slug my-app --name "My App" \
+     --display-name "My App" --voice product --audience customers --maintainer you --kind app
+   python -m influenzer.cli project create --id builder-1 --slug me --name Me \
+     --display-name Me --voice builder --audience builders --maintainer you --kind builder
+   ```
+3. Add content under one project only — never share bodies across profiles accidentally.
+4. Keep `scheduler.live_enabled` false until grants and dry-run adapters are verified.
+5. Platform credentials stay in env/keychain refs, never in config.

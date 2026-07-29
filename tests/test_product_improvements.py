@@ -1,136 +1,140 @@
-import importlib
-import importlib.util
-import json
-import sys
+from __future__ import annotations
+
 import tempfile
-import types
 import unittest
-from argparse import ArgumentParser
 from pathlib import Path
 
-
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-
-
-def load_plugin():
-    if sys.modules.get("hermes_plugins") is None:
-        parent = types.ModuleType("hermes_plugins")
-        parent.__path__ = []
-        sys.modules["hermes_plugins"] = parent
-    spec = importlib.util.spec_from_file_location(
-        "hermes_plugins.build_in_public",
-        PLUGIN_ROOT / "__init__.py",
-        submodule_search_locations=[str(PLUGIN_ROOT)],
-    )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["hermes_plugins.build_in_public"] = module
-    spec.loader.exec_module(module)
-    return module
+from influenzer.cli import main
+from influenzer.config import load_config
+from influenzer.storage import StateRepository
 
 
-class BuildPublicInitDemoTests(unittest.TestCase):
-    def setUp(self):
-        self.module = load_plugin()
-        self.commands = self.module.commands
-        self.config = importlib.import_module("hermes_plugins.build_in_public.config")
-        self.card = importlib.import_module("hermes_plugins.build_in_public.card")
+class InfluenzerInitDemoTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name) / "workspace"
+        self.config = self.home / "config.json"
 
-    def parser(self):
-        parser = ArgumentParser()
-        self.commands.setup_parser(parser)
-        return parser
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
 
-    def test_parser_registers_init_command(self):
-        args = self.parser().parse_args(["--config", "config.yaml", "init"])
-        self.assertEqual(args.build_in_public_command, "init")
+    def test_init_creates_workspace_and_state_db(self) -> None:
+        code = main(["--config", str(self.config), "init", "--home", str(self.home)])
+        self.assertEqual(code, 0)
+        self.assertTrue(self.config.exists())
+        self.assertTrue((self.home / "state.db").exists())
+        cfg = load_config(str(self.config))
+        self.assertEqual(cfg.home, self.home)
+        self.assertFalse(cfg.scheduler_live_enabled)
 
-    def test_init_bypasses_config_loading_and_writes_sample_note(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            config_path = root / "config.yaml"
-            notes = root / "notes"
-            output = root / "output"
-            args = self.parser().parse_args([
+    def test_project_create_and_show_roundtrip(self) -> None:
+        main(["--config", str(self.config), "init", "--home", str(self.home)])
+        code = main(
+            [
                 "--config",
-                str(config_path),
-                "init",
-                "--notes-dir",
-                str(notes),
-                "--output-dir",
-                str(output),
-            ])
-            original = self.commands.load_config
-            self.commands.load_config = lambda path: self.fail("init loaded config")
-            try:
-                result = self.commands.run_from_args(args)
-            finally:
-                self.commands.load_config = original
-            self.assertTrue(result["ok"])
-            self.assertTrue(config_path.exists())
-            self.assertTrue((notes / "demo.md").exists())
-            cfg = self.config.load_config(str(config_path))
-            self.assertEqual(cfg.output_mode, "draft-only")
-            self.assertFalse(cfg.publish.get("enabled"))
-            self.assertTrue(cfg.sources.manual.enabled)
-            self.assertEqual(Path(cfg.sources.manual.path), notes)
+                str(self.config),
+                "project",
+                "create",
+                "--id",
+                "builder-1",
+                "--slug",
+                "mikolaj",
+                "--name",
+                "Mikolaj",
+                "--display-name",
+                "Mikolaj",
+                "--voice",
+                "builder",
+                "--audience",
+                "builders",
+                "--maintainer",
+                "mikolaj92",
+                "--kind",
+                "builder",
+            ]
+        )
+        self.assertEqual(code, 0)
+        code = main(["--config", str(self.config), "project", "show", "--id", "builder-1"])
+        self.assertEqual(code, 0)
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            project = repo.get_project("builder-1")
+            self.assertIsNotNone(project)
+            assert project is not None
+            self.assertEqual(project.kind, "builder")
 
-    def test_init_refuses_to_overwrite_existing_config_without_force(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "config.yaml"
-            target.write_text("version: 1\n")
-            args = self.parser().parse_args(["--config", str(target), "init"])
-            with self.assertRaises(self.config.ConfigError):
-                self.commands.run_from_args(args)
-
-    def test_root_config_example_is_loadable_and_safe(self):
-        example = PLUGIN_ROOT / "config.example.yaml"
-        self.assertTrue(example.exists())
-        cfg = self.config.load_config(str(example))
-        self.assertEqual(cfg.output_mode, "draft-only")
-        self.assertFalse(cfg.publish.get("enabled"))
-        self.assertTrue(cfg.sources.manual.enabled)
-
-    def test_docs_and_ci_are_present_for_three_minute_path(self):
-        readme = (PLUGIN_ROOT / "README.md").read_text()
-        after_install = PLUGIN_ROOT / "after-install.md"
-        ci = PLUGIN_ROOT / ".github" / "workflows" / "ci.yml"
-        self.assertTrue(after_install.exists())
-        self.assertTrue(ci.exists())
-        self.assertIn("init", readme)
-        self.assertIn("install", readme.lower())
-        self.assertIn("checks", ci.read_text().lower())
-
-    def test_init_sample_demo_flow_creates_card_draft_and_weekly_recap(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            config_path = root / "config.yaml"
-            args = self.parser().parse_args([
+    def test_paid_campaign_requires_budget_and_disclosure(self) -> None:
+        main(["--config", str(self.config), "init", "--home", str(self.home)])
+        main(
+            [
                 "--config",
-                str(config_path),
-                "init",
-                "--notes-dir",
-                str(root / "notes"),
-                "--output-dir",
-                str(root / "output"),
-            ])
-            self.commands.run_from_args(args)
-            cfg = self.config.load_config(str(config_path))
-            collected = self.commands.collect(cfg, live_flag=True, source="manual", limit=10)
-            rendered = self.commands.render(cfg, live_flag=True, format_name="all")
-            weekly = self.commands.weekly_recap(cfg, live_flag=True, week="2026-W01")
-            card_paths = sorted((root / "output" / "cards").glob("*.json"))
-            draft_paths = sorted((root / "output" / "drafts").glob("*.md"))
-            weekly_path = root / "output" / "weekly" / "2026-W01.md"
-            self.assertEqual(collected["count"], 1)
-            self.assertEqual(rendered["count"], 1)
-            self.assertTrue(weekly["written"])
-            self.assertEqual(len(card_paths), 1)
-            self.assertEqual(len(draft_paths), 1)
-            self.assertTrue(weekly_path.exists())
-            card = json.loads(card_paths[0].read_text())
-            self.card.validate_card(card)
-            self.assertIn("## Short draft", draft_paths[0].read_text())
-            self.assertIn("Demo Project", weekly_path.read_text())
+                str(self.config),
+                "project",
+                "create",
+                "--id",
+                "app-1",
+                "--slug",
+                "app",
+                "--name",
+                "App",
+                "--display-name",
+                "App",
+                "--voice",
+                "v",
+                "--audience",
+                "a",
+                "--maintainer",
+                "m",
+            ]
+        )
+        bad = main(
+            [
+                "--config",
+                str(self.config),
+                "campaign",
+                "create",
+                "--project-id",
+                "app-1",
+                "--campaign-id",
+                "c1",
+                "--name",
+                "Ads",
+                "--kind",
+                "paid",
+            ]
+        )
+        self.assertEqual(bad, 1)
+        good = main(
+            [
+                "--config",
+                str(self.config),
+                "campaign",
+                "create",
+                "--project-id",
+                "app-1",
+                "--campaign-id",
+                "c1",
+                "--name",
+                "Ads",
+                "--kind",
+                "paid",
+                "--budget-amount",
+                "50",
+                "--budget-currency",
+                "USD",
+                "--disclosure",
+                "ad",
+            ]
+        )
+        self.assertEqual(good, 0)
+
+    def test_docs_and_ci_exist(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        self.assertTrue((root / "README.md").exists())
+        self.assertTrue((root / "after-install.md").exists())
+        self.assertTrue((root / ".github" / "workflows" / "ci.yml").exists())
+        self.assertTrue((root / "plugin.yaml").exists())
+        plugin = (root / "plugin.yaml").read_text(encoding="utf-8")
+        self.assertIn("name: influenzer", plugin)
 
 
 if __name__ == "__main__":

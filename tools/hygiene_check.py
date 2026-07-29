@@ -22,7 +22,7 @@ BLOCKED_PATTERNS = [
     ("social-credential", re.compile(r"(?:x_api_key|twitter_token|mastodon_token|reddit_client_secret)\s*[:=]", re.I)),
 ]
 
-SKIP_PARTS = {".git", "__pycache__", ".pytest_cache"}
+SKIP_PARTS = {".git", "__pycache__", ".pytest_cache", ".omo"}
 
 
 def iter_files(root: Path):

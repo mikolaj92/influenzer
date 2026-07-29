@@ -1,83 +1,91 @@
-# build-in-public Hermes plugin
+# Influenzer
 
-Local draft generator for build-in-public notes.
+Local multi-project social operator for organic posting and campaign planning.
 
-`build-in-public` turns a local Markdown note into build-card JSON, draft Markdown, and a weekly recap. It is intentionally separate from repo automation and never publishes to social networks in v0.
+Influenzer runs on your machine. Every app has its own Project + BrandProfile. The builder is also a first-class Project (`kind=builder`) with a separate profile and accounts. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
 
 ## Install
 
 ```bash
-hermes plugins install mikolaj92/hermes-plugin-build-in-public --enable
+hermes plugins install PATH_OR_GIT_SOURCE --enable
 ```
 
-This repository is a standalone Hermes plugin: `plugin.yaml` and `__init__.py`
-live at the repository root.
+Influenzer is a locally executed Hermes plugin, not a hosted service. Hermes installs it from a plugin source; runtime state, scheduling, policies, and credentials remain on the user's machine. `plugin.yaml` and `__init__.py` are the plugin entry surface.
 
-After install, Hermes may show [`after-install.md`](after-install.md). The short version is: create the sample config and note, collect the note, render drafts, then read the generated local files.
+After install, Hermes may show [`after-install.md`](after-install.md).
 
 ## 3-minute local demo
 
 ```bash
-hermes build-in-public --config config.yaml init
-hermes build-in-public --config config.yaml validate
-hermes build-in-public --config config.yaml collect --source manual --live
-hermes build-in-public --config config.yaml render --format all --live
-hermes build-in-public --config config.yaml weekly-recap --live
+python -m influenzer.cli --config /tmp/influenzer/config.json init --home /tmp/influenzer
+python -m influenzer.cli --config /tmp/influenzer/config.json project create \
+  --id app-1 --slug my-app --name "My App" --display-name "My App" \
+  --voice product --audience customers --maintainer you --kind app
+python -m influenzer.cli --config /tmp/influenzer/config.json project create \
+  --id builder-1 --slug me --name Me --display-name Me \
+  --voice builder --audience builders --maintainer you --kind builder
+python -m influenzer.cli --config /tmp/influenzer/config.json content add \
+  --project-id app-1 --content-id c1 --revision-id r1 \
+  --body "Shipped dry-run adapters" --status ready
+python -m influenzer.tick_all --config /tmp/influenzer/config.json
 ```
 
-`--live` means local file writes only for this plugin. It does not publish anywhere.
+`influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
 
 ## Configure
 
 Default config path:
 
 ```text
-~/.hermes/build-in-public/config.yaml
+~/.hermes/influenzer/config.json
 ```
 
-Override it with `--config PATH` or `HERMES_BUILD_IN_PUBLIC_CONFIG`.
+Override with `--config PATH` or `HERMES_INFLUENZER_CONFIG`.
 
-Start from `config.example.yaml`, or run `init` to create `config.yaml` and `notes/demo.md`. Keep real notes and generated output outside the repository you publish.
+```json
+{
+  "version": 1,
+  "home": "~/.hermes/influenzer",
+  "scheduler": { "live_enabled": false }
+}
+```
+
+Secrets never go in config. Platform accounts store `credential_ref` only (`env:NAME` or `keychain:SERVICE/ACCOUNT`).
 
 ## Commands
 
-```bash
-hermes build-in-public --config config.yaml init
-hermes build-in-public --config config.yaml validate
-hermes build-in-public --config config.yaml collect --source manual
-hermes build-in-public --config config.yaml collect --source manual --live
-hermes build-in-public --config config.yaml render --format all --live
-hermes build-in-public --config config.yaml weekly-recap --live
-```
+| Command | Purpose |
+| --- | --- |
+| `influenzer init` | Create workspace home, config, state.db |
+| `influenzer project create/show` | App or builder projects with BrandProfile |
+| `influenzer content add` | Immutable project-scoped content revision |
+| `influenzer campaign create` | Organic/paid plan (no spend) |
+| `influenzer-tick-all` | Single scheduled mutator (dry-run default) |
 
-Without `--live`, commands plan work and do not write files. With `--live`, v0 still writes only local files under the configured `output_dir`.
+## Platforms (v1 dry-run/contract)
 
-## Output
+Separate handlers: X, Bluesky, Mastodon, LinkedIn, Instagram, Facebook Pages.
 
-```text
-output_dir/
-  cards/<stable-id>.json
-  drafts/<stable-id>.md
-  weekly/YYYY-WW.md
-```
-
-Stable IDs include source kind, repo slug, event kind, date or number, and a short content hash. Running collection twice over the same input overwrites the same file instead of creating duplicates.
-
-## Safety
-
-- `output_mode` must be `draft-only`.
-- `publish.enabled` must be `false` or absent.
-- Social credential keys are rejected by config validation.
-- `render` and `weekly-recap` read local cards only.
-- Hook ingestion is optional; command-based collection is the primary path.
-- Generated drafts are review material, not publishing instructions.
+Each dry-run create returns planned envelope fields for capabilities, official API selection note, media limits, rate/idempotency metadata, access/host requirements, and read-only readback/reconcile shape. Live canaries are ordered: Bluesky+Mastodon → X → LinkedIn → Meta.
 
 ## Skills
 
-The plugin registers bare skill names with Hermes. Load them by qualified name when needed:
+- `influenzer-profile`
+- `influenzer-content`
+- `influenzer-campaign`
+- `influenzer-publish`
 
-- `build-in-public:build-card-capture`
-- `build-in-public:build-card-to-x-post`
-- `build-in-public:build-card-to-thread`
-- `build-in-public:build-card-to-weekly-recap`
-- `build-in-public:maintainer-narrative-policy`
+## Tests
+
+```bash
+python -m unittest discover -s tests
+python tools/hygiene_check.py .
+```
+
+## Safety
+
+- No Ads spend path.
+- No plaintext secrets in config/DB/logs/receipts.
+- No blind retry after ambiguous create — use `unknown` + reconcile.
+- Cross-project references are denied.
+- SSRF guard: HTTPS-only, host binding, private IP denial, redirect revalidation, size/type bounds.

@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-07-29",
+  "pin_status": "baseline_research_not_reverified",
+  "note": "Baseline research scores for dry-run adapters. Pins/versions are NOT re-verified at live-spike time yet. T12-T16 remain open for re-verified pins. Not a frozen lockfile.",
+  "criteria": [
+    "security",
+    "license",
+    "create_media_readback",
+    "output_shape",
+    "secret_state_isolation",
+    "dependency_weight",
+    "wrapper_size"
+  ],
+  "platforms": {
+    "bluesky": {
+      "candidates": [
+        {
+          "name": "goat",
+          "version": "latest-at-research",
+          "source": "https://github.com/bluesky-social/goat",
+          "license": "MIT",
+          "scores": {
+            "security": 0.7,
+            "license": 0.9,
+            "create_media_readback": 0.75,
+            "output_shape": 0.7,
+            "secret_state_isolation": 0.7,
+            "dependency_weight": 0.8,
+            "wrapper_size": 0.6
+          },
+          "total": 0.74,
+          "rejected_reason": null
+        },
+        {
+          "name": "atproto",
+          "version": "latest-at-research",
+          "source": "https://github.com/MarshalX/atproto",
+          "license": "MIT",
+          "scores": {
+            "security": 0.8,
+            "license": 0.9,
+            "create_media_readback": 0.85,
+            "output_shape": 0.8,
+            "secret_state_isolation": 0.8,
+            "dependency_weight": 0.7,
+            "wrapper_size": 0.75
+          },
+          "total": 0.8,
+          "rejected_reason": null
+        }
+      ],
+      "selected": "atproto",
+      "selection_reason": "Python client balances create/media/readback with wrapper size for subprocess adapter"
+    },
+    "mastodon": {
+      "candidates": [
+        {
+          "name": "Mastodon.py",
+          "version": "2.2.1",
+          "source": "https://github.com/halcy/Mastodon.py",
+          "license": "MIT",
+          "scores": {
+            "security": 0.85,
+            "license": 0.9,
+            "create_media_readback": 0.9,
+            "output_shape": 0.85,
+            "secret_state_isolation": 0.85,
+            "dependency_weight": 0.85,
+            "wrapper_size": 0.9
+          },
+          "total": 0.87,
+          "rejected_reason": null
+        },
+        {
+          "name": "InformationX/mastodon.py",
+          "version": "unknown",
+          "source": "https://github.com/InformationX/mastodon.py",
+          "license": "unknown",
+          "scores": {
+            "security": 0.3,
+            "license": 0.2,
+            "create_media_readback": 0.3,
+            "output_shape": 0.3,
+            "secret_state_isolation": 0.3,
+            "dependency_weight": 0.3,
+            "wrapper_size": 0.3
+          },
+          "total": 0.29,
+          "rejected_reason": "not the canonical upstream; rejected"
+        }
+      ],
+      "selected": "Mastodon.py",
+      "selected_version": "2.2.1",
+      "selection_reason": "Canonical halcy upstream pin for create/media/readback"
+    },
+    "x": {
+      "candidates": [
+        {
+          "name": "xurl",
+          "version": "latest-at-research",
+          "source": "https://github.com/xdevplatform/xurl",
+          "license": "Apache-2.0",
+          "scores": {
+            "security": 0.7,
+            "license": 0.85,
+            "create_media_readback": 0.65,
+            "output_shape": 0.7,
+            "secret_state_isolation": 0.7,
+            "dependency_weight": 0.8,
+            "wrapper_size": 0.55
+          },
+          "total": 0.71,
+          "rejected_reason": null
+        },
+        {
+          "name": "tweepy",
+          "version": "latest-at-research",
+          "source": "https://github.com/tweepy/tweepy",
+          "license": "MIT",
+          "scores": {
+            "security": 0.75,
+            "license": 0.9,
+            "create_media_readback": 0.8,
+            "output_shape": 0.8,
+            "secret_state_isolation": 0.75,
+            "dependency_weight": 0.7,
+            "wrapper_size": 0.7
+          },
+          "total": 0.77,
+          "rejected_reason": null
+        }
+      ],
+      "selected": "tweepy",
+      "selection_reason": "Mature Python create/media/readback; re-score against xurl at live spike"
+    },
+    "linkedin": {
+      "candidates": [
+        {
+          "name": "thin HTTPS",
+          "version": "stdlib-urllib",
+          "source": "stdlib",
+          "license": "PSF",
+          "scores": {
+            "security": 0.85,
+            "license": 1.0,
+            "create_media_readback": 0.7,
+            "output_shape": 0.8,
+            "secret_state_isolation": 0.9,
+            "dependency_weight": 1.0,
+            "wrapper_size": 0.9
+          },
+          "total": 0.88,
+          "rejected_reason": null
+        },
+        {
+          "name": "crosspost substrate",
+          "version": "1.0.4",
+          "source": "reference-only",
+          "license": "unknown",
+          "scores": {
+            "security": 0.5,
+            "license": 0.5,
+            "create_media_readback": 0.6,
+            "output_shape": 0.5,
+            "secret_state_isolation": 0.4,
+            "dependency_weight": 0.3,
+            "wrapper_size": 0.3
+          },
+          "total": 0.44,
+          "rejected_reason": "reference/substrate only; never owns fanout/policy/scheduling"
+        }
+      ],
+      "selected": "thin HTTPS",
+      "selection_reason": "Smallest trusted surface; Crosspost remains reference only"
+    },
+    "instagram": {
+      "candidates": [
+        {
+          "name": "thin HTTPS Meta Graph",
+          "version": "graph-v19",
+          "source": "Meta Graph API docs",
+          "license": "n/a-api",
+          "scores": {
+            "security": 0.8,
+            "license": 1.0,
+            "create_media_readback": 0.75,
+            "output_shape": 0.8,
+            "secret_state_isolation": 0.85,
+            "dependency_weight": 1.0,
+            "wrapper_size": 0.85
+          },
+          "total": 0.86,
+          "rejected_reason": null
+        }
+      ],
+      "selected": "thin HTTPS Meta Graph",
+      "selection_reason": "IG content publishing permissions/payloads differ from Pages; separate handler"
+    },
+    "facebook_pages": {
+      "candidates": [
+        {
+          "name": "thin HTTPS Meta Graph",
+          "version": "graph-v19",
+          "source": "Meta Graph API docs",
+          "license": "n/a-api",
+          "scores": {
+            "security": 0.8,
+            "license": 1.0,
+            "create_media_readback": 0.75,
+            "output_shape": 0.8,
+            "secret_state_isolation": 0.85,
+            "dependency_weight": 1.0,
+            "wrapper_size": 0.85
+          },
+          "total": 0.86,
+          "rejected_reason": null
+        }
+      ],
+      "selected": "thin HTTPS Meta Graph",
+      "selection_reason": "Page feed permissions/payloads differ from IG; separate handler"
+    }
+  }
+}

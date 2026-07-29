@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+import unittest
+from unittest.mock import patch
+
+from influenzer import effector, envelope
+
+
+class EnvelopeTests(unittest.TestCase):
+    def test_helpers_have_stable_envelope_shape(self) -> None:
+        self.assertEqual(envelope.ok(), {"status": "ok", "ok": True, "mutated": False})
+        self.assertEqual(
+            envelope.planned(job="publish"),
+            {"status": "planned", "ok": True, "mutated": False, "dry_run": True, "job": "publish"},
+        )
+        self.assertEqual(envelope.noop("already done")["status"], "noop")
+        self.assertEqual(envelope.fail("denied")["ok"], False)
+
+    def test_run_defaults_to_dry_run_and_normalizes_result(self) -> None:
+        result = effector.run({"handler": "noop"})
+        self.assertEqual(result["status"], "noop")
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["mutated"])
+        self.assertTrue(result["dry_run"])
+
+    def test_unknown_handler_and_malformed_output_fail_closed(self) -> None:
+        unknown = effector.run({"handler": "not-allowlisted"})
+        self.assertFalse(unknown["ok"])
+        self.assertEqual(unknown["reason"], "effector_boundary_failed")
+
+        with patch.object(effector, "resolve", return_value=lambda request: ["not", "an", "object"]):
+            malformed = effector.run({"handler": "noop"})
+        self.assertFalse(malformed["ok"])
+        self.assertEqual(malformed["reason"], "effector_boundary_failed")
+
+    def test_dry_run_mutation_is_rejected(self) -> None:
+        with patch.object(effector, "resolve", return_value=lambda request: {"status": "ok", "ok": True, "mutated": True}):
+            result = effector.run({"handler": "noop", "input": {"dry_run": True}})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["reason"], "effector_boundary_failed")
+        self.assertFalse(result["mutated"])
+
+    def test_secret_keys_and_credential_references_are_redacted(self) -> None:
+        secret = "sentinel-secret"
+        with patch.object(
+            effector,
+            "resolve",
+            return_value=lambda request: {
+                "status": "ok",
+                "ok": True,
+                "mutated": False,
+                "api_token": secret,
+                "credential_ref": "env:INFLUENZER_TOKEN",
+                "message": f"token={secret}",
+            },
+        ):
+            result = effector.run({"handler": "noop", "config": {"credential_ref": "env:INFLUENZER_TOKEN"}})
+        self.assertNotIn(secret, str(result))
+        self.assertEqual(result["api_token"], "<redacted>")
+        self.assertEqual(result["credential_ref"], "<redacted>")
+        self.assertIn("<redacted>", result["message"])
+
+
+if __name__ == "__main__":
+    unittest.main()
