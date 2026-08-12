@@ -5,8 +5,8 @@ Create project-scoped immutable content revisions.
 ## Rules
 - Content always belongs to one project_id.
 - Revisions are immutable; edit by creating a new revision_id.
-- Legacy build-card imports become `legacy_unverified` and never claim remote publish success.
-- Prefer `influenzer content add`.
+- Use the single modern path: `create_revision` / `influenzer content add`. Status is an explicit `ContentStatus` (`draft`, `in_review`, `ready`, `archived`) — never inferred from an import shim.
+- Creating a revision does not claim remote publish success; publish confirmation comes only from the publish/reconcile path.
 
 ## Example
 ```bash

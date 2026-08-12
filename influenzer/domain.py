@@ -88,7 +88,6 @@ class ContentStatus(str, Enum):
     DRAFT = "draft"
     IN_REVIEW = "in_review"
     READY = "ready"
-    LEGACY_UNVERIFIED = "legacy_unverified"
     ARCHIVED = "archived"
 
 
