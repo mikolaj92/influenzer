@@ -9,7 +9,8 @@ from influenzer.adapters.base import AdapterRequest, run_adapter
 from influenzer.adapters.registry import get_adapter
 from influenzer.campaigns import create_campaign, export_campaign_plan, persist_campaign
 from influenzer.config import Config, write_config
-from influenzer.content import create_revision, import_legacy_card, persist_revision
+from influenzer import content as content_mod
+from influenzer.content import create_revision, persist_revision
 from influenzer.domain import (
     AccountStatus,
     AttemptStatus,
@@ -81,12 +82,28 @@ class OperatorTests(unittest.TestCase):
         persist_revision(self.repo, other)
         self.assertNotEqual(rev.content_hash, other.content_hash)
 
-    def test_legacy_import_never_claims_verified_publish(self) -> None:
-        card = self.home / "card.json"
-        card.write_text(json.dumps({"id": "old-1", "narrative": "legacy draft"}), encoding="utf-8")
-        rev = import_legacy_card(card, project_id="app-1")
-        self.assertEqual(rev.status, ContentStatus.LEGACY_UNVERIFIED)
-        self.assertTrue(rev.source.startswith("legacy:"))
+    def test_content_revision_statuses_are_explicit_modern_path_only(self) -> None:
+        """Content uses create_revision only; no legacy importer or unverified status."""
+        self.assertFalse(hasattr(content_mod, "import_legacy_card"))
+        self.assertFalse(hasattr(content_mod, "import_legacy_directory"))
+        self.assertNotIn("legacy_unverified", {s.value for s in ContentStatus})
+        self.assertEqual(
+            {s.value for s in ContentStatus},
+            {"draft", "in_review", "ready", "archived"},
+        )
+        rev = create_revision(
+            project_id="app-1",
+            content_id="c-modern",
+            revision_id="r-modern",
+            body="modern draft body",
+            source="manual",
+            status=ContentStatus.DRAFT,
+        )
+        persist_revision(self.repo, rev)
+        self.assertEqual(rev.status, ContentStatus.DRAFT)
+        self.assertEqual(rev.source, "manual")
+        # Creating content never invents a remote publish outcome.
+        self.assertNotIn(rev.status.value, {"succeeded", "published_confirmed", "reconciled_succeeded"})
 
     def test_paid_campaign_is_plan_only_no_spend(self) -> None:
         campaign = create_campaign(
