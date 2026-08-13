@@ -117,6 +117,17 @@ class StateRepository:
             return list(self.conn.execute("SELECT * FROM domain_events ORDER BY event_id"))
         return list(self.conn.execute("SELECT * FROM domain_events WHERE project_id=? ORDER BY event_id", (project_id,)))
 
+    def record_github_scan(self, project_id: str, repo_slug: str, *, scanned_at: str) -> None:
+        """Append a github.scanned domain event for this project+repo. No new table."""
+        with self.transaction() as c:
+            self._require_project(c, project_id)
+            self._event(
+                project_id,
+                "github.scanned",
+                {"repo": repo_slug, "scanned_at": scanned_at},
+                conn=c,
+            )
+
     def save_project(self, project: Project, *, event_type: str = "project.created", event_payload: Any | None = None) -> None:
         if project.brand.project_id != project.project_id:
             raise CrossProjectError("brand profile belongs to another project")

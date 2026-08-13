@@ -184,6 +184,29 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     )
     scan.add_argument("--project-id", required=True)
     scan.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
+    scan.add_argument(
+        "--if-due",
+        action="store_true",
+        help="only survey when the coarse window elapsed (same as brief scan-due)",
+    )
+    scan.add_argument(
+        "--window-days",
+        type=int,
+        default=7,
+        help="coarse cadence in days when --if-due (default 7)",
+    )
+    scan_due = brief_sub.add_parser(
+        "scan-due",
+        help="same as scan only when the coarse window elapsed; else silence",
+    )
+    scan_due.add_argument("--project-id", required=True)
+    scan_due.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
+    scan_due.add_argument(
+        "--window-days",
+        type=int,
+        default=7,
+        help="coarse cadence in days (default 7)",
+    )
     show_brief = brief_sub.add_parser("show", help="show a brief, score, and draft if any")
     show_brief.add_argument("--project-id", required=True)
     show_brief.add_argument("--brief-id", required=True)
@@ -641,18 +664,29 @@ def handle_cli(args: argparse.Namespace) -> int:
         )
         return 0
 
-    if args.command == "brief" and args.brief_command == "scan":
+    if args.command == "brief" and args.brief_command in {"scan", "scan-due"}:
         from github_survey import invalid_repo_reason
 
         from influenzer.brief_scan import scan_github
+        from influenzer.scan_due import scan_github_if_due
 
         bad = invalid_repo_reason(args.repo)
         if bad:
             return _fail(bad)
+        if_due = args.brief_command == "scan-due" or bool(getattr(args, "if_due", False))
+        window_days = int(getattr(args, "window_days", 7))
         with _repo(args) as repo:
             if repo.get_project(args.project_id) is None:
                 return _fail("project not found")
-            out = scan_github(repo, project_id=args.project_id, repo_slug=args.repo)
+            if if_due:
+                out = scan_github_if_due(
+                    repo,
+                    project_id=args.project_id,
+                    repo_slug=args.repo,
+                    window_days=window_days,
+                )
+            else:
+                out = scan_github(repo, project_id=args.project_id, repo_slug=args.repo)
         print(json.dumps(out, sort_keys=True))
         return 0
 

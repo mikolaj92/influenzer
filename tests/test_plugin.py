@@ -98,6 +98,15 @@ class PluginRegistrationTests(unittest.TestCase):
         self.assertEqual(scan.command, "brief")
         self.assertEqual(scan.brief_command, "scan")
         self.assertEqual(scan.repo, "owner/name")
+        self.assertFalse(scan.if_due)
+        due = parser.parse_args(["brief", "scan-due", "--project-id", "app-1", "--repo", "owner/name"])
+        self.assertEqual(due.brief_command, "scan-due")
+        self.assertEqual(due.repo, "owner/name")
+        flagged = parser.parse_args(
+            ["brief", "scan", "--if-due", "--project-id", "app-1", "--repo", "owner/name", "--window-days", "14"]
+        )
+        self.assertTrue(flagged.if_due)
+        self.assertEqual(flagged.window_days, 14)
 
 
 if __name__ == "__main__":

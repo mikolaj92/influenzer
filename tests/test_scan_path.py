@@ -66,3 +66,7 @@ class ScanPathOwnershipTests(unittest.TestCase):
         self.assertNotIn("github_pack", init)
         self.assertIn("Does not call gh", admit)
         self.assertIn("Does not survey GitHub", tick)
+        due = (root / "influenzer" / "scan_due.py").read_text(encoding="utf-8")
+        self.assertIn("Does not call gh", due)
+        self.assertIn("Does not run every tick interval", due)
+        self.assertNotIn("scan_due", tick)
