@@ -139,6 +139,7 @@ class InfluenzerInitDemoTests(unittest.TestCase):
         self.assertIn("uv sync", readme)
         self.assertIn("uv run influenzer", readme)
         self.assertIn("--artifact-url https://github.com/mikolaj92/influenzer", readme)
+        self.assertIn("--claim-ship", readme)
         self.assertNotIn("mikolaj92/influenzer/pull/1", readme)
         after = (root / "after-install.md").read_text(encoding="utf-8")
         self.assertIn("uv run influenzer", after)

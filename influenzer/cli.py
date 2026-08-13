@@ -186,7 +186,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     ingest.add_argument("--arena", choices=[a.value for a in ArenaId], help="optional primary arena")
     ingest.add_argument(
         "--artifact-url",
-        help="PR, release, or issue URL required when --claim-ship",
+        help="repo, PR, release, or issue URL required when --claim-ship",
     )
     ingest.add_argument("--from-json", help="path to a brief JSON object (no secrets)")
     scan = brief_sub.add_parser(

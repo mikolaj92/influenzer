@@ -12,7 +12,7 @@ from influenzer.hom import Brief, Fact, Score, apply_brief, brief_to_mapping, co
 from influenzer.hom_draft import dress_brief, dress_payload, main as draft_main
 from influenzer.playbook import ARENAS, ArenaId, StoryKind, Verdict
 
-from tests.test_hom_operator import SHIP_PR
+from tests.test_hom_operator import SHIP_PR, SHIP_REPO
 
 
 def _ship_brief(**overrides: object) -> Brief:
@@ -78,6 +78,21 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("Show HN: ship artifact", body)
         self.assertNotEqual(body.splitlines()[0].casefold(), "show hn: ship artifact")
         self.assertNotIn("Costume:", body)
+
+    def test_hn_readme_demo_repo_root_wears_human_fact_and_repo_url(self) -> None:
+        human = "Local tick scores briefs and emits a draft"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_REPO),
+                Fact(kind="signal", text=human),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertEqual(decision.draft.body, f"Show HN: {human}\n\n{SHIP_REPO}")
+        self.assertNotIn("/pull/1", decision.draft.body)
+        self.assertNotIn("Show HN: ship artifact", decision.draft.body)
 
     def test_hn_keeps_distinct_rest_as_backstory_under_the_url(self) -> None:
         human = "Local tick scores briefs and emits a draft"

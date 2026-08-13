@@ -53,7 +53,7 @@ uv run influenzer --config /tmp/influenzer/config.json brief ingest \
   --project-id app-1 --brief-id b-patch --story-kind patch \
   --fact "typo in README"
 uv run influenzer --config /tmp/influenzer/config.json brief ingest \
-  --project-id app-1 --brief-id b-ship --story-kind major --tryable \
+  --project-id app-1 --brief-id b-ship --story-kind major --claim-ship --tryable \
   --artifact-url https://github.com/mikolaj92/influenzer \
   --fact "Local tick scores briefs and emits a draft" --arena hn
 uv run influenzer-tick-all --config /tmp/influenzer/config.json

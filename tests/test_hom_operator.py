@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from influenzer.cli import main
@@ -26,6 +28,7 @@ from influenzer.tick_all import main as tick_all_main
 SHIP_PR = "https://github.com/mikolaj92/influenzer/pull/12"
 SHIP_ISSUE = "https://github.com/mikolaj92/influenzer/issues/4"
 SHIP_RELEASE = "https://github.com/mikolaj92/influenzer/releases/tag/v0.1.0"
+SHIP_REPO = "https://github.com/mikolaj92/influenzer"
 
 
 def _project(repo: StateRepository, project_id: str = "app-1") -> None:
@@ -55,13 +58,24 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertTrue(play.canon_url.startswith(CANON_URL))
                 self.assertNotIn("champion", play.game.lower())
 
-    def test_ship_artifact_accepts_pr_issue_release_only(self) -> None:
+    def test_ship_artifact_accepts_repo_pr_issue_release(self) -> None:
         self.assertTrue(is_ship_artifact(SHIP_PR))
         self.assertTrue(is_ship_artifact(SHIP_ISSUE))
         self.assertTrue(is_ship_artifact(SHIP_RELEASE))
+        self.assertTrue(is_ship_artifact(SHIP_REPO))
+        self.assertTrue(is_ship_artifact(SHIP_REPO + "/"))
         self.assertFalse(is_ship_artifact("https://example.com/ship"))
         self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/commit/abc"))
-        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer"))
+        self.assertFalse(is_ship_artifact("https://gist.github.com/mikolaj92/abc"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/wiki"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/compare/main...dev"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/tree/main"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/blob/main/README.md"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/actions"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92/influenzer/settings"))
+        self.assertFalse(is_ship_artifact("https://github.com/mikolaj92"))
+        self.assertFalse(is_ship_artifact("https://github.com/orgs/github"))
+        self.assertFalse(is_ship_artifact("https://github.com/settings/profile"))
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -107,6 +121,23 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "ship_claim_missing_artifact")
+
+    def test_repo_root_is_a_ship_artifact_for_hn(self) -> None:
+        human = "Local tick scores briefs and emits a draft"
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_REPO),
+                Fact(text=human),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        self.assertEqual(decision.score.reason, "one_angle")
+        assert decision.draft is not None
+        self.assertEqual(decision.draft.body, f"Show HN: {human}\n\n{SHIP_REPO}")
+        self.assertNotIn("/pull/1", decision.draft.body)
 
     def test_hype_without_tryable_demo_is_killed(self) -> None:
         brief = self._brief(tryable=False, claims_ship=True)
@@ -458,6 +489,46 @@ class TickBriefPathTests(unittest.TestCase):
             self.repo.conn.execute("SELECT 1 FROM content_revisions").fetchone()
         )
         self.assertFalse(out["mutated"])
+
+    def test_cli_readme_demo_repo_root_emits_hn_angle(self) -> None:
+        human = "Local tick scores briefs and emits a draft"
+        ingest = main(
+            [
+                "--config",
+                str(self.home / "config.json"),
+                "brief",
+                "ingest",
+                "--project-id",
+                "app-1",
+                "--brief-id",
+                "b-ship",
+                "--story-kind",
+                "major",
+                "--claim-ship",
+                "--tryable",
+                "--artifact-url",
+                SHIP_REPO,
+                "--fact",
+                human,
+                "--arena",
+                "hn",
+            ]
+        )
+        self.assertEqual(ingest, 0)
+        tick_code = tick_all_main(["--config", str(self.home / "config.json")])
+        self.assertEqual(tick_code, 0)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            angle_code = main(["--config", str(self.home / "config.json"), "angle"])
+        self.assertEqual(angle_code, 0)
+        out = json.loads(buf.getvalue())
+        self.assertEqual(out["status"], "ok")
+        self.assertFalse(out["empty"])
+        body = out["body"]
+        self.assertEqual(body, f"Show HN: {human}\n\n{SHIP_REPO}")
+        self.assertIn(SHIP_REPO, body)
+        self.assertNotIn("/pull/1", body)
+        self.assertFalse(out["published"])
 
     def test_cli_ingest_and_tick_all_patch_is_changelog_only(self) -> None:
         code = main(
