@@ -207,6 +207,8 @@ class TickLoopTests(unittest.TestCase):
         self.assertIn("Not a laptop LaunchAgent", tick_src)
         self.assertIn("always-on host", tick_src)
         self.assertIn("Mac mini", tick_src)
+        self.assertIn("--pass-if-due", tick_src)
+        self.assertIn("score-only", tick_src)
         self.assertEqual(DEFAULT_INTERVAL_SECONDS, 300)
         package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
         command = package["correlation_paths"][0]["effectors"][0]["adapter"]["command"]

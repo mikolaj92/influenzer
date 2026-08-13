@@ -9,12 +9,13 @@ The laptop sleeps. The tick belongs on mini-m4-0.
 From that checkout:
 
 ```bash
+influenzer watch set --project-id app-1 --repo owner/name
 contrib/always-on-tick.sh
 # or:
 uv run influenzer-tick --interval 300
 ```
 
-`--once` is fine anywhere (including a laptop). The interval loop fails closed on a battery laptop.
+The interval loop scores every time. With a declared watch, it runs `hom_pass` when scan-due would consider that watch due, and stays quiet between. `--once` is score-only anywhere (including a laptop) unless `--pass-if-due`. The interval loop fails closed on a battery laptop.
 
 ## Leave mill alone
 

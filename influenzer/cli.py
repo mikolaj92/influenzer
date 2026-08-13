@@ -149,7 +149,18 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     tick_loop.add_argument(
         "--once",
         action="store_true",
-        help="run a single tick then exit (same mutator as influenzer-tick-all)",
+        help=(
+            "run a single tick then exit (score-only like influenzer-tick-all; "
+            "does not scan unless --pass-if-due)"
+        ),
+    )
+    tick_loop.add_argument(
+        "--pass-if-due",
+        action="store_true",
+        help=(
+            "with --once, run hom_pass if a declared watch is due "
+            "(interval loop already does this when a watch exists and scan-due would look)"
+        ),
     )
     tick_loop.add_argument(
         "--max-ticks",
@@ -229,6 +240,16 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
         default=7,
         help="coarse cadence in days for scan-due (default 7)",
     )
+
+    watch = sub.add_parser(
+        "watch",
+        help="declare the one project+repo the interval tick may look at",
+    )
+    watch_sub = watch.add_subparsers(dest="watch_command")
+    wset = watch_sub.add_parser("set", help="set the singleton watch (one project, one repo)")
+    wset.add_argument("--project-id", required=True)
+    wset.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
+    watch_sub.add_parser("show", help="show the declared watch")
 
     verdict = sub.add_parser(
         "verdict",
@@ -626,6 +647,8 @@ def handle_cli(args: argparse.Namespace) -> int:
             tick_argv.extend(["--interval", str(args.interval)])
         if args.once:
             tick_argv.append("--once")
+        if getattr(args, "pass_if_due", False):
+            tick_argv.append("--pass-if-due")
         if args.max_ticks is not None:
             tick_argv.extend(["--max-ticks", str(args.max_ticks)])
         if args.live:
@@ -768,6 +791,24 @@ def handle_cli(args: argparse.Namespace) -> int:
         print(json.dumps(out, sort_keys=True))
         return 0
 
+    if args.command == "watch" and args.watch_command == "set":
+        from influenzer.hom_watch import set_watch
+
+        with _repo(args) as repo:
+            out = set_watch(repo, project_id=args.project_id, repo_slug=args.repo)
+        if out.get("status") == "failed":
+            return _fail(str(out.get("reason") or "watch failed"))
+        print(json.dumps(out, sort_keys=True))
+        return 0
+
+    if args.command == "watch" and args.watch_command == "show":
+        from influenzer.hom_watch import show_watch
+
+        with _repo(args) as repo:
+            out = show_watch(repo)
+        print(json.dumps(out, sort_keys=True))
+        return 0
+
     if args.command == "verdict":
         from influenzer.hom_verdict import apply_verdict
 
@@ -782,7 +823,7 @@ def handle_cli(args: argparse.Namespace) -> int:
         return 0
 
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,pass,verdict}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,pass,watch,verdict}",
         file=sys.stderr,
     )
     return 2

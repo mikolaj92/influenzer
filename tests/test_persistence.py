@@ -82,6 +82,28 @@ class PersistenceTests(unittest.TestCase):
                 )
                 cols = [row[1] for row in repo.conn.execute("PRAGMA table_info(operator_drafts)")]
                 self.assertIn("gate_verdict", cols)
+                repo.conn.execute("SELECT * FROM hom_watch")
+
+    def test_v3_database_gains_hom_watch(self):
+        from influenzer.migrations import SCHEMA_VERSION, _SCHEMA, _V2_SCHEMA, _V3_SCHEMA
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            conn = sqlite3.connect(path)
+            conn.execute("CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            conn.executescript(_SCHEMA)
+            conn.executescript(_V2_SCHEMA)
+            conn.executescript(_V3_SCHEMA)
+            conn.execute("INSERT INTO schema_meta VALUES ('schema_version', '3')")
+            conn.commit()
+            conn.close()
+            with StateRepository(path) as repo:
+                self.assertEqual(
+                    repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0],
+                    str(SCHEMA_VERSION),
+                )
+                repo.conn.execute("SELECT * FROM hom_watch")
+                self.assertIsNone(repo.get_hom_watch())
 
     def test_future_schema_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

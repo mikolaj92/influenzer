@@ -1,10 +1,14 @@
 """Always-on HoM tick loop for a Mac mini / always-on host.
 
-Pending briefs → score / one-arena draft or kill. Does not survey GitHub.
-Does not call gh. Does not admit briefs. Not a laptop LaunchAgent. Not a
-hosted service. A human starts this process on the always-on box; the repo
-does not SSH or deploy. Fala may conduct the same one-shot as a subprocess
-organ (`influenzer-tick-all`).
+Pending briefs → score / one-arena draft or kill. The interval loop still
+scores every time. If a declared watch exists and scan-due would consider
+it due, it also runs hom_pass once. `--once` stays score-only (same
+mutator as influenzer-tick-all) unless `--pass-if-due`.
+
+Does not publish. Does not enable live social. Not a laptop LaunchAgent.
+Not a hosted service. A human starts this process on the always-on box;
+the repo does not SSH or deploy. Fala may conduct the score-only one-shot
+as a subprocess organ (`influenzer-tick-all`). Watch set is host CLI only.
 """
 
 from __future__ import annotations
@@ -16,8 +20,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from influenzer.hom_watch import run_watched_tick
 from influenzer.host import HostPower, HostUnsuitable, require_always_on_host
-from influenzer.tick_all import run_tick
 
 DEFAULT_INTERVAL_SECONDS = 300
 
@@ -82,8 +86,10 @@ def main(
         prog="influenzer-tick",
         description=(
             "Always-on HoM tick loop for a Mac mini / always-on host: score pending "
-            "briefs into drafts or kills. Dry-run default. Not a laptop LaunchAgent. "
-            "No live social publish. Battery laptops fail closed for the interval loop."
+            "briefs into drafts or kills. Interval loop may run hom_pass when a "
+            "declared watch is due. --once is score-only unless --pass-if-due. "
+            "Dry-run default. Not a laptop LaunchAgent. No live social publish. "
+            "Battery laptops fail closed for the interval loop."
         ),
     )
     parser.add_argument("--config", help="path to config.json")
@@ -96,7 +102,18 @@ def main(
     parser.add_argument(
         "--once",
         action="store_true",
-        help="run a single tick then exit (same mutator as influenzer-tick-all; allowed on any machine)",
+        help=(
+            "run a single tick then exit (score-only like influenzer-tick-all; "
+            "does not scan unless --pass-if-due; allowed on any machine)"
+        ),
+    )
+    parser.add_argument(
+        "--pass-if-due",
+        action="store_true",
+        help=(
+            "with --once, run hom_pass if a declared watch is due "
+            "(interval loop already does this when a watch exists and scan-due would look)"
+        ),
     )
     parser.add_argument(
         "--max-ticks",
@@ -123,7 +140,11 @@ def main(
         return 2
 
     def tick_once() -> dict[str, Any]:
-        return run_tick(config_path=args.config, cli_live=bool(args.live))
+        return run_watched_tick(
+            config_path=args.config,
+            cli_live=bool(args.live),
+            allow_hom_pass=not bool(args.once) or bool(args.pass_if_due),
+        )
 
     try:
         results = loop_ticks(

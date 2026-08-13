@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class MigrationError(RuntimeError):
@@ -134,6 +134,16 @@ _V3_SCHEMA = """
 ALTER TABLE operator_drafts ADD COLUMN gate_verdict TEXT;
 """
 
+_V4_SCHEMA = """
+CREATE TABLE IF NOT EXISTS hom_watch (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    project_id TEXT NOT NULL,
+    repo_slug TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+);
+"""
+
 
 def current_version(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
@@ -149,17 +159,25 @@ def migrate(conn: sqlite3.Connection) -> int:
         conn.executescript(_SCHEMA)
         conn.executescript(_V2_SCHEMA)
         conn.executescript(_V3_SCHEMA)
+        conn.executescript(_V4_SCHEMA)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
         return SCHEMA_VERSION
     if version == 1:
         conn.executescript(_V2_SCHEMA)
         conn.executescript(_V3_SCHEMA)
+        conn.executescript(_V4_SCHEMA)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
         return SCHEMA_VERSION
     if version == 2:
         conn.executescript(_V3_SCHEMA)
+        conn.executescript(_V4_SCHEMA)
+        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
+        conn.commit()
+        return SCHEMA_VERSION
+    if version == 3:
+        conn.executescript(_V4_SCHEMA)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
     return SCHEMA_VERSION
