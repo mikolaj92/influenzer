@@ -1,13 +1,16 @@
-"""Single scheduled mutator entrypoint."""
+"""Single scheduled mutator: score pending briefs.
+
+Does not survey GitHub. Does not call gh. Does not admit briefs.
+Does not open runtime.db. Never auto-publishes.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
-from pathlib import Path
 
 from influenzer.config import load_config
+from influenzer.fala_result import write_fala_result
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 
@@ -18,33 +21,6 @@ def run_tick(*, config_path: str | None = None, cli_live: bool = False) -> dict:
     cfg.home.mkdir(parents=True, exist_ok=True)
     with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
         return tick(repo, cfg, due=(), cli_live=bool(cli_live))
-
-
-def write_fala_result(payload: dict[str, object], *, env: dict[str, str] | None = None) -> Path | None:
-    """Honor the Fala subprocess organ contract when the host injected an output dir.
-
-    Does not import or embed a Fala host. Domain state stays in state.db.
-    """
-    source = os.environ if env is None else env
-    output_dir = source.get("FALA_EFFECTOR_OUTPUT_DIR")
-    if not output_dir:
-        return None
-    path = Path(output_dir) / "result.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    wrapped = {
-        "values": payload,
-        "associations": [],
-        "reactions": [
-            {
-                "kind": "hom.decision",
-                "media_type": "application/json",
-                "value": payload.get("operator", payload),
-            }
-        ],
-        "metadata": {"published": False, "mutated": bool(payload.get("mutated"))},
-    }
-    path.write_text(json.dumps(wrapped, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
-    return path
 
 
 def main(argv: list[str] | None = None) -> int:
