@@ -46,12 +46,13 @@ Story types I consider: major, hard issue, exploration, decision, failure. Patch
 
 ## Local operator (deterministic copy)
 
-On each `influenzer-tick-all`, pending briefs are scored by `influenzer/playbook.py` + `influenzer/hom.py` — rules/data, not freeform vibe:
+On each `influenzer-tick-all` (or `influenzer-tick` locally), pending briefs are scored by `influenzer/playbook.py` + `influenzer/hom.py` — fail-closed rules/data, not freeform vibe:
 
-- **kill** / **changelog-only** / **one angle**. Silence is a correct decision.
+- **kill** / **changelog-only** / **one angle**. Silence is a correct decision. Borderline briefs do not leak a social draft.
 - **One primary arena.** Costume of that arena only; play the wave (checklist), not a champion fantasy.
-- A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill.
+- A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill. Waitlist/landing and press-release tone fail closed.
 - Output is a **draft** (content status `draft`, source `operator`). Live publish stays behind the existing dry-run / grant / `scheduler.live_enabled` gates. Tick-all never auto-spams.
+- Run the tick on this machine: `uv run influenzer-tick --once` or `--interval 300`. No LaunchAgent. Fala may conduct the same one-shot as a subprocess organ.
 
 Ingest a brief (many facts), then tick:
 

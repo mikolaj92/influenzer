@@ -12,6 +12,14 @@ from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 
 
+def run_tick(*, config_path: str | None = None, cli_live: bool = False) -> dict:
+    """One dry-run-default mutator pass against state.db. Does not open runtime.db."""
+    cfg = load_config(config_path)
+    cfg.home.mkdir(parents=True, exist_ok=True)
+    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+        return tick(repo, cfg, due=(), cli_live=bool(cli_live))
+
+
 def write_fala_result(payload: dict[str, object], *, env: dict[str, str] | None = None) -> Path | None:
     """Honor the Fala subprocess organ contract when the host injected an output dir.
 
@@ -48,12 +56,9 @@ def main(argv: list[str] | None = None) -> int:
         help="ignored by tick-all; only scheduler.live_enabled can authorize live mutation",
     )
     args = parser.parse_args(argv)
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        # Briefs are scored every tick. Due-plan selection for live publish lands with
-        # a deeper scheduler; empty due set remains the safe default (no auto-spam).
-        out = tick(repo, cfg, due=(), cli_live=bool(args.live))
+    # Briefs are scored every tick. Due-plan selection for live publish lands with
+    # a deeper scheduler; empty due set remains the safe default (no auto-spam).
+    out = run_tick(config_path=args.config, cli_live=bool(args.live))
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out)
     return 0

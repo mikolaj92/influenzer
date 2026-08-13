@@ -7,7 +7,6 @@ Influenzer does not need Heimdall internals; briefs arrive, drafts leave.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -15,18 +14,23 @@ from influenzer.domain import DomainError, content_hash, require_slug, utc_now
 from influenzer.playbook import (
     ANGLES,
     ARENAS,
+    ArenaGate,
     ArenaId,
     CANON_URL,
+    MIN_FACT_CHARS,
+    MIN_SOCIAL_FACTS,
     StoryKind,
     Verdict,
+    arena_gate,
     arena_play,
-)
-
-
-# Ship claims must point at a PR, release, or issue — not a vibe, landing page, or commit.
-_ARTIFACT_RE = re.compile(
-    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
-    r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
+    has_cinema_package,
+    has_fair_hook,
+    has_named_subreddit,
+    is_ship_artifact_url,
+    is_social_arena,
+    looks_like_commit_noise,
+    looks_like_press_release,
+    looks_like_waitlist,
 )
 
 _SECRET_KEYS = frozenset(
@@ -208,9 +212,7 @@ class OperatorDecision:
 
 
 def is_ship_artifact(url: str | None) -> bool:
-    if not url:
-        return False
-    return bool(_ARTIFACT_RE.fullmatch(url.strip()))
+    return is_ship_artifact_url(url)
 
 
 def brief_artifacts(brief: Brief) -> tuple[str, ...]:
@@ -247,41 +249,110 @@ def _changelog(brief: Brief, reason: str) -> Score:
     ).with_hash()
 
 
-def _choose_arena(brief: Brief) -> ArenaId | str:
-    """Return one ArenaId, or a kill-reason string."""
-    preferred = brief.preferred_arena
-    if preferred is ArenaId.DISCORD:
-        return "discord_pre_pmf"
-    if preferred is ArenaId.HN and not brief.tryable:
-        return "hn_not_tryable"
-    if preferred is ArenaId.NEWSLETTER and brief.story_kind not in {
-        StoryKind.MAJOR,
-        StoryKind.DECISION,
-        StoryKind.FAILURE,
-    }:
-        return "newsletter_no_user_facing_change"
-    if preferred is not None:
-        return preferred
-    # ja.md: GitHub is the website; HN Show when there is something to click and run.
-    if brief.tryable and brief.story_kind in {StoryKind.MAJOR, StoryKind.HARD_ISSUE}:
+def _facts_blob(brief: Brief) -> str:
+    parts: list[str] = []
+    for fact in brief.facts:
+        parts.append(fact.text)
+        if fact.kind:
+            parts.append(fact.kind)
+        if fact.artifact_url:
+            parts.append(fact.artifact_url)
+    return "\n".join(parts)
+
+
+def _has_clickable_url(brief: Brief) -> bool:
+    for fact in brief.facts:
+        url = (fact.artifact_url or "").strip()
+        if is_ship_artifact(url) or url.startswith("https://"):
+            return True
+    return False
+
+
+def _enough_social_substance(brief: Brief) -> bool:
+    if any(is_ship_artifact(url) for url in brief_artifacts(brief)):
+        return True
+    meaty = [fact for fact in brief.facts if len(fact.text.strip()) >= MIN_FACT_CHARS]
+    return len(meaty) >= MIN_SOCIAL_FACTS
+
+
+def _choose_arena(brief: Brief) -> ArenaId:
+    """One primary arena. GitHub is the website; HN only when there is a clickable demo."""
+    if brief.preferred_arena is not None:
+        return brief.preferred_arena
+    if (
+        brief.tryable
+        and brief.story_kind in {StoryKind.MAJOR, StoryKind.HARD_ISSUE}
+        and _has_clickable_url(brief)
+    ):
         return ArenaId.HN
     return ArenaId.GITHUB
 
 
+def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, str] | None:
+    gate: ArenaGate = arena_gate(arena)
+    if gate.always_kill:
+        return Verdict.KILL, gate.reason
+    if gate.allowed_story_kinds is not None and brief.story_kind not in gate.allowed_story_kinds:
+        return gate.mismatch_verdict, gate.reason
+    if gate.require_tryable and not brief.tryable:
+        return Verdict.KILL, gate.reason
+    if gate.require_clickable_url and not _has_clickable_url(brief):
+        return Verdict.KILL, gate.reason
+    if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
+        return Verdict.KILL, gate.reason
+    if gate.forbid_ship_claim and brief.claims_ship:
+        return Verdict.KILL, gate.reason
+    if gate.min_facts and len(brief.facts) < gate.min_facts:
+        return Verdict.KILL, gate.reason
+    kinds = {fact.kind.strip().lower() for fact in brief.facts}
+    if gate.require_subreddit and "subreddit" not in kinds and not has_named_subreddit(blob):
+        return Verdict.KILL, gate.reason
+    if gate.require_package and "package" not in kinds and not has_cinema_package(blob):
+        return Verdict.KILL, gate.reason
+    if gate.require_hook and "hook" not in kinds and not has_fair_hook(blob):
+        return Verdict.KILL, gate.reason
+    return None
+
+
 def score_brief(brief: Brief) -> Score:
-    """Deterministic speak / silence decision. Not every brief becomes a post."""
+    """Fail-closed speak / silence decision. Borderline briefs do not leak a social draft."""
     if not brief.facts:
         return _kill(brief, "empty_brief")
+    blob = _facts_blob(brief)
     if brief.story_kind is StoryKind.PATCH:
         return _changelog(brief, "patch_changelog_only")
+    if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):
+        return _changelog(brief, "commit_noise_changelog")
     if brief.claims_ship:
         if not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
             return _kill(brief, "ship_claim_missing_artifact")
         if not brief.tryable:
             return _kill(brief, "hype_without_demo")
+    if looks_like_waitlist(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "waitlist_not_tryable")
+        return _changelog(brief, "waitlist_not_tryable")
+    if brief.story_kind is StoryKind.EXPLORATION:
+        if is_social_arena(brief.preferred_arena):
+            return _kill(brief, "exploration_not_a_post")
+        return _changelog(brief, "exploration_not_a_post")
+    if brief.story_kind is StoryKind.DECISION and not (brief.tryable or brief.claims_ship):
+        if is_social_arena(brief.preferred_arena):
+            return _kill(brief, "decision_not_user_facing")
+        return _changelog(brief, "decision_not_user_facing")
+
     chosen = _choose_arena(brief)
-    if not isinstance(chosen, ArenaId):
-        return _kill(brief, chosen)
+    blocked = _gate_violation(brief, chosen, blob)
+    if blocked is not None:
+        verdict, reason = blocked
+        if verdict is Verdict.CHANGELOG_ONLY:
+            return _changelog(brief, reason)
+        return _kill(brief, reason)
+    if is_social_arena(chosen):
+        if not _enough_social_substance(brief):
+            return _changelog(brief, "thin_brief")
+        if looks_like_press_release(blob):
+            return _kill(brief, "press_release_tone")
     play = arena_play(chosen)
     return Score(
         brief_id=brief.brief_id,
