@@ -8,6 +8,7 @@ from typing import Any
 
 from . import envelope
 from .catalog import resolve
+from .hom import HomError, apply_brief, brief_from_mapping, decision_to_dict
 
 _SECRET_KEY = re.compile(
     r"(?:token|password|passwd|secret|api[_-]?key|authorization|credential|access[_-]?token|refresh[_-]?token|client[_-]?secret)",
@@ -29,6 +30,22 @@ def echo(request: Mapping[str, Any]) -> dict[str, Any]:
     """Reference non-mutating handler; output is redacted by :func:`run`."""
 
     return envelope.ok(status="echo", echo=dict(request))
+
+
+def score_brief(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Pure HoM score. Drafts are decisions, not live publishes."""
+
+    payload = envelope.input_of(request)
+    if not payload:
+        cfg = envelope.cfg_of(request)
+        payload = dict(cfg.get("brief") or request.get("brief") or {})
+    try:
+        brief = brief_from_mapping(payload)
+        decision = apply_brief(brief)
+    except (HomError, ValueError, TypeError, KeyError) as exc:
+        return envelope.fail(str(exc), failure_class="validation")
+    out = decision_to_dict(decision)
+    return envelope.result(status="ok", ok=True, mutated=False, **out)
 
 
 def _dry_run(request: Mapping[str, Any]) -> bool:
@@ -123,7 +140,7 @@ def run(request: Mapping[str, Any]) -> dict[str, Any]:
     return redact(result, _secrets=secrets)
 
 
-__all__ = ["echo", "noop", "normalize_result", "redact", "run"]
+__all__ = ["echo", "noop", "normalize_result", "redact", "run", "score_brief"]
 
 
 if __name__ == "__main__":  # pragma: no cover

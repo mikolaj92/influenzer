@@ -1,7 +1,7 @@
 manifest_version: 1
 name: influenzer
 version: 0.1.0
-description: Local multi-project social operator for organic posting and campaign planning.
+description: Local Head of Marketing operator: briefs in, scored drafts out; dry-run publish.
 author: mikolaj92
 kind: standalone
 provides_hooks: []

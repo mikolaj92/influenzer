@@ -1,0 +1,473 @@
+"""Head of Marketing operator: Brief in, Score, Draft or explicit kill.
+
+Pure rules. No provider calls. Live publish stays on the existing policy/adapter path.
+Influenzer does not need Heimdall internals; briefs arrive, drafts leave.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from typing import Any, Mapping
+
+from influenzer.domain import DomainError, content_hash, require_slug, utc_now
+from influenzer.playbook import (
+    ANGLES,
+    ARENAS,
+    ArenaId,
+    CANON_URL,
+    StoryKind,
+    Verdict,
+    arena_play,
+)
+
+
+# Ship claims must point at a PR, release, or issue — not a vibe, landing page, or commit.
+_ARTIFACT_RE = re.compile(
+    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
+    r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
+)
+
+_SECRET_KEYS = frozenset(
+    {
+        "token",
+        "password",
+        "passwd",
+        "secret",
+        "api_key",
+        "apikey",
+        "authorization",
+        "credential",
+        "access_token",
+        "refresh_token",
+        "client_secret",
+    }
+)
+
+
+class HomError(DomainError):
+    pass
+
+
+@dataclass(frozen=True)
+class Fact:
+    """One signal in a brief. Many facts; the operator picks one angle."""
+
+    text: str
+    kind: str = "signal"
+    artifact_url: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.text.strip():
+            raise HomError("fact text must not be empty")
+        if self.kind.strip() != self.kind or not self.kind:
+            raise HomError("fact kind must be a non-empty string")
+
+
+@dataclass(frozen=True)
+class Brief:
+    """Many facts at once. Not a single commit/event."""
+
+    project_id: str
+    brief_id: str
+    facts: tuple[Fact, ...]
+    story_kind: StoryKind
+    claims_ship: bool = False
+    tryable: bool = False
+    preferred_arena: ArenaId | None = None
+    source: str = "manual"
+    status: str = "pending"
+    created_at: str = ""
+
+    @staticmethod
+    def create(
+        *,
+        project_id: str,
+        brief_id: str,
+        facts: tuple[Fact, ...] | list[Fact],
+        story_kind: StoryKind | str,
+        claims_ship: bool = False,
+        tryable: bool = False,
+        preferred_arena: ArenaId | str | None = None,
+        source: str = "manual",
+        created_at: str | None = None,
+        status: str = "pending",
+    ) -> "Brief":
+        require_slug(brief_id, "brief_id")
+        kind = story_kind if isinstance(story_kind, StoryKind) else StoryKind(story_kind)
+        arena: ArenaId | None
+        if preferred_arena is None or preferred_arena == "":
+            arena = None
+        elif isinstance(preferred_arena, ArenaId):
+            arena = preferred_arena
+        else:
+            try:
+                arena = ArenaId(preferred_arena)
+            except ValueError as exc:
+                raise HomError(f"unknown arena: {preferred_arena}") from exc
+        packed = tuple(facts)
+        if status not in {"pending", "processed"}:
+            raise HomError("brief status must be pending|processed")
+        return Brief(
+            project_id=project_id,
+            brief_id=brief_id,
+            facts=packed,
+            story_kind=kind,
+            claims_ship=bool(claims_ship),
+            tryable=bool(tryable),
+            preferred_arena=arena,
+            source=source,
+            status=status,
+            created_at=created_at or utc_now(),
+        )
+
+
+@dataclass(frozen=True)
+class Score:
+    brief_id: str
+    verdict: Verdict
+    reason: str
+    arena: ArenaId | None
+    angle: str | None
+    wave_checklist: tuple[str, ...]
+    canon_url: str
+    score_hash: str = ""
+
+    def with_hash(self) -> "Score":
+        payload = {
+            "brief_id": self.brief_id,
+            "verdict": self.verdict.value,
+            "reason": self.reason,
+            "arena": None if self.arena is None else self.arena.value,
+            "angle": self.angle,
+            "wave_checklist": list(self.wave_checklist),
+            "canon_url": self.canon_url,
+        }
+        return Score(
+            brief_id=self.brief_id,
+            verdict=self.verdict,
+            reason=self.reason,
+            arena=self.arena,
+            angle=self.angle,
+            wave_checklist=self.wave_checklist,
+            canon_url=self.canon_url,
+            score_hash=content_hash(payload),
+        )
+
+
+@dataclass(frozen=True)
+class Draft:
+    """Costume-native copy for one arena. Never an auto-publish."""
+
+    project_id: str
+    brief_id: str
+    draft_id: str
+    arena: ArenaId
+    costume: str
+    angle: str
+    body: str
+    wave_checklist: tuple[str, ...]
+    canon_url: str
+    created_at: str
+    content_hash: str = ""
+
+    def with_hash(self) -> "Draft":
+        payload = {
+            "project_id": self.project_id,
+            "brief_id": self.brief_id,
+            "draft_id": self.draft_id,
+            "arena": self.arena.value,
+            "costume": self.costume,
+            "angle": self.angle,
+            "body": self.body,
+            "wave_checklist": list(self.wave_checklist),
+            "canon_url": self.canon_url,
+            "created_at": self.created_at,
+        }
+        return Draft(
+            project_id=self.project_id,
+            brief_id=self.brief_id,
+            draft_id=self.draft_id,
+            arena=self.arena,
+            costume=self.costume,
+            angle=self.angle,
+            body=self.body,
+            wave_checklist=self.wave_checklist,
+            canon_url=self.canon_url,
+            created_at=self.created_at,
+            content_hash=content_hash(payload),
+        )
+
+
+@dataclass(frozen=True)
+class OperatorDecision:
+    brief: Brief
+    score: Score
+    draft: Draft | None
+
+
+def is_ship_artifact(url: str | None) -> bool:
+    if not url:
+        return False
+    return bool(_ARTIFACT_RE.fullmatch(url.strip()))
+
+
+def brief_artifacts(brief: Brief) -> tuple[str, ...]:
+    found: list[str] = []
+    for fact in brief.facts:
+        url = fact.artifact_url
+        if url and url not in found:
+            found.append(url)
+    return tuple(found)
+
+
+def _kill(brief: Brief, reason: str) -> Score:
+    return Score(
+        brief_id=brief.brief_id,
+        verdict=Verdict.KILL,
+        reason=reason,
+        arena=None,
+        angle=None,
+        wave_checklist=(),
+        canon_url=CANON_URL,
+    ).with_hash()
+
+
+def _changelog(brief: Brief, reason: str) -> Score:
+    play = arena_play(ArenaId.GITHUB)
+    return Score(
+        brief_id=brief.brief_id,
+        verdict=Verdict.CHANGELOG_ONLY,
+        reason=reason,
+        arena=None,
+        angle=ANGLES[StoryKind.PATCH],
+        wave_checklist=play.wave,
+        canon_url=play.canon_url,
+    ).with_hash()
+
+
+def _choose_arena(brief: Brief) -> ArenaId | str:
+    """Return one ArenaId, or a kill-reason string."""
+    preferred = brief.preferred_arena
+    if preferred is ArenaId.DISCORD:
+        return "discord_pre_pmf"
+    if preferred is ArenaId.HN and not brief.tryable:
+        return "hn_not_tryable"
+    if preferred is ArenaId.NEWSLETTER and brief.story_kind not in {
+        StoryKind.MAJOR,
+        StoryKind.DECISION,
+        StoryKind.FAILURE,
+    }:
+        return "newsletter_no_user_facing_change"
+    if preferred is not None:
+        return preferred
+    # ja.md: GitHub is the website; HN Show when there is something to click and run.
+    if brief.tryable and brief.story_kind in {StoryKind.MAJOR, StoryKind.HARD_ISSUE}:
+        return ArenaId.HN
+    return ArenaId.GITHUB
+
+
+def score_brief(brief: Brief) -> Score:
+    """Deterministic speak / silence decision. Not every brief becomes a post."""
+    if not brief.facts:
+        return _kill(brief, "empty_brief")
+    if brief.story_kind is StoryKind.PATCH:
+        return _changelog(brief, "patch_changelog_only")
+    if brief.claims_ship:
+        if not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
+            return _kill(brief, "ship_claim_missing_artifact")
+        if not brief.tryable:
+            return _kill(brief, "hype_without_demo")
+    chosen = _choose_arena(brief)
+    if not isinstance(chosen, ArenaId):
+        return _kill(brief, chosen)
+    play = arena_play(chosen)
+    return Score(
+        brief_id=brief.brief_id,
+        verdict=Verdict.DRAFT,
+        reason="one_angle",
+        arena=chosen,
+        angle=ANGLES[brief.story_kind],
+        wave_checklist=play.wave,
+        canon_url=play.canon_url,
+    ).with_hash()
+
+
+def _fact_lines(brief: Brief, *, limit: int = 3) -> list[str]:
+    lines: list[str] = []
+    for fact in brief.facts[:limit]:
+        line = fact.text.strip()
+        if fact.artifact_url:
+            line = f"{line} ({fact.artifact_url})"
+        lines.append(f"- {line}")
+    return lines
+
+
+def compose_draft(brief: Brief, score: Score, *, now: str | None = None) -> Draft | None:
+    """Costume-native body for the single chosen arena. Kill/changelog emit nothing."""
+    if score.verdict is not Verdict.DRAFT or score.arena is None or score.angle is None:
+        return None
+    play = arena_play(score.arena)
+    clock = now or utc_now()
+    facts = "\n".join(_fact_lines(brief))
+    artifact = next((url for url in brief_artifacts(brief) if is_ship_artifact(url)), None)
+    proof = f"\nProof: {artifact}" if artifact else ""
+    opener = {
+        ArenaId.X: "Agora reply — live in someone else's rising thread, not an original in an empty feed.",
+        ArenaId.LINKEDIN: "Court note — speak as a person. Insight before any pitch.",
+        ArenaId.YOUTUBE: "Cinema package first (title + thumb + 5s), then pay the promise.",
+        ArenaId.SHORTS: "Fair hook — 1–2 seconds, loop, not an essay.",
+        ArenaId.GITHUB: "Workshop — README and code are proof; stars are not success.",
+        ArenaId.HN: "Seminar — I struggled with this; press-release tone is a kill.",
+        ArenaId.REDDIT: "Village room — story of pain, receipts, no cold ad.",
+        ArenaId.NEWSLETTER: "Letter — named editor, cadence, owned list.",
+        ArenaId.DISCORD: "Tavern — energy, not canon.",
+        ArenaId.BLUESKY: "Newer cafe — artifact, not vibe.",
+        ArenaId.MASTODON: "Parish — slow, no PR tone.",
+    }[score.arena]
+    wave = "\n".join(f"- {item}" for item in play.wave)
+    body = (
+        f"{opener}\n\n"
+        f"Costume: {play.costume}. One arena: {play.arena.value}. One angle: {score.angle}.\n\n"
+        f"{facts}\n"
+        f"{proof}\n\n"
+        f"Wave checklist:\n{wave}\n"
+    ).strip()
+    return Draft(
+        project_id=brief.project_id,
+        brief_id=brief.brief_id,
+        draft_id=f"draft-{brief.brief_id}",
+        arena=score.arena,
+        costume=play.costume,
+        angle=score.angle,
+        body=body,
+        wave_checklist=play.wave,
+        canon_url=play.canon_url,
+        created_at=clock,
+    ).with_hash()
+
+
+def apply_brief(brief: Brief, *, now: str | None = None) -> OperatorDecision:
+    score = score_brief(brief)
+    draft = compose_draft(brief, score, now=now)
+    return OperatorDecision(brief=brief, score=score, draft=draft)
+
+
+def decision_to_dict(decision: OperatorDecision) -> dict[str, Any]:
+    score = decision.score
+    draft = decision.draft
+    out: dict[str, Any] = {
+        "brief_id": decision.brief.brief_id,
+        "project_id": decision.brief.project_id,
+        "verdict": score.verdict.value,
+        "reason": score.reason,
+        "arena": None if score.arena is None else score.arena.value,
+        "angle": score.angle,
+        "canon_url": score.canon_url,
+        "published": False,
+        "draft_id": None if draft is None else draft.draft_id,
+    }
+    if draft is not None:
+        out["costume"] = draft.costume
+        out["content_hash"] = draft.content_hash
+        out["wave_checklist"] = list(draft.wave_checklist)
+    else:
+        out["wave_checklist"] = list(score.wave_checklist)
+    return out
+
+
+def _reject_secret_keys(data: Mapping[str, Any], *, path: str = "") -> None:
+    for key, value in data.items():
+        lowered = str(key).lower().replace("-", "_")
+        here = f"{path}.{key}" if path else str(key)
+        if lowered in _SECRET_KEYS:
+            raise HomError(f"brief must not contain secret field: {here}")
+        if isinstance(value, Mapping):
+            _reject_secret_keys(value, path=here)
+        elif isinstance(value, list):
+            for idx, item in enumerate(value):
+                if isinstance(item, Mapping):
+                    _reject_secret_keys(item, path=f"{here}[{idx}]")
+
+
+def fact_from_mapping(raw: Mapping[str, Any] | str) -> Fact:
+    if isinstance(raw, str):
+        return Fact(text=raw)
+    text = str(raw.get("text") or "").strip()
+    kind = str(raw.get("kind") or "signal")
+    artifact = raw.get("artifact_url")
+    artifact_url = None if artifact in (None, "") else str(artifact)
+    return Fact(text=text, kind=kind, artifact_url=artifact_url)
+
+
+def brief_from_mapping(data: Mapping[str, Any], *, project_id: str | None = None) -> Brief:
+    if not isinstance(data, Mapping):
+        raise HomError("brief JSON must be an object")
+    _reject_secret_keys(data)
+    pid = str(data.get("project_id") or project_id or "")
+    if not pid:
+        raise HomError("project_id is required")
+    facts_raw = data.get("facts") or []
+    if not isinstance(facts_raw, list):
+        raise HomError("facts must be a list")
+    facts = tuple(fact_from_mapping(item) for item in facts_raw)
+    return Brief.create(
+        project_id=pid,
+        brief_id=str(data.get("brief_id") or ""),
+        facts=facts,
+        story_kind=str(data.get("story_kind") or ""),
+        claims_ship=bool(data.get("claims_ship", False)),
+        tryable=bool(data.get("tryable", False)),
+        preferred_arena=data.get("preferred_arena") or data.get("arena"),
+        source=str(data.get("source") or "json"),
+        created_at=data.get("created_at"),
+    )
+
+
+def brief_to_mapping(brief: Brief) -> dict[str, Any]:
+    return {
+        "project_id": brief.project_id,
+        "brief_id": brief.brief_id,
+        "facts": [
+            {"kind": f.kind, "text": f.text, "artifact_url": f.artifact_url}
+            for f in brief.facts
+        ],
+        "story_kind": brief.story_kind.value,
+        "claims_ship": brief.claims_ship,
+        "tryable": brief.tryable,
+        "preferred_arena": None if brief.preferred_arena is None else brief.preferred_arena.value,
+        "source": brief.source,
+        "status": brief.status,
+        "created_at": brief.created_at,
+    }
+
+
+def parse_facts_json(blob: str) -> tuple[Fact, ...]:
+    data = json.loads(blob)
+    if not isinstance(data, list):
+        raise HomError("facts_json must be a list")
+    return tuple(fact_from_mapping(item) for item in data)
+
+
+# Every listed arena has a costume and a non-empty wave so tests can lock the copy.
+assert all(play.costume and play.wave for play in ARENAS.values())
+
+__all__ = [
+    "Brief",
+    "Draft",
+    "Fact",
+    "HomError",
+    "OperatorDecision",
+    "Score",
+    "apply_brief",
+    "brief_artifacts",
+    "brief_from_mapping",
+    "brief_to_mapping",
+    "compose_draft",
+    "decision_to_dict",
+    "fact_from_mapping",
+    "is_ship_artifact",
+    "parse_facts_json",
+    "score_brief",
+]

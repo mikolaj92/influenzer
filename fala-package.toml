@@ -1,0 +1,45 @@
+version = "2"
+id = "influenzer"
+title = "Influenzer HoM operator"
+description = "Local 24/7 Head of Marketing: brief in, score, one-arena draft or kill. Dry-run default. Not a Fala host — the Mojo correlator in mikolaj92/Fala conducts this package."
+tags = ["influenzer", "hom", "local"]
+
+[[impulse_types]]
+id = "hom.brief"
+title = "HoM brief"
+media_types = ["application/json"]
+value_schema = { type = "object", properties = { project_id = { type = "string" }, brief_id = { type = "string" }, story_kind = { type = "string" }, facts = { type = "array" } }, required = ["project_id", "brief_id"] }
+
+[[association_kinds]]
+id = "hom.score"
+title = "HoM score"
+
+[[reaction_kinds]]
+id = "hom.decision"
+title = "Kill, changelog-only, or one-angle draft"
+media_types = ["application/json"]
+
+[[capabilities]]
+id = "tick_all"
+title = "Single scheduled mutator: score pending briefs; never auto-publish"
+accepts_impulse_types = ["hom.brief"]
+emits_reaction_kinds = ["hom.decision"]
+emits_association_kinds = ["hom.score"]
+
+[[correlation_paths]]
+id = "operator_tick"
+title = "Brief → score → draft or kill"
+
+[[correlation_paths.effectors]]
+id = "tick"
+capability = "tick_all"
+adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.tick_all"] }
+
+# Fala-owned journal. Domain state stays in state.db. Effectors never open this file.
+[runtime.backend]
+kind = "sqlite"
+path = "runtime.db"
+
+[runtime.reaction_store]
+kind = "filesystem"
+root = "artifacts/fala-reactions"

@@ -8,6 +8,7 @@ import sys
 import re
 import webbrowser
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode, urlparse
 
 from influenzer import __version__
@@ -30,6 +31,8 @@ from influenzer.domain import (
     content_hash,
     utc_now,
 )
+from influenzer.hom import Brief, Fact, HomError, brief_from_mapping
+from influenzer.playbook import ArenaId, StoryKind
 from influenzer.storage import CrossProjectError, StateRepository, StorageError
 
 
@@ -132,6 +135,25 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     confirm.add_argument("--project-id", required=True)
     confirm.add_argument("--plan-id", required=True)
     confirm.add_argument("--url", required=True)
+
+    brief = sub.add_parser("brief", help="ingest HoM briefs (many facts; tick scores them)")
+    brief_sub = brief.add_subparsers(dest="brief_command")
+    ingest = brief_sub.add_parser("ingest", help="store a pending brief; tick-all scores it")
+    ingest.add_argument("--project-id", required=True)
+    ingest.add_argument("--brief-id")
+    ingest.add_argument("--story-kind", choices=[k.value for k in StoryKind])
+    ingest.add_argument("--fact", action="append", default=[], help="repeatable fact text")
+    ingest.add_argument("--claim-ship", action="store_true", help="this brief claims a ship")
+    ingest.add_argument("--tryable", action="store_true", help="stranger can click and run it")
+    ingest.add_argument("--arena", choices=[a.value for a in ArenaId], help="optional primary arena")
+    ingest.add_argument(
+        "--artifact-url",
+        help="PR, release, or issue URL required when --claim-ship",
+    )
+    ingest.add_argument("--from-json", help="path to a brief JSON object (no secrets)")
+    show_brief = brief_sub.add_parser("show", help="show a brief, score, and draft if any")
+    show_brief.add_argument("--project-id", required=True)
+    show_brief.add_argument("--brief-id", required=True)
 
 
 def _repo(args: argparse.Namespace) -> StateRepository:
@@ -511,8 +533,95 @@ def handle_cli(args: argparse.Namespace) -> int:
             print(json.dumps({"status": "ok", "plan_id": plan.plan_id, "plan_status": updated.status.value, "provider_id": match.group(1), "provider_url": args.url}, sort_keys=True))
             return 0
 
+    if args.command == "brief" and args.brief_command == "ingest":
+        try:
+            if args.from_json:
+                payload = json.loads(Path(args.from_json).read_text(encoding="utf-8"))
+                if not isinstance(payload, dict):
+                    return _fail("brief JSON must be an object")
+                if args.brief_id:
+                    payload.setdefault("brief_id", args.brief_id)
+                payload.setdefault("project_id", args.project_id)
+                brief = brief_from_mapping(payload, project_id=args.project_id)
+            else:
+                if not args.brief_id:
+                    return _fail("brief-id is required unless --from-json supplies it")
+                if not args.story_kind:
+                    return _fail("story-kind is required unless --from-json supplies it")
+                facts: list[Fact] = [Fact(text=text) for text in (args.fact or [])]
+                if args.artifact_url:
+                    facts.insert(0, Fact(kind="artifact", text="ship artifact", artifact_url=args.artifact_url))
+                brief = Brief.create(
+                    project_id=args.project_id,
+                    brief_id=args.brief_id,
+                    facts=tuple(facts),
+                    story_kind=args.story_kind,
+                    claims_ship=bool(args.claim_ship),
+                    tryable=bool(args.tryable),
+                    preferred_arena=args.arena,
+                    source="cli",
+                )
+        except (HomError, DomainError, ValueError, json.JSONDecodeError) as exc:
+            return _fail(str(exc))
+        with _repo(args) as repo:
+            if repo.get_project(brief.project_id) is None:
+                return _fail("project not found")
+            try:
+                repo.save_brief(brief)
+            except StorageError as exc:
+                return _fail(str(exc))
+        print(
+            json.dumps(
+                {
+                    "status": "ok",
+                    "project_id": brief.project_id,
+                    "brief_id": brief.brief_id,
+                    "story_kind": brief.story_kind.value,
+                    "fact_count": len(brief.facts),
+                    "pending": True,
+                    "published": False,
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
+
+    if args.command == "brief" and args.brief_command == "show":
+        with _repo(args) as repo:
+            stored = repo.get_brief(args.project_id, args.brief_id)
+            if stored is None:
+                return _fail("brief not found")
+            score = repo.get_operator_score(args.project_id, args.brief_id)
+            draft = repo.get_operator_draft(args.project_id, args.brief_id)
+        payload: dict[str, Any] = {
+            "status": "ok",
+            "project_id": stored.project_id,
+            "brief_id": stored.brief_id,
+            "story_kind": stored.story_kind.value,
+            "claims_ship": stored.claims_ship,
+            "tryable": stored.tryable,
+            "preferred_arena": None if stored.preferred_arena is None else stored.preferred_arena.value,
+            "brief_status": stored.status,
+            "fact_count": len(stored.facts),
+            "published": False,
+        }
+        if score is not None:
+            payload["verdict"] = score.verdict.value
+            payload["reason"] = score.reason
+            payload["arena"] = None if score.arena is None else score.arena.value
+            payload["angle"] = score.angle
+            payload["canon_url"] = score.canon_url
+        if draft is not None:
+            payload["draft_id"] = draft.draft_id
+            payload["costume"] = draft.costume
+            payload["body"] = draft.body
+            payload["wave_checklist"] = list(draft.wave_checklist)
+            payload["content_hash"] = draft.content_hash
+        print(json.dumps(payload, sort_keys=True))
+        return 0
+
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief}",
         file=sys.stderr,
     )
     return 2
