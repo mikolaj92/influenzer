@@ -74,6 +74,7 @@ Each dry-run create returns planned envelope fields for capabilities, official A
 - `influenzer-content`
 - `influenzer-campaign`
 - `influenzer-publish`
+- `influenzer-hom` — first-person HoM notes (angles, arenas, acquisition/retention); canon: https://github.com/mikolaj92/influenzer-playbook
 
 ## Tests
 
