@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class MigrationError(RuntimeError):
@@ -130,6 +130,10 @@ CREATE TABLE IF NOT EXISTS operator_drafts (
 );
 """
 
+_V3_SCHEMA = """
+ALTER TABLE operator_drafts ADD COLUMN gate_verdict TEXT;
+"""
+
 
 def current_version(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
@@ -144,11 +148,18 @@ def migrate(conn: sqlite3.Connection) -> int:
     if version == 0:
         conn.executescript(_SCHEMA)
         conn.executescript(_V2_SCHEMA)
+        conn.executescript(_V3_SCHEMA)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
         return SCHEMA_VERSION
     if version == 1:
         conn.executescript(_V2_SCHEMA)
+        conn.executescript(_V3_SCHEMA)
+        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
+        conn.commit()
+        return SCHEMA_VERSION
+    if version == 2:
+        conn.executescript(_V3_SCHEMA)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
     return SCHEMA_VERSION

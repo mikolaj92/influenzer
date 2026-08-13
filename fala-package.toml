@@ -172,6 +172,33 @@ id = "outbox"
 capability = "hom_outbox"
 adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_outbox"] }
 
+[[impulse_types]]
+id = "hom.verdict"
+title = "Hold or pass the current wearable angle"
+media_types = ["application/json"]
+value_schema = { type = "object", properties = { verdict = { type = "string" }, project_id = { type = "string" }, draft_id = { type = "string" } }, required = ["verdict"] }
+
+[[reaction_kinds]]
+id = "hom.verdict"
+title = "Gate decision on the current angle, or silence"
+media_types = ["application/json"]
+
+[[capabilities]]
+id = "hom_verdict"
+title = "Hold or pass the current wearable draft; hold releases the one-story lock; does not publish, score, dress, scan, or enable live"
+accepts_impulse_types = ["hom.verdict"]
+emits_reaction_kinds = ["hom.verdict"]
+
+[[correlation_paths]]
+id = "hom_verdict"
+title = "Current angle → hold or pass"
+description = "Does not survey GitHub, call gh, score, dress, scan, publish, enable live, send mail, know Heimdall, or open runtime.db. Hold archives the draft so scan-due may run again. Pass records fit and does not post. Host compose is influenzer verdict."
+
+[[correlation_paths.effectors]]
+id = "verdict"
+capability = "hom_verdict"
+adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_verdict"] }
+
 # Always-on interval loop is `influenzer-tick` on a Mac mini (not a laptop LaunchAgent).
 # Fala conducts tick, always-run github_scan, and coarse github_scan_due (not on the 5-minute tick).
 # `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` is the weekly-ish path.
