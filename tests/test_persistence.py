@@ -36,8 +36,28 @@ class PersistenceTests(unittest.TestCase):
                 repo.save_project(self.project("p", "project"))
             with StateRepository(path) as repo:
                 self.assertIsNotNone(repo.get_project("p"))
-                self.assertEqual(repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0], "1")
+                self.assertEqual(repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0], "2")
                 self.assertEqual(len(repo.events("p")), 1)
+
+    def test_v1_database_gains_brief_tables(self):
+        from influenzer.migrations import SCHEMA_VERSION, _SCHEMA
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            conn = sqlite3.connect(path)
+            conn.execute("CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            conn.executescript(_SCHEMA)
+            conn.execute("INSERT INTO schema_meta VALUES ('schema_version', '1')")
+            conn.commit()
+            conn.close()
+            with StateRepository(path) as repo:
+                self.assertEqual(
+                    repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0],
+                    str(SCHEMA_VERSION),
+                )
+                repo.conn.execute("SELECT * FROM briefs")
+                repo.conn.execute("SELECT * FROM operator_scores")
+                repo.conn.execute("SELECT * FROM operator_drafts")
 
     def test_future_schema_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -2,7 +2,11 @@
 
 Local multi-project social operator for organic posting and campaign planning.
 
-Influenzer runs on your machine. Every app has its own Project + BrandProfile. The builder is also a first-class Project (`kind=builder`) with a separate profile and accounts. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
+Influenzer runs on your machine as a **local 24/7 Head of Marketing operator**. Every app has its own Project + BrandProfile. The builder is also a first-class Project (`kind=builder`) with a separate profile and accounts.
+
+On each `influenzer-tick-all`, pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Not every commit/event becomes a post. Drafts are local; they are not auto-published. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
+
+Playbook canon (first person): https://github.com/mikolaj92/influenzer-playbook — encoded as rules/data in `influenzer/playbook.py`.
 
 ## Install
 
@@ -27,10 +31,19 @@ python -m influenzer.cli --config /tmp/influenzer/config.json project create \
 python -m influenzer.cli --config /tmp/influenzer/config.json content add \
   --project-id app-1 --content-id c1 --revision-id r1 \
   --body "Shipped dry-run adapters" --status ready
+python -m influenzer.cli --config /tmp/influenzer/config.json brief ingest \
+  --project-id app-1 --brief-id b-patch --story-kind patch \
+  --fact "typo in README"
+python -m influenzer.cli --config /tmp/influenzer/config.json brief ingest \
+  --project-id app-1 --brief-id b-ship --story-kind major --claim-ship --tryable \
+  --artifact-url https://github.com/mikolaj92/influenzer/pull/1 \
+  --fact "Local tick scores briefs and emits a draft" --arena hn
 python -m influenzer.tick_all --config /tmp/influenzer/config.json
+python -m influenzer.cli --config /tmp/influenzer/config.json brief show \
+  --project-id app-1 --brief-id b-ship
 ```
 
-`influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
+`tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It still does not auto-publish. `influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
 
 ## Configure
 
@@ -52,6 +65,13 @@ Override with `--config PATH` or `HERMES_INFLUENZER_CONFIG`.
 
 Secrets never go in config. Platform accounts store `credential_ref` only (`env:NAME` or `keychain:SERVICE/ACCOUNT`).
 
+## Stack
+
+- **SQLite** `state.db` is the host-owned domain (projects, briefs, drafts). `runtime.db` is reserved for the Fala journal; effectors do not open it.
+- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for the `operator_tick` path (subprocess `influenzer-tick-all`). The engine stays Mojo; Influenzer does not embed a second host.
+- **uv** is the Python env/tooling. Mojo is not used here — the HoM copy is rules/data in Python.
+- Local only. No hosted service, no Ads spend, no live social in this path.
+
 ## Commands
 
 | Command | Purpose |
@@ -59,8 +79,9 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer init` | Create workspace home, config, state.db |
 | `influenzer project create/show` | App or builder projects with BrandProfile |
 | `influenzer content add` | Immutable project-scoped content revision |
+| `influenzer brief ingest/show` | HoM brief in; tick scores to draft or kill |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
-| `influenzer-tick-all` | Single scheduled mutator (dry-run default) |
+| `influenzer-tick-all` | Score pending briefs; due-plan mutator (dry-run default) |
 
 ## Platforms (v1 dry-run/contract)
 
@@ -74,7 +95,7 @@ Each dry-run create returns planned envelope fields for capabilities, official A
 - `influenzer-content`
 - `influenzer-campaign`
 - `influenzer-publish`
-- `influenzer-hom` — HoM notes; canon: https://github.com/mikolaj92/influenzer-playbook
+- `influenzer-hom` — HoM operator: brief → score → one arena draft or kill. Canon: https://github.com/mikolaj92/influenzer-playbook
 - `influenzer-x` / `influenzer-linkedin` / `influenzer-youtube` / `influenzer-shorts`
 - `influenzer-github` / `influenzer-hn` / `influenzer-reddit`
 - `influenzer-newsletter` / `influenzer-discord` / `influenzer-bluesky`
@@ -82,9 +103,11 @@ Each dry-run create returns planned envelope fields for capabilities, official A
 ## Tests
 
 ```bash
-python -m unittest discover -s tests
-python tools/hygiene_check.py .
+uv run python -m unittest discover -s tests
+uv run python tools/hygiene_check.py .
 ```
+
+`python3 -m unittest discover -s tests` also works.
 
 ## Safety
 

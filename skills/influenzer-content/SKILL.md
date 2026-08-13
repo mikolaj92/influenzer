@@ -7,6 +7,7 @@ Create project-scoped immutable content revisions.
 - Revisions are immutable; edit by creating a new revision_id.
 - Use the single modern path: `create_revision` / `influenzer content add`. Status is an explicit `ContentStatus` (`draft`, `in_review`, `ready`, `archived`) — never inferred from an import shim.
 - Creating a revision does not claim remote publish success; publish confirmation comes only from the publish/reconcile path.
+- Operator ticks may write a draft revision with `source=operator` after scoring a brief. That is still a draft, not a publish.
 
 ## Example
 ```bash

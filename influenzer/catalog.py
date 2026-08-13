@@ -14,12 +14,15 @@ class EffectorEntry:
     description: str
 
 
-# This list is intentionally tiny until real domain handlers are added.  A
-# manifest may only select a handler named here; dotted imports are never
-# accepted directly from untrusted input.
+# Allowlisted process-local handlers. Fala packages may only name entries here.
 EFFECTORS: tuple[EffectorEntry, ...] = (
     EffectorEntry("noop", "influenzer.effector.noop", "Do nothing."),
     EffectorEntry("echo", "influenzer.effector.echo", "Return the request payload."),
+    EffectorEntry(
+        "score_brief",
+        "influenzer.effector.score_brief",
+        "Score a HoM brief into kill, changelog-only, or one-arena draft. Never publishes.",
+    ),
 )
 
 _BY_NAME = {entry.name: entry for entry in EFFECTORS}

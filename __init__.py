@@ -10,6 +10,7 @@ SKILLS = (
     ("content", "Create project-scoped social content."),
     ("campaign", "Plan organic and paid campaigns without spend."),
     ("publish", "Inspect policy-gated publish plans."),
+    ("hom", "Head of Marketing: score briefs, choose one arena, draft or kill."),
 )
 
 

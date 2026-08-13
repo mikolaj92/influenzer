@@ -16,7 +16,9 @@ from .domain import (
     PublicationAttempt, AccountStatus, PlanStatus, AttemptStatus,
 )
 from .domain import content_hash
+from .hom import Brief, Draft, Score, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
+from .playbook import ArenaId, StoryKind, Verdict
 
 
 class StorageError(RuntimeError):
@@ -487,6 +489,186 @@ class StateRepository:
             if c.execute("SELECT changes()").fetchone()[0] != 1:
                 raise StorageError("attempt status CAS update raced")
             self._event(attempt.project_id, event_type, attempt, conn=c)
+
+    def save_brief(self, brief: Brief, *, event_type: str = "brief.ingested") -> None:
+        with self.transaction() as c:
+            self._require_project(c, brief.project_id)
+            c.execute(
+                "INSERT INTO briefs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    brief.project_id,
+                    brief.brief_id,
+                    _json(brief_to_mapping(brief)["facts"]),
+                    brief.story_kind.value,
+                    int(brief.claims_ship),
+                    int(brief.tryable),
+                    None if brief.preferred_arena is None else brief.preferred_arena.value,
+                    brief.source,
+                    brief.status,
+                    brief.created_at,
+                ),
+            )
+            self._event(brief.project_id, event_type, brief_to_mapping(brief), conn=c)
+
+    def get_brief(self, project_id: str, brief_id: str) -> Brief | None:
+        row = self.conn.execute(
+            "SELECT * FROM briefs WHERE project_id=? AND brief_id=?",
+            (project_id, brief_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._brief_from_row(row)
+
+    def list_pending_briefs(self) -> list[Brief]:
+        rows = self.conn.execute(
+            "SELECT * FROM briefs WHERE status='pending' ORDER BY created_at, brief_id"
+        )
+        return [self._brief_from_row(row) for row in rows]
+
+    def get_operator_score(self, project_id: str, brief_id: str) -> Score | None:
+        row = self.conn.execute(
+            "SELECT * FROM operator_scores WHERE project_id=? AND brief_id=?",
+            (project_id, brief_id),
+        ).fetchone()
+        if row is None:
+            return None
+        arena = None if not row["arena"] else ArenaId(row["arena"])
+        return Score(
+            brief_id=row["brief_id"],
+            verdict=Verdict(row["verdict"]),
+            reason=row["reason"],
+            arena=arena,
+            angle=row["angle"],
+            wave_checklist=tuple(json.loads(row["wave_checklist_json"] or "[]")),
+            canon_url=row["canon_url"],
+            score_hash=row["score_hash"],
+        )
+
+    def get_operator_draft(self, project_id: str, brief_id: str) -> Draft | None:
+        row = self.conn.execute(
+            "SELECT * FROM operator_drafts WHERE project_id=? AND brief_id=?",
+            (project_id, brief_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return Draft(
+            project_id=row["project_id"],
+            brief_id=row["brief_id"],
+            draft_id=row["draft_id"],
+            arena=ArenaId(row["arena"]),
+            costume=row["costume"],
+            angle=row["angle"],
+            body=row["body"],
+            wave_checklist=tuple(json.loads(row["wave_checklist_json"] or "[]")),
+            canon_url=row["canon_url"],
+            created_at=row["created_at"],
+            content_hash=row["content_hash"],
+        )
+
+    def persist_operator_decision(
+        self,
+        brief: Brief,
+        score: Score,
+        draft: Draft | None,
+        *,
+        revision: ContentRevision | None = None,
+        now: str,
+    ) -> None:
+        """Atomically record score, optional draft/revision, and mark the brief processed."""
+        with self.transaction() as c:
+            self._require_project(c, brief.project_id)
+            row = c.execute(
+                "SELECT status FROM briefs WHERE project_id=? AND brief_id=?",
+                (brief.project_id, brief.brief_id),
+            ).fetchone()
+            if row is None:
+                raise StorageError(f"unknown brief: {brief.brief_id}")
+            if row["status"] != "pending":
+                raise StorageError(f"brief already processed: {brief.brief_id}")
+            c.execute(
+                "INSERT INTO operator_scores VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    brief.project_id,
+                    brief.brief_id,
+                    score.verdict.value,
+                    score.reason,
+                    None if score.arena is None else score.arena.value,
+                    score.angle,
+                    _json(score.wave_checklist),
+                    score.canon_url,
+                    score.score_hash,
+                    now,
+                ),
+            )
+            if draft is not None:
+                c.execute(
+                    "INSERT INTO operator_drafts VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        draft.project_id,
+                        draft.brief_id,
+                        draft.draft_id,
+                        draft.arena.value,
+                        draft.costume,
+                        draft.angle,
+                        draft.body,
+                        _json(draft.wave_checklist),
+                        draft.canon_url,
+                        draft.content_hash,
+                        draft.created_at,
+                    ),
+                )
+            if revision is not None:
+                if revision.project_id != brief.project_id:
+                    raise CrossProjectError("operator draft revision belongs to another project")
+                c.execute(
+                    "INSERT INTO content_revisions VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        revision.project_id,
+                        revision.content_id,
+                        revision.revision_id,
+                        revision.body,
+                        revision.kind,
+                        _enum(revision.status),
+                        revision.source,
+                        revision.source_digest,
+                        revision.created_at,
+                        revision.content_hash,
+                    ),
+                )
+                self._event(revision.project_id, "content_revision.created", revision, conn=c)
+            c.execute(
+                "UPDATE briefs SET status='processed' WHERE project_id=? AND brief_id=? AND status='pending'",
+                (brief.project_id, brief.brief_id),
+            )
+            if c.execute("SELECT changes()").fetchone()[0] != 1:
+                raise StorageError("brief process CAS raced")
+            self._event(
+                brief.project_id,
+                "brief.scored",
+                {
+                    "brief_id": brief.brief_id,
+                    "verdict": score.verdict.value,
+                    "reason": score.reason,
+                    "arena": None if score.arena is None else score.arena.value,
+                    "published": False,
+                },
+                conn=c,
+            )
+
+    def _brief_from_row(self, row: sqlite3.Row) -> Brief:
+        arena = row["preferred_arena"]
+        return Brief.create(
+            project_id=row["project_id"],
+            brief_id=row["brief_id"],
+            facts=parse_facts_json(row["facts_json"]),
+            story_kind=StoryKind(row["story_kind"]),
+            claims_ship=bool(row["claims_ship"]),
+            tryable=bool(row["tryable"]),
+            preferred_arena=None if not arena else arena,
+            source=row["source"],
+            status=row["status"],
+            created_at=row["created_at"],
+        )
 
     def _require_project(self, c: sqlite3.Connection, project_id: str) -> None:
         if c.execute("SELECT 1 FROM projects WHERE project_id=?", (project_id,)).fetchone() is None:

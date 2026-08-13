@@ -44,4 +44,23 @@ One primary arena + owned mail sink. Package before produce. Measure platform me
 
 Story types I consider: major, hard issue, exploration, decision, failure. Patches often stay changelog-only.
 
+## Local operator (deterministic copy)
+
+On each `influenzer-tick-all`, pending briefs are scored by `influenzer/playbook.py` + `influenzer/hom.py` — rules/data, not freeform vibe:
+
+- **kill** / **changelog-only** / **one angle**. Silence is a correct decision.
+- **One primary arena.** Costume of that arena only; play the wave (checklist), not a champion fantasy.
+- A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill.
+- Output is a **draft** (content status `draft`, source `operator`). Live publish stays behind the existing dry-run / grant / `scheduler.live_enabled` gates. Tick-all never auto-spams.
+
+Ingest a brief (many facts), then tick:
+
+```bash
+influenzer brief ingest --project-id app-1 --brief-id b1 --story-kind major \
+  --claim-ship --tryable --artifact-url https://github.com/OWNER/REPO/pull/1 \
+  --fact "what shipped" --fact "why a stranger should try it"
+influenzer-tick-all
+influenzer brief show --project-id app-1 --brief-id b1
+```
+
 Canon (longer, first person): https://github.com/mikolaj92/influenzer-playbook

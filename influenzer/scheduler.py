@@ -8,8 +8,10 @@ from typing import Any, Callable, Sequence
 from influenzer.adapters.base import AdapterRequest, AdapterResult, run_adapter
 from influenzer.adapters.registry import get_adapter
 from influenzer.config import Config
+from influenzer.content import create_revision
 from influenzer.domain import (
     AttemptStatus,
+    ContentStatus,
     PlanStatus,
     PlatformAccount,
     PolicyActivationGrant,
@@ -21,6 +23,8 @@ from influenzer.domain import (
     utc_now,
 )
 from influenzer.envelope import noop, planned, result
+from influenzer.hom import apply_brief, decision_to_dict
+from influenzer.playbook import CANON_URL
 from influenzer.policy import evaluate_policy
 from influenzer.storage import StateRepository
 
@@ -42,6 +46,39 @@ def resolve_live_intent(*, scheduler: bool, cli_live: bool, config: Config) -> b
     return bool(cli_live)
 
 
+def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
+    """Ingested briefs → score → draft or explicit kill. Never publishes."""
+    outcomes: list[dict[str, Any]] = []
+    for brief in repo.list_pending_briefs():
+        decision = apply_brief(brief, now=now)
+        revision = None
+        if decision.draft is not None:
+            revision = create_revision(
+                project_id=brief.project_id,
+                content_id=f"brief-{brief.brief_id}",
+                revision_id=decision.draft.draft_id,
+                body=decision.draft.body,
+                kind="post",
+                source="operator",
+                status=ContentStatus.DRAFT,
+                created_at=now,
+            )
+        repo.persist_operator_decision(
+            brief,
+            decision.score,
+            decision.draft,
+            revision=revision,
+            now=now,
+        )
+        outcomes.append(decision_to_dict(decision))
+    return {
+        "processed": len(outcomes),
+        "outcomes": outcomes,
+        "published": False,
+        "canon_url": CANON_URL,
+    }
+
+
 def tick(
     repo: StateRepository,
     config: Config,
@@ -52,16 +89,20 @@ def tick(
     now: str | None = None,
     handlers: dict[str, Handler] | None = None,
 ) -> dict[str, Any]:
-    """Process due plans. Live mutation requires durable scheduler.live_enabled + grant."""
+    """Process pending briefs, then due plans. Live mutation requires durable scheduler.live_enabled + grant."""
     clock = now or utc_now()
     live = resolve_live_intent(scheduler=True, cli_live=cli_live, config=config)
+    operator = run_operator_tick(repo, now=clock)
     if not due:
-        return noop(
-            "no due work",
-            scheduler_live_enabled=config.scheduler_live_enabled,
-            cli_live_ignored=bool(cli_live),
-            processed=0,
-        )
+        extra = {
+            "scheduler_live_enabled": config.scheduler_live_enabled,
+            "cli_live_ignored": bool(cli_live),
+            "processed": 0,
+            "operator": operator,
+        }
+        if operator["processed"]:
+            return result(status="ok", ok=True, mutated=False, **extra)
+        return noop("no due work", **extra)
 
     processed = 0
     outcomes: list[dict[str, Any]] = []
@@ -182,4 +223,5 @@ def tick(
         cli_live_ignored=bool(cli_live),
         processed=processed,
         outcomes=outcomes,
+        operator=operator,
     )

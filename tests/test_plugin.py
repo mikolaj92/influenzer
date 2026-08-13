@@ -61,6 +61,7 @@ class PluginRegistrationTests(unittest.TestCase):
                 "influenzer-content",
                 "influenzer-campaign",
                 "influenzer-publish",
+                "influenzer-hom",
             ],
         )
         for _name, path, _desc in ctx.skills:

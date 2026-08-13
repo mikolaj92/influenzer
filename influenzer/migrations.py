@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class MigrationError(RuntimeError):
@@ -104,6 +104,32 @@ CREATE TABLE IF NOT EXISTS domain_events (
 CREATE INDEX IF NOT EXISTS domain_events_project_idx ON domain_events(project_id, event_id);
 """
 
+_V2_SCHEMA = """
+CREATE TABLE IF NOT EXISTS briefs (
+    project_id TEXT NOT NULL, brief_id TEXT NOT NULL, facts_json TEXT NOT NULL,
+    story_kind TEXT NOT NULL, claims_ship INTEGER NOT NULL, tryable INTEGER NOT NULL,
+    preferred_arena TEXT, source TEXT NOT NULL, status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, brief_id),
+    FOREIGN KEY(project_id) REFERENCES projects(project_id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS operator_scores (
+    project_id TEXT NOT NULL, brief_id TEXT NOT NULL, verdict TEXT NOT NULL,
+    reason TEXT NOT NULL, arena TEXT, angle TEXT, wave_checklist_json TEXT NOT NULL,
+    canon_url TEXT NOT NULL, score_hash TEXT NOT NULL, created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, brief_id),
+    FOREIGN KEY(project_id, brief_id) REFERENCES briefs(project_id, brief_id)
+);
+CREATE TABLE IF NOT EXISTS operator_drafts (
+    project_id TEXT NOT NULL, brief_id TEXT NOT NULL, draft_id TEXT NOT NULL,
+    arena TEXT NOT NULL, costume TEXT NOT NULL, angle TEXT NOT NULL, body TEXT NOT NULL,
+    wave_checklist_json TEXT NOT NULL, canon_url TEXT NOT NULL, content_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, draft_id), UNIQUE(project_id, brief_id),
+    FOREIGN KEY(project_id, brief_id) REFERENCES briefs(project_id, brief_id)
+);
+"""
+
 
 def current_version(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
@@ -117,6 +143,12 @@ def migrate(conn: sqlite3.Connection) -> int:
         raise MigrationError(f"state database schema {version} is newer than supported {SCHEMA_VERSION}")
     if version == 0:
         conn.executescript(_SCHEMA)
+        conn.executescript(_V2_SCHEMA)
+        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
+        conn.commit()
+        return SCHEMA_VERSION
+    if version == 1:
+        conn.executescript(_V2_SCHEMA)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
     return SCHEMA_VERSION
