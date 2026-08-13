@@ -188,6 +188,12 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     show_brief.add_argument("--project-id", required=True)
     show_brief.add_argument("--brief-id", required=True)
 
+    angle = sub.add_parser(
+        "angle",
+        help="emit at most one wearable draft from state.db, or silence",
+    )
+    angle.add_argument("--project-id", help="limit to one project")
+
 
 def _repo(args: argparse.Namespace) -> StateRepository:
     cfg = load_config(args.config)
@@ -684,8 +690,16 @@ def handle_cli(args: argparse.Namespace) -> int:
         print(json.dumps(payload, sort_keys=True))
         return 0
 
+    if args.command == "angle":
+        from influenzer.hom_outbox import emit_angle
+
+        with _repo(args) as repo:
+            out = emit_angle(repo, project_id=getattr(args, "project_id", None))
+        print(json.dumps(out, sort_keys=True))
+        return 0
+
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle}",
         file=sys.stderr,
     )
     return 2

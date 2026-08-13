@@ -123,6 +123,33 @@ id = "draft"
 capability = "hom_draft"
 adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_draft"] }
 
+[[impulse_types]]
+id = "hom.angle"
+title = "Ask for the current wearable angle"
+media_types = ["application/json"]
+value_schema = { type = "object", properties = { project_id = { type = "string" } } }
+
+[[reaction_kinds]]
+id = "hom.angle"
+title = "One wearable draft packet or silence"
+media_types = ["application/json"]
+
+[[capabilities]]
+id = "hom_outbox"
+title = "Emit at most one wearable draft from state.db, or silence; does not score, dress, publish, write, or enable live"
+accepts_impulse_types = ["hom.angle"]
+emits_reaction_kinds = ["hom.angle"]
+
+[[correlation_paths]]
+id = "hom_outbox"
+title = "state.db → one angle or silence"
+description = "Does not survey GitHub, call gh, score, dress, publish, enable live, send mail, or open runtime.db. Read-only on operator_drafts. Newest wearable by created_at, then draft_id. Host compose is influenzer angle."
+
+[[correlation_paths.effectors]]
+id = "outbox"
+capability = "hom_outbox"
+adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_outbox"] }
+
 # Always-on interval loop is `influenzer-tick` on a Mac mini (not a laptop LaunchAgent).
 # Fala conducts tick and the github_scan path. `influenzer brief scan` is host compose.
 
