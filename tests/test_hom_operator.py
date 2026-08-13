@@ -229,6 +229,31 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.score.reason, "decision_not_user_facing")
         self.assertIsNone(decision.draft)
 
+    def test_merged_pr_stack_is_changelog_not_show_hn(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(
+                    text="Merged PR #190: Treat GitHub repo root as a ship artifact",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/190",
+                ),
+                Fact(
+                    text="Merged PR #187: feat: prior operator look",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/187",
+                ),
+                Fact(
+                    text="Merged PR #22: feat(hom): local tick scores briefs",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/22",
+                ),
+                Fact(text="README has an install/quickstart a stranger can run"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "merge_log_changelog")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
     def test_commit_noise_is_changelog_only(self) -> None:
         brief = self._brief(
             claims_ship=False,

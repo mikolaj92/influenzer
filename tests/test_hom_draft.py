@@ -150,6 +150,45 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertIsNone(compose_draft(patch_brief, patch_score))
         self.assertIsNone(dress_brief(patch_brief, patch_score))
 
+    def test_hn_refuses_merged_pr_title_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            facts=(
+                Fact(
+                    text="Merged PR #190: Treat GitHub repo root as a ship artifact",
+                    artifact_url=SHIP_PR,
+                ),
+                Fact(text="Merged PR #187: feat: prior operator look"),
+                Fact(text="Merged PR #22: feat(hom): local tick scores briefs"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "hn",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                    "canon_url": ARENAS[ArenaId.HN].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        self.assertNotIn("Show HN: Merged PR", json.dumps(payload))
+
     def test_hn_without_tryable_url_is_undressable_not_a_label_dump(self) -> None:
         brief = _ship_brief(
             facts=(Fact(text="a working demo exists on my laptop"), Fact(text="strangers can run it locally")),

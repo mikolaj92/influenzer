@@ -39,6 +39,8 @@ from influenzer.playbook import (
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
+    is_merge_log_texts,
+    looks_like_merged_pr_fact,
     looks_like_press_release,
     looks_like_waitlist,
 )
@@ -165,6 +167,10 @@ def _undressable_blob(bits: CopyBits) -> bool:
     return looks_like_waitlist(bits.blob) or looks_like_press_release(bits.blob)
 
 
+def _merge_log_bits(bits: CopyBits) -> bool:
+    return is_merge_log_texts((bits.one_liner, *bits.rest))
+
+
 def _body_or_none(body: str) -> str | None:
     text = body.strip()
     if not text:
@@ -201,6 +207,11 @@ def _show_hn_title(one_liner: str) -> str:
 
 def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     """Seminar: Show HN title + tryable URL + first-comment backstory."""
+    title_src = bits.one_liner.strip()
+    if title_src.lower().startswith("show hn:"):
+        title_src = title_src.split(":", 1)[1].strip()
+    if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
+        return None
     url = _proof_url(bits)
     if not url:
         return None

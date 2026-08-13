@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from github_pack.classify import (
+    facts_are_merge_log,
     headline_prs,
     is_ship_artifact,
     is_tryable,
@@ -106,6 +107,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     blob = "\n".join(str(fact.get("text") or "") for fact in facts)
     if looks_like_waitlist(blob):
         return _silence("waitlist_not_tryable", repo=slug)
+    if facts_are_merge_log(facts) and not survey.get("releases"):
+        return _silence("not_tryable", repo=slug)
     claims_ship = any(is_ship_artifact(str(fact.get("artifact_url") or "") or None) for fact in facts)
     if not (claims_ship and is_tryable(survey, facts)):
         return _silence("not_tryable", repo=slug)
