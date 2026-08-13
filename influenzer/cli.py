@@ -178,6 +178,12 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
         help="PR, release, or issue URL required when --claim-ship",
     )
     ingest.add_argument("--from-json", help="path to a brief JSON object (no secrets)")
+    scan = brief_sub.add_parser(
+        "scan",
+        help="survey public GitHub via gh; store 0 or 1 pending brief (never publishes)",
+    )
+    scan.add_argument("--project-id", required=True)
+    scan.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
     show_brief = brief_sub.add_parser("show", help="show a brief, score, and draft if any")
     show_brief.add_argument("--project-id", required=True)
     show_brief.add_argument("--brief-id", required=True)
@@ -627,6 +633,19 @@ def handle_cli(args: argparse.Namespace) -> int:
                 sort_keys=True,
             )
         )
+        return 0
+
+    if args.command == "brief" and args.brief_command == "scan":
+        from influenzer.github_scan import invalid_repo_reason, scan_github
+
+        bad = invalid_repo_reason(args.repo)
+        if bad:
+            return _fail(bad)
+        with _repo(args) as repo:
+            if repo.get_project(args.project_id) is None:
+                return _fail("project not found")
+            out = scan_github(repo, project_id=args.project_id, repo_slug=args.repo)
+        print(json.dumps(out, sort_keys=True))
         return 0
 
     if args.command == "brief" and args.brief_command == "show":

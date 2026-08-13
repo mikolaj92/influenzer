@@ -94,6 +94,10 @@ class PluginRegistrationTests(unittest.TestCase):
         )
         self.assertEqual(args.command, "project")
         self.assertEqual(args.project_command, "create")
+        scan = parser.parse_args(["brief", "scan", "--project-id", "app-1", "--repo", "owner/name"])
+        self.assertEqual(scan.command, "brief")
+        self.assertEqual(scan.brief_command, "scan")
+        self.assertEqual(scan.repo, "owner/name")
 
 
 if __name__ == "__main__":
