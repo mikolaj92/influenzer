@@ -10,40 +10,58 @@ Playbook canon (first person): https://github.com/mikolaj92/influenzer-playbook 
 
 ## Install
 
+Requires [uv](https://docs.astral.sh/uv/). From a checkout of this repo:
+
 ```bash
-hermes plugins install PATH_OR_GIT_SOURCE --enable
+git clone https://github.com/mikolaj92/influenzer
+cd influenzer
+uv sync
 ```
 
-Influenzer is a locally executed Hermes plugin, not a hosted service. Hermes installs it from a plugin source; runtime state, scheduling, policies, and credentials remain on the user's machine. `plugin.yaml` and `__init__.py` are the plugin entry surface.
+Then run `uv run influenzer …` (see the 3-minute demo below).
 
-After install, Hermes may show [`after-install.md`](after-install.md).
+To put the CLI on PATH without keeping a checkout:
+
+```bash
+uv tool install git+https://github.com/mikolaj92/influenzer
+```
+
+One-shot from git (same package):
+
+```bash
+uvx --from git+https://github.com/mikolaj92/influenzer influenzer --help
+```
+
+Influenzer is a local CLI, not a hosted service. Runtime state, scheduling, policies, and credentials remain on the user's machine.
+
+After install, see [`after-install.md`](after-install.md).
 
 ## 3-minute local demo
 
 ```bash
-python -m influenzer.cli --config /tmp/influenzer/config.json init --home /tmp/influenzer
-python -m influenzer.cli --config /tmp/influenzer/config.json project create \
+uv run influenzer --config /tmp/influenzer/config.json init --home /tmp/influenzer
+uv run influenzer --config /tmp/influenzer/config.json project create \
   --id app-1 --slug my-app --name "My App" --display-name "My App" \
   --voice product --audience customers --maintainer you --kind app
-python -m influenzer.cli --config /tmp/influenzer/config.json project create \
+uv run influenzer --config /tmp/influenzer/config.json project create \
   --id builder-1 --slug me --name Me --display-name Me \
   --voice builder --audience builders --maintainer you --kind builder
-python -m influenzer.cli --config /tmp/influenzer/config.json content add \
+uv run influenzer --config /tmp/influenzer/config.json content add \
   --project-id app-1 --content-id c1 --revision-id r1 \
   --body "Shipped dry-run adapters" --status ready
-python -m influenzer.cli --config /tmp/influenzer/config.json brief ingest \
+uv run influenzer --config /tmp/influenzer/config.json brief ingest \
   --project-id app-1 --brief-id b-patch --story-kind patch \
   --fact "typo in README"
-python -m influenzer.cli --config /tmp/influenzer/config.json brief ingest \
+uv run influenzer --config /tmp/influenzer/config.json brief ingest \
   --project-id app-1 --brief-id b-ship --story-kind major --claim-ship --tryable \
   --artifact-url https://github.com/mikolaj92/influenzer/pull/1 \
   --fact "Local tick scores briefs and emits a draft" --arena hn
-python -m influenzer.tick_all --config /tmp/influenzer/config.json
+uv run influenzer-tick-all --config /tmp/influenzer/config.json
 # same one-shot via the local loop CLI:
-python -m influenzer.tick --config /tmp/influenzer/config.json --once
-python -m influenzer.cli --config /tmp/influenzer/config.json brief show \
+uv run influenzer-tick --config /tmp/influenzer/config.json --once
+uv run influenzer --config /tmp/influenzer/config.json brief show \
   --project-id app-1 --brief-id b-ship
-python -m influenzer.cli --config /tmp/influenzer/config.json angle
+uv run influenzer --config /tmp/influenzer/config.json angle
 ```
 
 `brief scan --project-id ID --repo owner/name` reads public GitHub signals through a `gh` subprocess (merged PRs, releases, tags) and stores **at most one** pending brief (`source=github-scan`), or stays silent. Commit-noise, waitlists, missing `gh`/auth, an empty survey, or an already-pending story are silence — not a crash. Scan does not publish, does not enable live social, and does not score; `tick-all` still scores pending briefs.
