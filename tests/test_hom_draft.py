@@ -61,6 +61,28 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertEqual(decision.draft.costume, "seminar")
         self.assertIn("body", __import__("influenzer.hom", fromlist=["decision_to_dict"]).decision_to_dict(decision))
 
+    def test_hn_title_wears_the_human_fact_not_the_ship_artifact_stub(self) -> None:
+        """README demo ingest: --artifact-url inserts kind=artifact text='ship artifact' first."""
+        human = "Local tick scores briefs and emits a draft"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+                Fact(kind="signal", text=human),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        body = decision.draft.body
+        self.assertTrue(body.startswith(f"Show HN: {human}"))
+        self.assertNotIn("Show HN: ship artifact", body)
+        self.assertNotEqual(body.splitlines()[0].casefold(), "show hn: ship artifact")
+        self.assertIn(SHIP_PR, body)
+        parts = body.split("\n\n")
+        self.assertGreaterEqual(len(parts), 3)
+        self.assertEqual(parts[1], SHIP_PR)
+        self.assertNotIn("Costume:", body)
+
     def test_github_ship_tryable_is_readme_shaped_with_artifact_url(self) -> None:
         brief = _ship_brief(preferred_arena=ArenaId.GITHUB)
         decision = apply_brief(brief)

@@ -23,6 +23,7 @@ from influenzer.domain import utc_now
 from influenzer.hom import (
     Brief,
     Draft,
+    Fact,
     HomError,
     Score,
     brief_artifacts,
@@ -105,6 +106,11 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
     return tuple(found)
 
 
+def _is_artifact_stub(fact: Fact) -> bool:
+    """Operator proof slot, not wearable copy. URL still belongs in the proof slot."""
+    return fact.kind.strip().lower() == "artifact" or fact.text.strip().casefold() == "ship artifact"
+
+
 def _copy_bits(brief: Brief) -> CopyBits | None:
     texts: list[str] = []
     package_text: str | None = None
@@ -112,7 +118,7 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
     subreddit: str | None = None
     for fact in brief.facts:
         text = fact.text.strip()
-        if not text:
+        if not text or _is_artifact_stub(fact):
             continue
         kind = fact.kind.strip().lower()
         if kind == "package" or (package_text is None and has_cinema_package(text)):
