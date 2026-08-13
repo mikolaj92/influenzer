@@ -204,9 +204,11 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     url = _proof_url(bits)
     if not url:
         return None
-    backstory = _join_rest(bits) or bits.one_liner
-    body = f"{_show_hn_title(bits.one_liner)}\n\n{url}\n\n{backstory}"
-    return _body_or_none(body)
+    parts = [_show_hn_title(bits.one_liner), url]
+    backstory = _join_rest(bits)
+    if backstory:
+        parts.append(backstory)
+    return _body_or_none("\n\n".join(parts))
 
 
 def _dress_x(bits: CopyBits, score: Score) -> str | None:

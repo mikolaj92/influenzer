@@ -74,14 +74,28 @@ class HomDraftCostumeTests(unittest.TestCase):
         decision = apply_brief(brief)
         assert decision.draft is not None
         body = decision.draft.body
-        self.assertTrue(body.startswith(f"Show HN: {human}"))
+        self.assertEqual(body, f"Show HN: {human}\n\n{SHIP_PR}")
         self.assertNotIn("Show HN: ship artifact", body)
         self.assertNotEqual(body.splitlines()[0].casefold(), "show hn: ship artifact")
-        self.assertIn(SHIP_PR, body)
-        parts = body.split("\n\n")
-        self.assertGreaterEqual(len(parts), 3)
-        self.assertEqual(parts[1], SHIP_PR)
         self.assertNotIn("Costume:", body)
+
+    def test_hn_keeps_distinct_rest_as_backstory_under_the_url(self) -> None:
+        human = "Local tick scores briefs and emits a draft"
+        backstory = "Dry-run still default"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+                Fact(kind="signal", text=human),
+                Fact(kind="signal", text=backstory),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertEqual(
+            decision.draft.body,
+            f"Show HN: {human}\n\n{SHIP_PR}\n\n{backstory}",
+        )
 
     def test_github_ship_tryable_is_readme_shaped_with_artifact_url(self) -> None:
         brief = _ship_brief(preferred_arena=ArenaId.GITHUB)
