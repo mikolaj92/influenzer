@@ -152,11 +152,13 @@ class ScoreBriefTests(unittest.TestCase):
         assert decision.draft is not None
         self.assertEqual(decision.draft.costume, "seminar")
         self.assertEqual(decision.draft.arena, ArenaId.HN)
-        self.assertIn("One arena: hn", decision.draft.body)
-        self.assertIn("One angle:", decision.draft.body)
+        self.assertTrue(decision.draft.body.lstrip().startswith("Show HN:"))
+        self.assertNotIn("Costume:", decision.draft.body)
+        self.assertNotIn("One arena:", decision.draft.body)
+        self.assertNotIn("One angle:", decision.draft.body)
         self.assertIn(SHIP_PR, decision.draft.body)
         self.assertGreaterEqual(len(decision.draft.wave_checklist), 3)
-        self.assertNotIn("linkedin", decision.draft.body.split("One arena:")[1].split("\n", 1)[0])
+        self.assertNotIn("linkedin", decision.draft.body.lower().split("show hn:", 1)[0])
 
     def test_preferred_x_uses_agora_costume_not_hn(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.X)
@@ -164,7 +166,13 @@ class ScoreBriefTests(unittest.TestCase):
         assert decision.draft is not None
         self.assertEqual(decision.draft.arena, ArenaId.X)
         self.assertEqual(decision.draft.costume, "agora")
-        self.assertIn("rising thread", decision.draft.body)
+        self.assertNotIn("Costume:", decision.draft.body)
+        self.assertNotIn("One arena:", decision.draft.body)
+        first = decision.draft.body.splitlines()[0]
+        self.assertTrue(first.strip())
+        self.assertNotIn("http", first.lower())
+        self.assertLess(len(decision.draft.body), 500)
+        self.assertIn(SHIP_PR, decision.draft.body)
 
     def test_default_without_tryable_is_changelog_not_a_social_draft(self) -> None:
         brief = self._brief(
@@ -308,6 +316,9 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.score.verdict, Verdict.DRAFT)
         self.assertEqual(decision.draft.arena, ArenaId.GITHUB)
         self.assertEqual(decision.draft.costume, "workshop")
+        self.assertNotIn("Costume:", decision.draft.body)
+        self.assertNotIn("One arena:", decision.draft.body)
+        self.assertIn("I struggled with timeouts looking like success", decision.draft.body)
 
     def test_youtube_with_package_drafts_cinema_only(self) -> None:
         brief = self._brief(
@@ -404,12 +415,17 @@ class TickBriefPathTests(unittest.TestCase):
         self.assertEqual(outcome["verdict"], "draft")
         self.assertEqual(outcome["arena"], "hn")
         self.assertFalse(outcome["published"])
+        self.assertTrue(str(outcome.get("body") or "").startswith("Show HN:"))
+        self.assertNotIn("Costume:", str(outcome.get("body") or ""))
         stored = self.repo.get_brief("app-1", "ship-1")
         assert stored is not None
         self.assertEqual(stored.status, "processed")
         draft = self.repo.get_operator_draft("app-1", "ship-1")
         assert draft is not None
         self.assertEqual(draft.costume, "seminar")
+        self.assertTrue(draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertNotIn("Costume:", draft.body)
         revision = self.repo.conn.execute(
             "SELECT status, source, kind FROM content_revisions WHERE revision_id=?",
             (draft.draft_id,),
