@@ -12,6 +12,9 @@ NOW = "2026-08-13T06:00:00Z"
 REPO = "mikolaj92/demo"
 SHIP_PR = "https://github.com/mikolaj92/demo/pull/12"
 SHIP_RELEASE = "https://github.com/mikolaj92/demo/releases/tag/v0.1.0"
+ISSUE_COMMENT = "https://github.com/mikolaj92/demo/issues/7#issuecomment-101"
+ISSUE_COMMENT_BUG = "https://github.com/mikolaj92/demo/issues/8#issuecomment-102"
+PR_COMMENT = "https://github.com/mikolaj92/demo/pull/12#discussion_r202"
 
 
 class ScriptedGh:
@@ -121,4 +124,102 @@ def noise_script() -> dict[str, GhCall]:
         "releases": GhCall(0, "[]"),
         "tags": GhCall(0, "[]"),
         "readme": GhCall(0, b64_readme("# Demo\nWIP\n")),
+    }
+
+
+def gh_comment(
+    *,
+    html_url: str,
+    body: str,
+    login: str = "alice",
+    user_type: str = "User",
+    created_at: str = "2026-08-12T12:00:00Z",
+    comment_id: int = 101,
+) -> dict:
+    return {
+        "id": comment_id,
+        "html_url": html_url,
+        "body": body,
+        "user": {"login": login, "type": user_type},
+        "created_at": created_at,
+    }
+
+
+def feedback_question_script(**overrides: GhCall) -> dict[str, GhCall]:
+    script = {
+        "repo": GhCall(0, repo_json()),
+        "issue_comments": GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(
+                        html_url=ISSUE_COMMENT,
+                        body="How do I install this when uv is missing?",
+                        comment_id=101,
+                    ),
+                    gh_comment(
+                        html_url=ISSUE_COMMENT_BUG,
+                        body="The Windows install fails with a traceback",
+                        login="bob",
+                        comment_id=102,
+                        created_at="2026-08-12T13:00:00Z",
+                    ),
+                ]
+            ),
+        ),
+        "pull_comments": GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(
+                        html_url=PR_COMMENT,
+                        body="Does this break the tick on Python 3.12?",
+                        login="cara",
+                        comment_id=202,
+                        created_at="2026-08-12T14:00:00Z",
+                    )
+                ]
+            ),
+        ),
+    }
+    script.update(overrides)
+    return script
+
+
+def feedback_noise_script() -> dict[str, GhCall]:
+    return {
+        "repo": GhCall(0, repo_json()),
+        "issue_comments": GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(
+                        html_url="https://github.com/mikolaj92/demo/issues/1#issuecomment-1",
+                        body="LGTM",
+                        login="dependabot[bot]",
+                        user_type="Bot",
+                        comment_id=1,
+                    ),
+                    gh_comment(
+                        html_url="https://github.com/mikolaj92/demo/issues/1#issuecomment-2",
+                        body="thanks!",
+                        login="bob",
+                        comment_id=2,
+                    ),
+                ]
+            ),
+        ),
+        "pull_comments": GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(
+                        html_url="https://github.com/mikolaj92/demo/pull/3#discussion_r3",
+                        body="Looks good to me",
+                        login="carol",
+                        comment_id=3,
+                    )
+                ]
+            ),
+        ),
     }

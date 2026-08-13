@@ -68,6 +68,10 @@ def classify_gh_argv(argv: Sequence[str]) -> str:
             return "readme"
         if "/tags" in path:
             return "tags"
+        if "/issues/comments" in path:
+            return "issue_comments"
+        if "/pulls/comments" in path:
+            return "pull_comments"
     return "other"
 
 

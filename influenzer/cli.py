@@ -259,6 +259,14 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     verdict.add_argument("--project-id", help="limit to one project")
     verdict.add_argument("--draft-id", help="disambiguate when more than one draft exists")
 
+    feedback = sub.add_parser(
+        "feedback",
+        help="collect public GitHub replies into 0 or 1 pending brief (never publishes)",
+    )
+    feedback.add_argument("--project-id", help="defaults to the declared watch")
+    feedback.add_argument("--repo", help="owner/name; defaults to the declared watch")
+    feedback.add_argument("--now", help="ISO-8601 clock for the lookback window")
+
 
 def _repo(args: argparse.Namespace) -> StateRepository:
     cfg = load_config(args.config)
@@ -822,8 +830,21 @@ def handle_cli(args: argparse.Namespace) -> int:
         print(json.dumps(out, sort_keys=True))
         return 0
 
+    if args.command == "feedback":
+        from influenzer.hom_feedback import collect_and_admit
+
+        with _repo(args) as repo:
+            out = collect_and_admit(
+                repo,
+                project_id=getattr(args, "project_id", None),
+                repo_slug=getattr(args, "repo", None),
+                now=getattr(args, "now", None),
+            )
+        print(json.dumps(out, sort_keys=True))
+        return 0
+
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,pass,watch,verdict}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,pass,watch,verdict,feedback}",
         file=sys.stderr,
     )
     return 2

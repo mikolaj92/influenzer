@@ -16,6 +16,8 @@ class ClassifyArgvTests(unittest.TestCase):
         self.assertEqual(classify_gh_argv(["release", "list", "--repo", REPO]), "releases")
         self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/tags?per_page=20"]), "tags")
         self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/readme"]), "readme")
+        self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/issues/comments"]), "issue_comments")
+        self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/pulls/comments"]), "pull_comments")
         self.assertEqual(classify_gh_argv(["auth", "status"]), "other")
 
 
