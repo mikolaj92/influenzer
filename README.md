@@ -49,7 +49,7 @@ python -m influenzer.cli --config /tmp/influenzer/config.json brief show \
 
 ## Always-on tick (Mac mini)
 
-The 24/7 operator stays up on an **always-on host** (a Mac mini or similar), not a laptop LaunchAgent. There is no plist in this repo. This repo does not SSH or deploy; a human starts the process on the box that already has `state.db`.
+The 24/7 operator stays up on an **always-on host** (a Mac mini or similar), not a laptop LaunchAgent. There is no plist in this repo. This repo does not SSH or deploy; a human starts the process on the box that already has `state.db`. On **mini-m4-0**, hop on and start the existing dry-run tick: [`docs/mini-m4-0.md`](docs/mini-m4-0.md).
 
 ```bash
 # on the mini — interval loop against local SQLite state.db
