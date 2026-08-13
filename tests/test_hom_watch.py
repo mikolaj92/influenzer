@@ -21,7 +21,7 @@ from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
 from influenzer.tick import main as tick_main
-from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, ship_script
+from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, look_script, ship_script
 
 ALWAYS_ON = HostPower(has_battery=False, source="test")
 
@@ -64,7 +64,7 @@ class HomWatchTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _tick(self, script: dict | None = None, **kwargs: Any) -> tuple[dict[str, Any], ScriptedGh]:
-        fake = ScriptedGh(script or ship_script())
+        fake = ScriptedGh(script or look_script())
         kwargs.setdefault("allow_hom_pass", True)
         kwargs.setdefault("now", NOW)
         with (
@@ -127,6 +127,7 @@ class HomWatchTests(unittest.TestCase):
         set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
         out, fake = self._tick()
         self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["feedback"]["status"], "silence")
         self.assertEqual(out["scan"]["status"], "admitted")
         self.assertEqual(out["scan"]["brief_id"], "scan-v0-1-0")
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
@@ -324,10 +325,11 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
             ),
             0,
         )
-        fake = ScriptedGh(ship_script())
+        fake = ScriptedGh(look_script())
         buf = io.StringIO()
         with (
             patch("github_survey.survey.run_gh", fake),
+            patch("github_feedback.feedback.run_gh", fake),
             patch("influenzer.hom_watch.utc_now", return_value=NOW),
             patch("influenzer.hom_pass.utc_now", return_value=NOW),
             patch("influenzer.scan_due.utc_now", return_value=NOW),
@@ -362,10 +364,11 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
             ),
             0,
         )
-        fake = ScriptedGh(ship_script())
+        fake = ScriptedGh(look_script())
         buf = io.StringIO()
         with (
             patch("github_survey.survey.run_gh", fake),
+            patch("github_feedback.feedback.run_gh", fake),
             patch("influenzer.hom_watch.utc_now", return_value=NOW),
             patch("influenzer.hom_pass.utc_now", return_value=NOW),
             patch("influenzer.scan_due.utc_now", return_value=NOW),

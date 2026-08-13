@@ -223,3 +223,35 @@ def feedback_noise_script() -> dict[str, GhCall]:
             ),
         ),
     }
+
+
+def feedback_bot_script() -> dict[str, GhCall]:
+    return {
+        "repo": GhCall(0, repo_json()),
+        "issue_comments": GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(
+                        html_url="https://github.com/mikolaj92/demo/issues/1#issuecomment-1",
+                        body="chore: bump lodash from 4.17.20 to 4.17.21",
+                        login="dependabot[bot]",
+                        user_type="Bot",
+                        comment_id=1,
+                    )
+                ]
+            ),
+        ),
+        "pull_comments": GhCall(0, "[]"),
+    }
+
+
+def look_script(
+    *,
+    comments: dict[str, GhCall] | None = None,
+    survey: dict[str, GhCall] | None = None,
+) -> dict[str, GhCall]:
+    """One CMO look: comment endpoints plus ship/noise survey keys."""
+    script = dict(survey or ship_script())
+    script.update(comments or feedback_noise_script())
+    return script

@@ -230,7 +230,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
 
     hom_pass = sub.add_parser(
         "pass",
-        help="one CMO look: scan-due, score pending briefs, one angle (does not publish)",
+        help="one CMO look: listen, scan-due, score pending briefs, one angle (does not publish)",
     )
     hom_pass.add_argument("--project-id", required=True)
     hom_pass.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")

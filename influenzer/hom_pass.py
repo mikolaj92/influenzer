@@ -1,16 +1,16 @@
-"""One CMO look: scan-due, score pending briefs, one angle.
+"""One CMO look: listen for replies, scan-due, score pending briefs, one angle.
 
-One job: run the weekly-ish cycle once. Compose existing scan_due, tick,
-and outbox in that order. Do not copy survey, pack, admit, score, dress,
-or outbox.
+One job: run the weekly-ish cycle once. Compose existing hom_feedback,
+scan_due, tick, and outbox in that order. Do not copy survey, pack, admit,
+score, dress, outbox, or github_feedback.
 
 `--project-id` and `--repo` are required; this block does not invent a
 repo inventory.
 
 Does not publish. Does not enable live social. Does not call gh
-(github_survey owns gh). Does not know Heimdall. Does not know my-auth.
-Does not invoke hold or pass. Does not run every tick interval.
-Does not merge scan_due, tick, and outbox into one file.
+(github_survey / github_feedback own gh). Does not know Heimdall. Does not
+know my-auth. Does not invoke hold or pass. Does not run every tick interval.
+Does not merge feedback, scan_due, tick, and outbox into one file.
 Does not open runtime.db. Does not embed a Fala host.
 """
 
@@ -24,17 +24,18 @@ from influenzer.config import Config, load_config
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
+from influenzer.hom_feedback import collect_and_admit, host_silence
 from influenzer.hom_outbox import emit_angle
 from influenzer.scan_due import DEFAULT_WINDOW_DAYS, scan_github_if_due
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 
 
-def _scan_effect(scan: dict[str, Any]) -> dict[str, Any]:
-    brief_id = scan.get("brief_id")
-    if scan.get("status") == "ok" and isinstance(brief_id, str) and brief_id:
+def _look_effect(look: dict[str, Any]) -> dict[str, Any]:
+    brief_id = look.get("brief_id")
+    if look.get("status") == "ok" and isinstance(brief_id, str) and brief_id:
         return {"status": "admitted", "brief_id": brief_id}
-    reason = scan.get("reason")
+    reason = look.get("reason")
     return {"status": "silence", "reason": str(reason) if reason else "silence"}
 
 
@@ -47,6 +48,27 @@ def _tick_summary(tick_out: dict[str, Any]) -> dict[str, Any]:
     return {"scored": processed}
 
 
+def _listen(
+    repo: StateRepository,
+    *,
+    project_id: str,
+    repo_slug: str,
+    gh: Any = None,
+    now: str | None = None,
+) -> dict[str, Any]:
+    """Reuse hom_feedback. Fail closed: a broken look is silence, not a crash."""
+    try:
+        return collect_and_admit(
+            repo,
+            project_id=project_id,
+            repo_slug=repo_slug,
+            gh=gh,
+            now=now,
+        )
+    except (OSError, TypeError, ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return host_silence("scan_failed", project_id=project_id, repo_slug=repo_slug)
+
+
 def run_pass(
     repo: StateRepository,
     cfg: Config,
@@ -57,9 +79,10 @@ def run_pass(
     now: str | None = None,
     window_days: int = DEFAULT_WINDOW_DAYS,
 ) -> dict[str, Any]:
-    """Scan if due, score pending briefs, emit one angle. Dry-run. No live."""
+    """Listen, scan if due, score pending briefs, emit one angle. Dry-run. No live."""
     clock = now or utc_now()
     slug = repo_slug.strip()
+    listened = _listen(repo, project_id=project_id, repo_slug=slug, gh=gh, now=clock)
     scan = scan_github_if_due(
         repo,
         project_id=project_id,
@@ -70,8 +93,10 @@ def run_pass(
     )
     tick_out = tick(repo, cfg, due=(), cli_live=False, now=clock)
     angle = emit_angle(repo, project_id=project_id)
-    scan_effect = _scan_effect(scan)
+    feedback_effect = _look_effect(listened)
+    scan_effect = _look_effect(scan)
     tick_summary = _tick_summary(tick_out)
+    heard = feedback_effect["status"] == "admitted"
     admitted = scan_effect["status"] == "admitted"
     scored = tick_summary["scored"]
     has_angle = angle.get("status") == "ok" and not angle.get("empty")
@@ -79,13 +104,16 @@ def run_pass(
         "published": False,
         "project_id": project_id,
         "repo": slug,
+        "feedback": feedback_effect,
         "scan": scan_effect,
         "tick": tick_summary,
         "angle": angle,
     }
-    if admitted or scored or has_angle:
+    if heard or admitted or scored or has_angle:
         return ok(**extra)
-    reason = str(scan_effect.get("reason") or angle.get("reason") or "silence")
+    reason = str(
+        feedback_effect.get("reason") or scan_effect.get("reason") or angle.get("reason") or "silence"
+    )
     return noop(reason, **extra)
 
 
