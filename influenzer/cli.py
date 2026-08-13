@@ -217,6 +217,14 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     )
     angle.add_argument("--project-id", help="limit to one project")
 
+    verdict = sub.add_parser(
+        "verdict",
+        help="hold or pass the current wearable angle (does not publish)",
+    )
+    verdict.add_argument("verdict", choices=("hold", "pass"))
+    verdict.add_argument("--project-id", help="limit to one project")
+    verdict.add_argument("--draft-id", help="disambiguate when more than one draft exists")
+
 
 def _repo(args: argparse.Namespace) -> StateRepository:
     cfg = load_config(args.config)
@@ -732,8 +740,21 @@ def handle_cli(args: argparse.Namespace) -> int:
         print(json.dumps(out, sort_keys=True))
         return 0
 
+    if args.command == "verdict":
+        from influenzer.hom_verdict import apply_verdict
+
+        with _repo(args) as repo:
+            out = apply_verdict(
+                repo,
+                args.verdict,
+                project_id=getattr(args, "project_id", None),
+                draft_id=getattr(args, "draft_id", None),
+            )
+        print(json.dumps(out, sort_keys=True))
+        return 0
+
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,verdict}",
         file=sys.stderr,
     )
     return 2

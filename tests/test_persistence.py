@@ -30,13 +30,15 @@ class PersistenceTests(unittest.TestCase):
                 self.assertEqual(len(repo.events("builder")), 1)
 
     def test_reopen_and_migration_preserve_events(self):
+        from influenzer.migrations import SCHEMA_VERSION
+
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "state.db"
             with StateRepository(path) as repo:
                 repo.save_project(self.project("p", "project"))
             with StateRepository(path) as repo:
                 self.assertIsNotNone(repo.get_project("p"))
-                self.assertEqual(repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0], "2")
+                self.assertEqual(repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0], str(SCHEMA_VERSION))
                 self.assertEqual(len(repo.events("p")), 1)
 
     def test_v1_database_gains_brief_tables(self):
@@ -58,6 +60,28 @@ class PersistenceTests(unittest.TestCase):
                 repo.conn.execute("SELECT * FROM briefs")
                 repo.conn.execute("SELECT * FROM operator_scores")
                 repo.conn.execute("SELECT * FROM operator_drafts")
+                cols = [row[1] for row in repo.conn.execute("PRAGMA table_info(operator_drafts)")]
+                self.assertIn("gate_verdict", cols)
+
+    def test_v2_database_gains_gate_verdict(self):
+        from influenzer.migrations import SCHEMA_VERSION, _SCHEMA, _V2_SCHEMA
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            conn = sqlite3.connect(path)
+            conn.execute("CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            conn.executescript(_SCHEMA)
+            conn.executescript(_V2_SCHEMA)
+            conn.execute("INSERT INTO schema_meta VALUES ('schema_version', '2')")
+            conn.commit()
+            conn.close()
+            with StateRepository(path) as repo:
+                self.assertEqual(
+                    repo.conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0],
+                    str(SCHEMA_VERSION),
+                )
+                cols = [row[1] for row in repo.conn.execute("PRAGMA table_info(operator_drafts)")]
+                self.assertIn("gate_verdict", cols)
 
     def test_future_schema_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -549,14 +549,21 @@ class StateRepository:
         )
         return [self._brief_from_row(row) for row in rows]
 
-    def list_operator_drafts(self, project_id: str | None = None) -> list[Draft]:
+    def list_operator_drafts(
+        self,
+        project_id: str | None = None,
+        *,
+        include_held: bool = False,
+    ) -> list[Draft]:
+        """Open drafts by default. Held (gate veto) rows stay in the table."""
+        held_sql = "" if include_held else " AND coalesce(gate_verdict, '') != 'hold'"
         if project_id is None:
             rows = self.conn.execute(
-                "SELECT * FROM operator_drafts ORDER BY created_at, draft_id"
+                f"SELECT * FROM operator_drafts WHERE 1=1{held_sql} ORDER BY created_at, draft_id"
             )
         else:
             rows = self.conn.execute(
-                "SELECT * FROM operator_drafts WHERE project_id=? ORDER BY created_at, draft_id",
+                f"SELECT * FROM operator_drafts WHERE project_id=?{held_sql} ORDER BY created_at, draft_id",
                 (project_id,),
             )
         return [self._draft_from_row(row) for row in rows]
@@ -641,7 +648,10 @@ class StateRepository:
             )
             if draft is not None:
                 c.execute(
-                    "INSERT INTO operator_drafts VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO operator_drafts("
+                    "project_id, brief_id, draft_id, arena, costume, angle, body, "
+                    "wave_checklist_json, canon_url, content_hash, created_at"
+                    ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         draft.project_id,
                         draft.brief_id,
@@ -689,6 +699,34 @@ class StateRepository:
                     "verdict": score.verdict.value,
                     "reason": score.reason,
                     "arena": None if score.arena is None else score.arena.value,
+                    "published": False,
+                },
+                conn=c,
+            )
+
+    def record_draft_verdict(self, draft: Draft, verdict: str) -> None:
+        """Stamp pass|hold on a draft. Hold dismisses it from the open set; never deletes."""
+        if verdict not in {"hold", "pass"}:
+            raise StorageError("verdict must be pass|hold")
+        with self.transaction() as c:
+            self._require_project(c, draft.project_id)
+            row = c.execute(
+                "SELECT draft_id FROM operator_drafts WHERE project_id=? AND draft_id=?",
+                (draft.project_id, draft.draft_id),
+            ).fetchone()
+            if row is None:
+                raise StorageError(f"unknown draft: {draft.draft_id}")
+            c.execute(
+                "UPDATE operator_drafts SET gate_verdict=? WHERE project_id=? AND draft_id=?",
+                (verdict, draft.project_id, draft.draft_id),
+            )
+            self._event(
+                draft.project_id,
+                "draft.verdict",
+                {
+                    "draft_id": draft.draft_id,
+                    "brief_id": draft.brief_id,
+                    "verdict": verdict,
                     "published": False,
                 },
                 conn=c,

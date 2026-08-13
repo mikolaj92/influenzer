@@ -107,6 +107,13 @@ class PluginRegistrationTests(unittest.TestCase):
         )
         self.assertTrue(flagged.if_due)
         self.assertEqual(flagged.window_days, 14)
+        hold = parser.parse_args(["verdict", "hold"])
+        self.assertEqual(hold.command, "verdict")
+        self.assertEqual(hold.verdict, "hold")
+        passed = parser.parse_args(["verdict", "pass", "--project-id", "app-1", "--draft-id", "draft-1"])
+        self.assertEqual(passed.verdict, "pass")
+        self.assertEqual(passed.project_id, "app-1")
+        self.assertEqual(passed.draft_id, "draft-1")
 
 
 if __name__ == "__main__":
