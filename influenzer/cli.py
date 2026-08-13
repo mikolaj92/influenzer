@@ -217,6 +217,19 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     )
     angle.add_argument("--project-id", help="limit to one project")
 
+    hom_pass = sub.add_parser(
+        "pass",
+        help="one CMO look: scan-due, score pending briefs, one angle (does not publish)",
+    )
+    hom_pass.add_argument("--project-id", required=True)
+    hom_pass.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
+    hom_pass.add_argument(
+        "--window-days",
+        type=int,
+        default=7,
+        help="coarse cadence in days for scan-due (default 7)",
+    )
+
     verdict = sub.add_parser(
         "verdict",
         help="hold or pass the current wearable angle (does not publish)",
@@ -740,6 +753,21 @@ def handle_cli(args: argparse.Namespace) -> int:
         print(json.dumps(out, sort_keys=True))
         return 0
 
+    if args.command == "pass":
+        from influenzer.hom_pass import run_pass
+
+        cfg = load_config(args.config)
+        with _repo(args) as repo:
+            out = run_pass(
+                repo,
+                cfg,
+                project_id=args.project_id,
+                repo_slug=args.repo,
+                window_days=int(getattr(args, "window_days", 7)),
+            )
+        print(json.dumps(out, sort_keys=True))
+        return 0
+
     if args.command == "verdict":
         from influenzer.hom_verdict import apply_verdict
 
@@ -754,7 +782,7 @@ def handle_cli(args: argparse.Namespace) -> int:
         return 0
 
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,verdict}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop,angle,pass,verdict}",
         file=sys.stderr,
     )
     return 2

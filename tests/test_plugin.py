@@ -114,6 +114,10 @@ class PluginRegistrationTests(unittest.TestCase):
         self.assertEqual(passed.verdict, "pass")
         self.assertEqual(passed.project_id, "app-1")
         self.assertEqual(passed.draft_id, "draft-1")
+        hom_pass = parser.parse_args(["pass", "--project-id", "app-1", "--repo", "owner/name"])
+        self.assertEqual(hom_pass.command, "pass")
+        self.assertEqual(hom_pass.project_id, "app-1")
+        self.assertEqual(hom_pass.repo, "owner/name")
 
 
 if __name__ == "__main__":
