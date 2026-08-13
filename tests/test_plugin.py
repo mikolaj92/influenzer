@@ -125,6 +125,10 @@ class PluginRegistrationTests(unittest.TestCase):
         self.assertEqual(watch.repo, "owner/name")
         shown = parser.parse_args(["watch", "show"])
         self.assertEqual(shown.watch_command, "show")
+        feedback = parser.parse_args(["feedback", "--project-id", "app-1", "--repo", "owner/name"])
+        self.assertEqual(feedback.command, "feedback")
+        self.assertEqual(feedback.project_id, "app-1")
+        self.assertEqual(feedback.repo, "owner/name")
 
 
 if __name__ == "__main__":

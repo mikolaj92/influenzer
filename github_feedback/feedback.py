@@ -1,0 +1,271 @@
+"""Collect public issue/PR comments. No storage. No replies."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+from datetime import timedelta
+from pathlib import Path
+from typing import Any
+
+from github_survey.gh import (
+    REPO_JSON_FIELDS,
+    GhRunner,
+    invalid_repo_reason,
+    optional_json,
+    required_json,
+    run_gh,
+)
+from github_survey.survey import LOOKBACK_DAYS, in_window, parse_now
+
+SOURCE = "github-feedback"
+MAX_FACTS = 8
+MAX_FACT_CHARS = 240
+MIN_BODY_CHARS = 12
+
+_BOT_LOGINS = frozenset(
+    {
+        "dependabot",
+        "dependabot[bot]",
+        "renovate",
+        "renovate[bot]",
+        "github-actions",
+        "github-actions[bot]",
+        "codecov",
+        "codecov[bot]",
+        "imgbot",
+        "imgbot[bot]",
+        "greenkeeper",
+        "snyk-bot",
+        "copilot",
+        "copilot[bot]",
+        "sonarcloud",
+        "sonarcloud[bot]",
+    }
+)
+_THANKS_RE = re.compile(r"(?i)^\s*(?:thanks(?:\s+you)?|thank\s+you|ty|thx)(?:\s*[!.]*)?\s*$")
+_LGTM_RE = re.compile(
+    r"(?i)^\s*(?:lgtm|looks\s+good(?:\s+to\s+me)?|\+1|👍|:shipit:|ship\s+it|"
+    r"approved|sgtm|nit(?:pick)?)\s*[!.]*\s*$"
+)
+_SIGNAL_RE = re.compile(
+    r"(?i)\?|"
+    r"\b(?:bug|broken|crash(?:es|ed|ing)?|error|fail(?:s|ed|ing|ure)?|"
+    r"doesn'?t work|cannot|can'?t|regression|repro(?:duce)?|"
+    r"stacktrace|exception|blocker?|disagree|wrong|this breaks|"
+    r"how (?:do|does|can|should)|why (?:did|does|is|would|can))\b"
+)
+
+
+def _silence(reason: str, *, repo: str) -> dict[str, Any]:
+    return {"status": "noop", "ok": True, "reason": reason, "repo": repo, "brief_id": None}
+
+
+def _clip(text: str, limit: int = MAX_FACT_CHARS) -> str:
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[: limit - 3].rstrip() + "..."
+
+
+def _login(user: Any) -> str:
+    if not isinstance(user, dict):
+        return ""
+    return str(user.get("login") or "").strip()
+
+
+def is_bot_user(user: Any) -> bool:
+    if not isinstance(user, dict):
+        return True
+    login = _login(user).lower()
+    if str(user.get("type") or "") == "Bot":
+        return True
+    if not login:
+        return True
+    if login.endswith("[bot]"):
+        return True
+    return login in _BOT_LOGINS
+
+
+def is_noise_body(text: str) -> bool:
+    stripped = text.strip()
+    if len(stripped) < MIN_BODY_CHARS:
+        return True
+    if _THANKS_RE.fullmatch(stripped):
+        return True
+    if _LGTM_RE.fullmatch(stripped):
+        return True
+    return False
+
+
+def is_feedback_signal(text: str) -> bool:
+    if is_noise_body(text):
+        return False
+    return bool(_SIGNAL_RE.search(text))
+
+
+def is_noise_comment(item: dict[str, Any]) -> bool:
+    if is_bot_user(item.get("user")):
+        return True
+    return not is_feedback_signal(str(item.get("body") or ""))
+
+
+def _items(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def _comment_url(item: dict[str, Any]) -> str:
+    return str(item.get("html_url") or "").strip()
+
+
+def _fact_from_comment(item: dict[str, Any], *, kind: str) -> dict[str, Any] | None:
+    if is_noise_comment(item):
+        return None
+    url = _comment_url(item)
+    if not url.startswith("https://github.com/"):
+        return None
+    body = _clip(str(item.get("body") or ""))
+    if not body:
+        return None
+    login = _login(item.get("user")) or "someone"
+    return {
+        "kind": kind,
+        "text": f"@{login}: {body}",
+        "artifact_url": url,
+    }
+
+
+def _brief_id(facts: list[dict[str, Any]]) -> str:
+    first = str(facts[0].get("artifact_url") or "")
+    match = re.search(r"(?:issuecomment-|discussion_r)(\d+)", first)
+    if match:
+        return f"fb-{match.group(1)}"[:63]
+    digits = re.search(r"(\d+)$", first.rstrip("/"))
+    if digits:
+        return f"fb-{digits.group(1)}"[:63]
+    return "fb-comments"
+
+
+def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[str, Any] | None, str | None]:
+    meta, reason = required_json(gh(["repo", "view", repo_slug, "--json", REPO_JSON_FIELDS]))
+    if reason:
+        return None, "empty_feedback" if reason == "empty_survey" else reason
+    if not isinstance(meta, dict):
+        return None, "empty_feedback"
+    if bool(meta.get("isPrivate")):
+        return None, "private_repo"
+
+    since = (now - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    issues_raw, reason = required_json(
+        gh(["api", f"repos/{repo_slug}/issues/comments?per_page=100&since={since}"])
+    )
+    if reason:
+        return None, "empty_feedback" if reason == "empty_survey" else reason
+    pulls_raw = optional_json(
+        gh(["api", f"repos/{repo_slug}/pulls/comments?per_page=100&since={since}"]),
+        [],
+    )
+    comments: list[tuple[str, dict[str, Any]]] = []
+    for item in _items(issues_raw):
+        if in_window(str(item.get("created_at") or ""), now=now):
+            comments.append(("issue_comment", item))
+    for item in _items(pulls_raw):
+        if in_window(str(item.get("created_at") or ""), now=now):
+            comments.append(("pull_comment", item))
+    comments.sort(key=lambda pair: str(pair[1].get("created_at") or ""))
+    return {"comments": comments}, None
+
+
+def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
+    facts: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for kind, item in collected.get("comments") or []:
+        fact = _fact_from_comment(item, kind=kind)
+        if fact is None:
+            continue
+        url = str(fact.get("artifact_url") or "")
+        if url in seen:
+            continue
+        seen.add(url)
+        facts.append(fact)
+        if len(facts) >= MAX_FACTS:
+            break
+    if not facts:
+        return _silence("comment_noise", repo=repo_slug)
+    return {
+        "status": "ok",
+        "ok": True,
+        "repo": repo_slug,
+        "brief_id": _brief_id(facts),
+        "source": SOURCE,
+        "story_kind": "hard_issue",
+        "claims_ship": False,
+        "tryable": False,
+        "facts": facts,
+    }
+
+
+def collect_feedback(
+    repo_slug: str,
+    *,
+    gh: GhRunner | None = None,
+    now: str | None = None,
+) -> dict[str, Any]:
+    slug = repo_slug.strip()
+    if invalid_repo_reason(slug):
+        return _silence("repo must be owner/name", repo=slug)
+    runner = gh if gh is not None else run_gh
+    clock = parse_now(now)
+    try:
+        collected, reason = collect_comments(slug, gh=runner, now=clock)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return _silence("scan_failed", repo=slug)
+    if reason:
+        return _silence(reason, repo=slug)
+    assert collected is not None
+    packed = pack_comments(slug, collected)
+    if packed.get("status") == "ok":
+        packed["now"] = now or clock.isoformat().replace("+00:00", "Z")
+    return packed
+
+
+def _emit(payload: dict[str, Any]) -> int:
+    print(json.dumps(payload, sort_keys=True))
+    output_dir = os.environ.get("FALA_EFFECTOR_OUTPUT_DIR")
+    if output_dir:
+        path = Path(output_dir) / "result.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(
+                {
+                    "values": payload,
+                    "associations": [],
+                    "reactions": [
+                        {"kind": "github.feedback", "media_type": "application/json", "value": payload}
+                    ],
+                    "metadata": {"published": False, "mutated": False},
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="github-feedback")
+    parser.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
+    parser.add_argument("--now", help="ISO-8601 clock for the lookback window")
+    parser.add_argument("--project-id", default=None, help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    return _emit(collect_feedback(args.repo, now=args.now))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
