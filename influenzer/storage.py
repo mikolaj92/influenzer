@@ -519,11 +519,46 @@ class StateRepository:
             return None
         return self._brief_from_row(row)
 
-    def list_pending_briefs(self) -> list[Brief]:
+    def list_pending_briefs(self, project_id: str | None = None) -> list[Brief]:
+        if project_id is None:
+            rows = self.conn.execute(
+                "SELECT * FROM briefs WHERE status='pending' ORDER BY created_at, brief_id"
+            )
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM briefs WHERE status='pending' AND project_id=? ORDER BY created_at, brief_id",
+                (project_id,),
+            )
+        return [self._brief_from_row(row) for row in rows]
+
+    def list_briefs(self, project_id: str) -> list[Brief]:
         rows = self.conn.execute(
-            "SELECT * FROM briefs WHERE status='pending' ORDER BY created_at, brief_id"
+            "SELECT * FROM briefs WHERE project_id=? ORDER BY created_at, brief_id",
+            (project_id,),
         )
         return [self._brief_from_row(row) for row in rows]
+
+    def list_operator_drafts(self, project_id: str) -> list[Draft]:
+        rows = self.conn.execute(
+            "SELECT * FROM operator_drafts WHERE project_id=? ORDER BY created_at, draft_id",
+            (project_id,),
+        )
+        return [
+            Draft(
+                project_id=row["project_id"],
+                brief_id=row["brief_id"],
+                draft_id=row["draft_id"],
+                arena=ArenaId(row["arena"]),
+                costume=row["costume"],
+                angle=row["angle"],
+                body=row["body"],
+                wave_checklist=tuple(json.loads(row["wave_checklist_json"] or "[]")),
+                canon_url=row["canon_url"],
+                created_at=row["created_at"],
+                content_hash=row["content_hash"],
+            )
+            for row in rows
+        ]
 
     def get_operator_score(self, project_id: str, brief_id: str) -> Score | None:
         row = self.conn.execute(

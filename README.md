@@ -45,6 +45,8 @@ python -m influenzer.cli --config /tmp/influenzer/config.json brief show \
   --project-id app-1 --brief-id b-ship
 ```
 
+`brief scan --project-id ID --repo owner/name` reads public GitHub signals through a `gh` subprocess (merged PRs, releases, tags) and stores **at most one** pending brief (`source=github-scan`), or stays silent. Commit-noise, waitlists, missing `gh`/auth, an empty survey, or an already-pending story are silence — not a crash. Scan does not publish, does not enable live social, and does not score; `tick-all` still scores pending briefs.
+
 `tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It still does not auto-publish. `influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
 
 ## Always-on tick (Mac mini)
@@ -99,7 +101,7 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer init` | Create workspace home, config, state.db |
 | `influenzer project create/show` | App or builder projects with BrandProfile |
 | `influenzer content add` | Immutable project-scoped content revision |
-| `influenzer brief ingest/show` | HoM brief in; tick scores to draft or kill |
+| `influenzer brief ingest/show/scan` | HoM brief in; GitHub scan writes 0 or 1 pending brief; tick scores to draft or kill |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
 | `influenzer-tick-all` | Score pending briefs; due-plan mutator (dry-run default) |
 | `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini (not a laptop LaunchAgent) |
