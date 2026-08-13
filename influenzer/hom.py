@@ -2,6 +2,8 @@
 
 Pure rules. No provider calls. Live publish stays on the existing policy/adapter path.
 Influenzer does not need Heimdall internals; briefs arrive, drafts leave.
+
+Scoring lives here. Costume-native copy is influenzer.hom_draft (thin call).
 """
 
 from __future__ import annotations
@@ -365,58 +367,14 @@ def score_brief(brief: Brief) -> Score:
     ).with_hash()
 
 
-def _fact_lines(brief: Brief, *, limit: int = 3) -> list[str]:
-    lines: list[str] = []
-    for fact in brief.facts[:limit]:
-        line = fact.text.strip()
-        if fact.artifact_url:
-            line = f"{line} ({fact.artifact_url})"
-        lines.append(f"- {line}")
-    return lines
-
-
 def compose_draft(brief: Brief, score: Score, *, now: str | None = None) -> Draft | None:
-    """Costume-native body for the single chosen arena. Kill/changelog emit nothing."""
-    if score.verdict is not Verdict.DRAFT or score.arena is None or score.angle is None:
-        return None
-    play = arena_play(score.arena)
-    clock = now or utc_now()
-    facts = "\n".join(_fact_lines(brief))
-    artifact = next((url for url in brief_artifacts(brief) if is_ship_artifact(url)), None)
-    proof = f"\nProof: {artifact}" if artifact else ""
-    opener = {
-        ArenaId.X: "Agora reply — live in someone else's rising thread, not an original in an empty feed.",
-        ArenaId.LINKEDIN: "Court note — speak as a person. Insight before any pitch.",
-        ArenaId.YOUTUBE: "Cinema package first (title + thumb + 5s), then pay the promise.",
-        ArenaId.SHORTS: "Fair hook — 1–2 seconds, loop, not an essay.",
-        ArenaId.GITHUB: "Workshop — README and code are proof; stars are not success.",
-        ArenaId.HN: "Seminar — I struggled with this; press-release tone is a kill.",
-        ArenaId.REDDIT: "Village room — story of pain, receipts, no cold ad.",
-        ArenaId.NEWSLETTER: "Letter — named editor, cadence, owned list.",
-        ArenaId.DISCORD: "Tavern — energy, not canon.",
-        ArenaId.BLUESKY: "Newer cafe — artifact, not vibe.",
-        ArenaId.MASTODON: "Parish — slow, no PR tone.",
-    }[score.arena]
-    wave = "\n".join(f"- {item}" for item in play.wave)
-    body = (
-        f"{opener}\n\n"
-        f"Costume: {play.costume}. One arena: {play.arena.value}. One angle: {score.angle}.\n\n"
-        f"{facts}\n"
-        f"{proof}\n\n"
-        f"Wave checklist:\n{wave}\n"
-    ).strip()
-    return Draft(
-        project_id=brief.project_id,
-        brief_id=brief.brief_id,
-        draft_id=f"draft-{brief.brief_id}",
-        arena=score.arena,
-        costume=play.costume,
-        angle=score.angle,
-        body=body,
-        wave_checklist=play.wave,
-        canon_url=play.canon_url,
-        created_at=clock,
-    ).with_hash()
+    """Costume-native body for the single chosen arena. Kill/changelog emit nothing.
+
+    Scoring stays here. Dressing is influenzer.hom_draft — this is a thin call.
+    """
+    from influenzer.hom_draft import dress_brief
+
+    return dress_brief(brief, score, now=now)
 
 
 def apply_brief(brief: Brief, *, now: str | None = None) -> OperatorDecision:
@@ -443,6 +401,7 @@ def decision_to_dict(decision: OperatorDecision) -> dict[str, Any]:
         out["costume"] = draft.costume
         out["content_hash"] = draft.content_hash
         out["wave_checklist"] = list(draft.wave_checklist)
+        out["body"] = draft.body
     else:
         out["wave_checklist"] = list(score.wave_checklist)
     return out

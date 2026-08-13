@@ -96,6 +96,33 @@ capability = "brief_admit"
 conduction = ["pack"]
 adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.brief_admit"] }
 
+[[impulse_types]]
+id = "hom.scored_brief"
+title = "Scored HoM brief"
+media_types = ["application/json"]
+value_schema = { type = "object", properties = { brief = { type = "object" }, score = { type = "object" } }, required = ["brief", "score"] }
+
+[[reaction_kinds]]
+id = "hom.draft"
+title = "Costume-native one-arena draft or silence"
+media_types = ["application/json"]
+
+[[capabilities]]
+id = "hom_draft"
+title = "Dress a scored brief into costume-native copy, or silence; does not score, pick an arena, write state.db, or publish"
+accepts_impulse_types = ["hom.scored_brief"]
+emits_reaction_kinds = ["hom.draft"]
+
+[[correlation_paths]]
+id = "hom_draft"
+title = "Scored brief → costume-native draft or silence"
+description = "Does not survey GitHub, call gh, write state.db, pick the arena, score, publish, or enable live. Host compose is apply_brief / tick (score then this block)."
+
+[[correlation_paths.effectors]]
+id = "draft"
+capability = "hom_draft"
+adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_draft"] }
+
 # Always-on interval loop is `influenzer-tick` on a Mac mini (not a laptop LaunchAgent).
 # Fala conducts tick and the github_scan path. `influenzer brief scan` is host compose.
 

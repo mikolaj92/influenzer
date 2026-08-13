@@ -90,9 +90,10 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 ## Stack
 
 - **SQLite** `state.db` is the host-owned domain (projects, briefs, drafts). `runtime.db` is reserved for the Fala journal; effectors do not open it.
-- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for `operator_tick` (`influenzer-tick-all`) and `github_scan` (`github_survey` → `github_pack` → `influenzer.brief_admit`). Survey and pack are separate blocks; the host admits into `state.db`. Effectors never open `runtime.db`. The engine stays Mojo; Influenzer does not embed a second host.
+- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for `operator_tick` (`influenzer-tick-all`), `github_scan` (`github_survey` → `github_pack` → `influenzer.brief_admit`), and draft-only `hom_draft`. Survey and pack are separate blocks; the host admits into `state.db`. Tick scores then asks `hom_draft` for wearable copy. Effectors never open `runtime.db`. The engine stays Mojo; Influenzer does not embed a second host.
 - **github_survey** — public GitHub → JSON. Does not know briefs, drafts, `state.db`, scoring, publishing, or arenas. See [`github_survey/README.md`](github_survey/README.md).
 - **github_pack** — survey JSON → facts + ship/tryable, or silence. Does not call `gh`, write SQLite, or tick. See [`github_pack/README.md`](github_pack/README.md).
+- **hom_draft** — scored brief → costume-native one-arena `body`, or silence. Does not score, pick the arena, survey GitHub, write `state.db`, or publish. Host compose is `apply_brief` / tick. Fala may run `python3 -m influenzer.hom_draft`.
 - **uv** is the Python env/tooling. Mojo is not used here — the HoM copy is fail-closed rules/data in Python.
 - Local only. No hosted service, no Ads spend, no live social in this path. 24/7 tick is an always-on host process, not a laptop LaunchAgent.
 
