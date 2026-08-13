@@ -538,27 +538,17 @@ class StateRepository:
         )
         return [self._brief_from_row(row) for row in rows]
 
-    def list_operator_drafts(self, project_id: str) -> list[Draft]:
-        rows = self.conn.execute(
-            "SELECT * FROM operator_drafts WHERE project_id=? ORDER BY created_at, draft_id",
-            (project_id,),
-        )
-        return [
-            Draft(
-                project_id=row["project_id"],
-                brief_id=row["brief_id"],
-                draft_id=row["draft_id"],
-                arena=ArenaId(row["arena"]),
-                costume=row["costume"],
-                angle=row["angle"],
-                body=row["body"],
-                wave_checklist=tuple(json.loads(row["wave_checklist_json"] or "[]")),
-                canon_url=row["canon_url"],
-                created_at=row["created_at"],
-                content_hash=row["content_hash"],
+    def list_operator_drafts(self, project_id: str | None = None) -> list[Draft]:
+        if project_id is None:
+            rows = self.conn.execute(
+                "SELECT * FROM operator_drafts ORDER BY created_at, draft_id"
             )
-            for row in rows
-        ]
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM operator_drafts WHERE project_id=? ORDER BY created_at, draft_id",
+                (project_id,),
+            )
+        return [self._draft_from_row(row) for row in rows]
 
     def get_operator_score(self, project_id: str, brief_id: str) -> Score | None:
         row = self.conn.execute(
@@ -586,6 +576,9 @@ class StateRepository:
         ).fetchone()
         if row is None:
             return None
+        return self._draft_from_row(row)
+
+    def _draft_from_row(self, row: sqlite3.Row) -> Draft:
         return Draft(
             project_id=row["project_id"],
             brief_id=row["brief_id"],

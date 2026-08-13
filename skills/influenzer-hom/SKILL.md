@@ -51,7 +51,7 @@ On each `influenzer-tick-all` (or `influenzer-tick` locally), pending briefs are
 - **kill** / **changelog-only** / **one angle**. Silence is a correct decision. Borderline briefs do not leak a social draft.
 - **One primary arena.** Costume of that arena only; play the wave (checklist), not a champion fantasy.
 - A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill. Waitlist/landing and press-release tone fail closed.
-- Output is a **draft** (content status `draft`, source `operator`) whose `body` is costume-native copy for that one arena — not a `Costume:` / `One arena:` label dump. `influenzer.hom_draft` dresses; scoring stays fail-closed in `hom.py`. Live publish stays behind the existing dry-run / grant / `scheduler.live_enabled` gates. Tick-all never auto-spams.
+- Output is a **draft** (content status `draft`, source `operator`) whose `body` is costume-native copy for that one arena — not a `Costume:` / `One arena:` label dump. `influenzer.hom_draft` dresses; scoring stays fail-closed in `hom.py`. `influenzer angle` (`influenzer.hom_outbox`) leaves **one** wearable packet or silence — it does not publish. Live publish stays behind the existing dry-run / grant / `scheduler.live_enabled` gates. Tick-all never auto-spams.
 - Run the 24/7 tick on an always-on host (Mac mini): `uv run influenzer-tick --interval 300` or `contrib/always-on-tick.sh`. Battery laptops fail closed for the interval loop. `--once` is allowed anywhere. Not a laptop LaunchAgent. Fala may conduct the same one-shot as a subprocess organ.
 
 Ingest a brief (many facts), then tick:
@@ -62,6 +62,7 @@ influenzer brief ingest --project-id app-1 --brief-id b1 --story-kind major \
   --fact "what shipped" --fact "why a stranger should try it"
 influenzer-tick-all
 influenzer brief show --project-id app-1 --brief-id b1
+influenzer angle
 ```
 
 Canon (longer, first person): https://github.com/mikolaj92/influenzer-playbook

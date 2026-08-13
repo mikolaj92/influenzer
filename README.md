@@ -43,6 +43,7 @@ python -m influenzer.tick_all --config /tmp/influenzer/config.json
 python -m influenzer.tick --config /tmp/influenzer/config.json --once
 python -m influenzer.cli --config /tmp/influenzer/config.json brief show \
   --project-id app-1 --brief-id b-ship
+python -m influenzer.cli --config /tmp/influenzer/config.json angle
 ```
 
 `brief scan --project-id ID --repo owner/name` reads public GitHub signals through a `gh` subprocess (merged PRs, releases, tags) and stores **at most one** pending brief (`source=github-scan`), or stays silent. Commit-noise, waitlists, missing `gh`/auth, an empty survey, or an already-pending story are silence — not a crash. Scan does not publish, does not enable live social, and does not score; `tick-all` still scores pending briefs.
@@ -90,10 +91,11 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 ## Stack
 
 - **SQLite** `state.db` is the host-owned domain (projects, briefs, drafts). `runtime.db` is reserved for the Fala journal; effectors do not open it.
-- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for `operator_tick` (`influenzer-tick-all`), `github_scan` (`github_survey` → `github_pack` → `influenzer.brief_admit`), and draft-only `hom_draft`. Survey and pack are separate blocks; the host admits into `state.db`. Tick scores then asks `hom_draft` for wearable copy. Effectors never open `runtime.db`. The engine stays Mojo; Influenzer does not embed a second host.
+- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for `operator_tick` (`influenzer-tick-all`), `github_scan` (`github_survey` → `github_pack` → `influenzer.brief_admit`), draft-only `hom_draft`, and read-only `hom_outbox`. Survey and pack are separate blocks; the host admits into `state.db`. Tick scores then asks `hom_draft` for wearable copy. `influenzer angle` leaves at most one draft. Effectors never open `runtime.db`. The engine stays Mojo; Influenzer does not embed a second host.
 - **github_survey** — public GitHub → JSON. Does not know briefs, drafts, `state.db`, scoring, publishing, or arenas. See [`github_survey/README.md`](github_survey/README.md).
 - **github_pack** — survey JSON → facts + ship/tryable, or silence. Does not call `gh`, write SQLite, or tick. See [`github_pack/README.md`](github_pack/README.md).
 - **hom_draft** — scored brief → costume-native one-arena `body`, or silence. Does not score, pick the arena, survey GitHub, write `state.db`, or publish. Host compose is `apply_brief` / tick. Fala may run `python3 -m influenzer.hom_draft`.
+- **hom_outbox** — `state.db` → at most one wearable draft packet, or silence. Newest wearable by `created_at`, then `draft_id`. Does not score, dress, survey GitHub, call `gh`, publish, enable live, send mail, or write SQLite. Host compose is `influenzer angle`. Fala may run `python3 -m influenzer.hom_outbox`.
 - **uv** is the Python env/tooling. Mojo is not used here — the HoM copy is fail-closed rules/data in Python.
 - Local only. No hosted service, no Ads spend, no live social in this path. 24/7 tick is an always-on host process, not a laptop LaunchAgent.
 
@@ -105,6 +107,7 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer project create/show` | App or builder projects with BrandProfile |
 | `influenzer content add` | Immutable project-scoped content revision |
 | `influenzer brief ingest/show/scan` | HoM brief in; GitHub scan writes 0 or 1 pending brief; tick scores to draft or kill |
+| `influenzer angle` | One wearable draft from `state.db`, or silence. Does not publish. |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
 | `influenzer-tick-all` | Score pending briefs; due-plan mutator (dry-run default) |
 | `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini (not a laptop LaunchAgent) |
