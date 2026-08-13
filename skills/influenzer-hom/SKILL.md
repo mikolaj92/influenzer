@@ -53,7 +53,7 @@ On each `influenzer-tick-all` (or `influenzer-tick` locally), pending briefs are
 - A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill. Waitlist/landing and press-release tone fail closed.
 - Output is a **draft** (content status `draft`, source `operator`) whose `body` is costume-native copy for that one arena — not a `Costume:` / `One arena:` label dump. `influenzer.hom_draft` dresses; scoring stays fail-closed in `hom.py`. `influenzer angle` (`influenzer.hom_outbox`) leaves **one** wearable packet or silence — it does not publish. `influenzer verdict hold` / `pass` (`influenzer.hom_verdict`) records the gate decision; hold releases the one-story lock, pass does not post. Live publish stays behind the existing dry-run / grant / `scheduler.live_enabled` gates. Tick-all never auto-spams.
 - Run the 24/7 tick on an always-on host (Mac mini): `uv run influenzer-tick --interval 300` or `contrib/always-on-tick.sh`. Battery laptops fail closed for the interval loop. `--once` is allowed anywhere. Not a laptop LaunchAgent. Fala may conduct the same one-shot as a subprocess organ.
-- Look at GitHub on a coarse cadence (about weekly), one story or silence — not every tick. `influenzer brief scan-due --project-id ID --repo owner/name` (or `brief scan --if-due`) composes the existing scan only when due. Tick still does not survey GitHub.
+- Look at GitHub on a coarse cadence (about weekly), one story or silence — not every tick. `influenzer pass --project-id ID --repo owner/name` is one CMO look: scan-due, score pending briefs, at most one wearable angle. `influenzer brief scan-due --project-id ID --repo owner/name` (or `brief scan --if-due`) is the scan-only slice. Tick still does not survey GitHub. Verdict stays the gate.
 
 Ingest a brief (many facts), then tick:
 
@@ -65,6 +65,8 @@ influenzer-tick-all
 influenzer brief show --project-id app-1 --brief-id b1
 influenzer angle
 influenzer verdict hold
+# or one CMO look:
+influenzer pass --project-id app-1 --repo owner/name
 ```
 
 Canon (longer, first person): https://github.com/mikolaj92/influenzer-playbook
