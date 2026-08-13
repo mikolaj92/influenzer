@@ -235,10 +235,15 @@ SOCIAL_ARENAS: frozenset[ArenaId] = frozenset(
     }
 )
 
-# Ship claims must point at a PR, release, or issue — not a vibe, landing page, or commit.
+# Ship claims must point at a tryable GitHub artifact: the repo (the website),
+# a PR, a release, or an issue — not a vibe, landing page, commit, or GitHub chrome.
+# Repo root may have a trailing slash. Gist/wiki/compare/commit/tree/blob/actions/
+# settings and user/org profile URLs are not ship artifacts.
 SHIP_ARTIFACT_RE = re.compile(
-    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
-    r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
+    r"^https://github\.com/"
+    r"(?!(?:gist|orgs|settings|users)/)"
+    r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+    r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))?)?$"
 )
 
 WAITLIST_RE = re.compile(
