@@ -5,9 +5,10 @@ import unittest
 from unittest.mock import patch
 
 from github_pack import looks_like_patch_only, looks_like_ship_title, pack_survey
+from github_pack.classify import facts_are_merge_log, looks_like_merged_pr_fact
 from github_survey import GhCall, survey_public_repo
 
-from tests.gh_scripts import NOW, REPO, noise_script, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, merge_log_script, noise_script, ship_script, ScriptedGh
 
 
 class HeuristicTests(unittest.TestCase):
@@ -19,7 +20,27 @@ class HeuristicTests(unittest.TestCase):
         self.assertFalse(looks_like_ship_title("chore: bump deps"))
         self.assertTrue(looks_like_ship_title("feat: local HoM operator scores briefs"))
         self.assertTrue(looks_like_ship_title("Shipped the operator tick"))
+        self.assertTrue(looks_like_ship_title("Treat GitHub repo root as a ship artifact"))
         self.assertFalse(looks_like_ship_title("Refactor storage helpers"))
+        self.assertTrue(looks_like_merged_pr_fact("Merged PR #190: Treat GitHub repo root as a ship artifact"))
+        self.assertFalse(looks_like_merged_pr_fact("Released v0.1.0"))
+        self.assertTrue(
+            facts_are_merge_log(
+                [
+                    {"text": "Merged PR #190: Treat GitHub repo root as a ship artifact"},
+                    {"text": "Merged PR #187: feat: prior look"},
+                    {"text": "README has an install/quickstart a stranger can run"},
+                ]
+            )
+        )
+        self.assertFalse(
+            facts_are_merge_log(
+                [
+                    {"text": "Released v0.1.0"},
+                    {"text": "Merged PR #12: feat: local HoM operator scores briefs"},
+                ]
+            )
+        )
 
 
 class PackSilenceTests(unittest.TestCase):
@@ -46,6 +67,14 @@ class PackSilenceTests(unittest.TestCase):
         urls = {item["artifact_url"] for item in out["facts"] if item.get("artifact_url")}
         self.assertIn("https://github.com/mikolaj92/demo/pull/12", urls)
         self.assertIn("https://github.com/mikolaj92/demo/releases/tag/v0.1.0", urls)
+
+    def test_merge_window_without_release_is_not_a_tryable_ship(self) -> None:
+        out = self._pack(merge_log_script())
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "not_tryable")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("facts", out)
 
     def test_waitlist_release_is_silence(self) -> None:
         out = self._pack(

@@ -21,7 +21,7 @@ from influenzer.hom_pass import main as pass_main
 from influenzer.hom_pass import run_pass
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
-from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, noise_script, ship_script
+from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, merge_log_script, noise_script, ship_script
 
 
 def _import_lines(path: Path) -> list[str]:
@@ -163,6 +163,25 @@ class HomPassTests(unittest.TestCase):
         self.assertIsNone(self.repo.get_brief("app-1", "scan-v0-1-0"))
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
         self.assertFalse(out["published"])
+
+    def test_merge_log_look_is_not_show_hn(self) -> None:
+        out, fake = self._pass(merge_log_script())
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        blob = json.dumps(out)
+        self.assertNotIn("Show HN: Merged PR", blob)
+        self.assertNotIn("Show HN: Merged PR #190", blob)
+        angle = out["angle"]
+        body = angle.get("body")
+        if body:
+            self.assertFalse(str(body).startswith("Show HN: Merged PR"))
+            self.assertNotIn("Merged PR #190", str(body).split("\n", 1)[0])
+        else:
+            self.assertTrue(angle.get("empty") or angle.get("status") == "noop")
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], "not_tryable")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertTrue(fake.calls)
 
     def test_noise_look_is_due_silence_then_not_due_without_gh(self) -> None:
         first, fake1 = self._pass(noise_script())

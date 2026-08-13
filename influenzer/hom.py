@@ -28,6 +28,7 @@ from influenzer.playbook import (
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
+    is_merge_log_texts,
     is_ship_artifact_url,
     is_social_arena,
     looks_like_commit_noise,
@@ -277,6 +278,22 @@ def _enough_social_substance(brief: Brief) -> bool:
     return len(meaty) >= MIN_SOCIAL_FACTS
 
 
+def _wearable_fact_texts(brief: Brief) -> tuple[str, ...]:
+    found: list[str] = []
+    for fact in brief.facts:
+        text = fact.text.strip()
+        if not text:
+            continue
+        if fact.kind.strip().lower() == "artifact" or text.casefold() == "ship artifact":
+            continue
+        found.append(text)
+    return tuple(found)
+
+
+def _is_merge_log_brief(brief: Brief) -> bool:
+    return is_merge_log_texts(_wearable_fact_texts(brief))
+
+
 def _choose_arena(brief: Brief) -> ArenaId:
     """One primary arena. GitHub is the website; HN only when there is a clickable demo."""
     if brief.preferred_arena is not None:
@@ -325,6 +342,8 @@ def score_brief(brief: Brief) -> Score:
         return _changelog(brief, "patch_changelog_only")
     if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):
         return _changelog(brief, "commit_noise_changelog")
+    if _is_merge_log_brief(brief):
+        return _changelog(brief, "merge_log_changelog")
     if brief.claims_ship:
         if not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
             return _kill(brief, "ship_claim_missing_artifact")

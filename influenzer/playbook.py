@@ -256,6 +256,8 @@ PRESS_RELEASE_RE = re.compile(
 COMMIT_NOISE_RE = re.compile(
     r"(?i)^\s*(?:chore|typo|lint|ci|wip|bump\s+(?:version|deps)|fix(?:es)?\s+tests|merge\s+branch)\b"
 )
+# A window of merged PRs is changelog, not a clickable product.
+MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
@@ -373,6 +375,21 @@ def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
 
+def looks_like_merged_pr_fact(text: str) -> bool:
+    return bool(MERGED_PR_FACT_RE.match(text.strip()))
+
+
+def is_merge_log_texts(texts: tuple[str, ...] | list[str]) -> bool:
+    """True when the look is a stack of 'Merged PR #N: …' (lead or all wearable)."""
+    meat = [item.strip() for item in texts if item and item.strip()]
+    if not meat:
+        return False
+    merge = [item for item in meat if looks_like_merged_pr_fact(item)]
+    if not merge:
+        return False
+    return looks_like_merged_pr_fact(meat[0]) or len(merge) == len(meat)
+
+
 def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
@@ -408,6 +425,7 @@ __all__ = [
     "CANON_URL",
     "COMMIT_NOISE_RE",
     "HN_STORY_KINDS",
+    "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
     "NEWSLETTER_STORY_KINDS",
@@ -421,9 +439,11 @@ __all__ = [
     "has_cinema_package",
     "has_fair_hook",
     "has_named_subreddit",
+    "is_merge_log_texts",
     "is_ship_artifact_url",
     "is_social_arena",
     "looks_like_commit_noise",
+    "looks_like_merged_pr_fact",
     "looks_like_press_release",
     "looks_like_waitlist",
     "parse_arena",

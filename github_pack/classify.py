@@ -1,4 +1,4 @@
-"""Ship vs patch/typo/chore noise. Waitlist is not a ship."""
+"""Ship vs patch/typo/chore noise. Waitlist is not a ship. A merge log is not a ship."""
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
 )
+_MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 
 
 def looks_like_patch_only(text: str) -> bool:
@@ -75,9 +76,26 @@ def readme_installable(text: str) -> bool:
     return bool(_INSTALL_RE.search(text))
 
 
+def looks_like_merged_pr_fact(text: str) -> bool:
+    return bool(_MERGED_PR_FACT_RE.match(text.strip()))
+
+
+def facts_are_merge_log(facts: Sequence[Mapping[str, Any]]) -> bool:
+    """A stack of 'Merged PR #N: …' is changelog, not a tryable ship."""
+    meat = [str(item.get("text") or "").strip() for item in facts if str(item.get("text") or "").strip()]
+    if not meat:
+        return False
+    merge = [text for text in meat if looks_like_merged_pr_fact(text)]
+    if not merge:
+        return False
+    return looks_like_merged_pr_fact(meat[0]) or len(merge) == len(meat)
+
+
 def is_tryable(survey: Mapping[str, Any], facts: Sequence[Mapping[str, Any]]) -> bool:
+    if facts_are_merge_log(facts) and not survey.get("releases"):
+        return False
     if survey.get("releases"):
         return True
     if readme_installable(str(survey.get("readme_text") or "")):
         return True
-    return any(is_ship_artifact(str(fact.get("artifact_url") or "") or None) and fact.get("kind") == "pull" for fact in facts)
+    return False

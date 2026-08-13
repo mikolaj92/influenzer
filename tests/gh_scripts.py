@@ -90,6 +90,44 @@ def ship_script(**overrides: GhCall) -> dict[str, GhCall]:
     return script
 
 
+def merge_log_script() -> dict[str, GhCall]:
+    """Merged-PR window with an installable README and no release — changelog, not Show HN."""
+    return {
+        "repo": GhCall(0, repo_json(description="Local tick scores briefs and emits a draft")),
+        "prs": GhCall(
+            0,
+            json.dumps(
+                [
+                    {
+                        "number": 190,
+                        "title": "Treat GitHub repo root as a ship artifact",
+                        "url": "https://github.com/mikolaj92/demo/pull/190",
+                        "mergedAt": "2026-08-12T12:00:00Z",
+                        "body": "",
+                    },
+                    {
+                        "number": 187,
+                        "title": "feat: prior operator look",
+                        "url": "https://github.com/mikolaj92/demo/pull/187",
+                        "mergedAt": "2026-08-12T11:00:00Z",
+                        "body": "",
+                    },
+                    {
+                        "number": 22,
+                        "title": "feat(hom): local tick scores briefs",
+                        "url": "https://github.com/mikolaj92/demo/pull/22",
+                        "mergedAt": "2026-08-12T10:00:00Z",
+                        "body": "",
+                    },
+                ]
+            ),
+        ),
+        "releases": GhCall(0, "[]"),
+        "tags": GhCall(0, "[]"),
+        "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n")),
+    }
+
+
 def noise_script() -> dict[str, GhCall]:
     return {
         "repo": GhCall(0, repo_json()),
