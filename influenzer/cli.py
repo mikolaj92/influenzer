@@ -136,6 +136,33 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     confirm.add_argument("--plan-id", required=True)
     confirm.add_argument("--url", required=True)
 
+    tick_loop = sub.add_parser(
+        "tick-loop",
+        help="always-on HoM tick on a Mac mini / always-on host (not a laptop LaunchAgent)",
+    )
+    tick_loop.add_argument(
+        "--interval",
+        type=float,
+        default=None,
+        help="seconds between ticks (default 300; ignored with --once)",
+    )
+    tick_loop.add_argument(
+        "--once",
+        action="store_true",
+        help="run a single tick then exit (same mutator as influenzer-tick-all)",
+    )
+    tick_loop.add_argument(
+        "--max-ticks",
+        type=int,
+        default=None,
+        help="stop after N ticks",
+    )
+    tick_loop.add_argument(
+        "--live",
+        action="store_true",
+        help="ignored; only scheduler.live_enabled can authorize live mutation",
+    )
+
     brief = sub.add_parser("brief", help="ingest HoM briefs (many facts; tick scores them)")
     brief_sub = brief.add_subparsers(dest="brief_command")
     ingest = brief_sub.add_parser("ingest", help="store a pending brief; tick-all scores it")
@@ -533,6 +560,22 @@ def handle_cli(args: argparse.Namespace) -> int:
             print(json.dumps({"status": "ok", "plan_id": plan.plan_id, "plan_status": updated.status.value, "provider_id": match.group(1), "provider_url": args.url}, sort_keys=True))
             return 0
 
+    if args.command == "tick-loop":
+        from influenzer.tick import main as tick_main
+
+        tick_argv: list[str] = []
+        if args.config:
+            tick_argv.extend(["--config", args.config])
+        if args.interval is not None:
+            tick_argv.extend(["--interval", str(args.interval)])
+        if args.once:
+            tick_argv.append("--once")
+        if args.max_ticks is not None:
+            tick_argv.extend(["--max-ticks", str(args.max_ticks)])
+        if args.live:
+            tick_argv.append("--live")
+        return tick_main(tick_argv)
+
     if args.command == "brief" and args.brief_command == "ingest":
         try:
             if args.from_json:
@@ -621,7 +664,7 @@ def handle_cli(args: argparse.Namespace) -> int:
         return 0
 
     print(
-        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief}",
+        "usage: influenzer [--version] {init,project,content,campaign,account,policy,grant,publish,brief,tick-loop}",
         file=sys.stderr,
     )
     return 2
