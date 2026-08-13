@@ -636,7 +636,9 @@ def handle_cli(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "brief" and args.brief_command == "scan":
-        from influenzer.github_scan import invalid_repo_reason, scan_github
+        from github_survey import invalid_repo_reason
+
+        from influenzer.brief_scan import scan_github
 
         bad = invalid_repo_reason(args.repo)
         if bad:

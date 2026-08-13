@@ -1,8 +1,10 @@
 """Always-on HoM tick loop for a Mac mini / always-on host.
 
-Not a laptop LaunchAgent. Not a hosted service. A human starts this process on
-the always-on box; the repo does not SSH or deploy. Fala may conduct the same
-one-shot as a subprocess organ (`influenzer-tick-all`).
+Pending briefs → score / one-arena draft or kill. Does not survey GitHub.
+Does not call gh. Does not admit briefs. Not a laptop LaunchAgent. Not a
+hosted service. A human starts this process on the always-on box; the repo
+does not SSH or deploy. Fala may conduct the same one-shot as a subprocess
+organ (`influenzer-tick-all`).
 """
 
 from __future__ import annotations
