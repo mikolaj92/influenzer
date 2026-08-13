@@ -4,7 +4,7 @@ Local multi-project social operator for organic posting and campaign planning.
 
 Influenzer runs on your machine as a **local 24/7 Head of Marketing operator**. Every app has its own Project + BrandProfile. The builder is also a first-class Project (`kind=builder`) with a separate profile and accounts.
 
-On each `influenzer-tick-all` (or a local `influenzer-tick` loop), pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Scoring is fail-closed: borderline briefs do not leak a social draft. Not every commit/event becomes a post. Drafts are local; they are not auto-published. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
+On each `influenzer-tick-all` (or an always-on `influenzer-tick` loop on a Mac mini), pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Scoring is fail-closed: borderline briefs do not leak a social draft. Not every commit/event becomes a post. Drafts are local; they are not auto-published. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
 
 Playbook canon (first person): https://github.com/mikolaj92/influenzer-playbook — encoded as rules/data in `influenzer/playbook.py`.
 
@@ -47,22 +47,23 @@ python -m influenzer.cli --config /tmp/influenzer/config.json brief show \
 
 `tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It still does not auto-publish. `influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
 
-## Local tick (no LaunchAgent)
+## Always-on tick (Mac mini)
 
-The operator tick is a local process. There is no LaunchAgent plist and no Mac mini target.
+The 24/7 operator stays up on an **always-on host** (a Mac mini or similar), not a laptop LaunchAgent. There is no plist in this repo. This repo does not SSH or deploy; a human starts the process on the box that already has `state.db`.
 
 ```bash
-# one shot (same mutator as influenzer-tick-all)
-uv run influenzer-tick --once
-
-# interval loop against local SQLite state.db
+# on the mini — interval loop against local SQLite state.db
+# (fails closed if this machine is a battery laptop)
 uv run influenzer-tick --interval 300
+# same keep-up:
+contrib/always-on-tick.sh
+# or: influenzer tick-loop --interval 300
 
-# equivalent shell loop
-while true; do uv run influenzer-tick-all; sleep 300; done
+# one shot (same mutator as influenzer-tick-all; allowed on any machine)
+uv run influenzer-tick --once
 ```
 
-Fala (`mikolaj92/Fala`) may conduct the same one-shot as a **subprocess** organ (`python3 -m influenzer.tick_all` in [`fala-package.toml`](fala-package.toml)). The loop CLI is for when no Fala host and no LaunchAgent are present. Domain state stays in `state.db`.
+Fala (`mikolaj92/Fala`) may conduct the same one-shot as a **subprocess** organ (`python3 -m influenzer.tick_all` in [`fala-package.toml`](fala-package.toml)). Domain state stays in `state.db`. Do **not** install a LaunchAgent on a laptop.
 
 ## Configure
 
@@ -89,7 +90,7 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 - **SQLite** `state.db` is the host-owned domain (projects, briefs, drafts). `runtime.db` is reserved for the Fala journal; effectors do not open it.
 - **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for the `operator_tick` path (subprocess `influenzer-tick-all`). The engine stays Mojo; Influenzer does not embed a second host.
 - **uv** is the Python env/tooling. Mojo is not used here — the HoM copy is fail-closed rules/data in Python.
-- Local only. No hosted service, no Ads spend, no live social in this path, no LaunchAgent.
+- Local only. No hosted service, no Ads spend, no live social in this path. 24/7 tick is an always-on host process, not a laptop LaunchAgent.
 
 ## Commands
 
@@ -101,7 +102,7 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer brief ingest/show` | HoM brief in; tick scores to draft or kill |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
 | `influenzer-tick-all` | Score pending briefs; due-plan mutator (dry-run default) |
-| `influenzer-tick` | Local interval loop around the same mutator (no LaunchAgent) |
+| `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini (not a laptop LaunchAgent) |
 
 ## Platforms (v1 dry-run/contract)
 

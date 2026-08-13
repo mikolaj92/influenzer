@@ -5,7 +5,7 @@ Inspect policy-gated publish plans and scheduler intent.
 ## Rules
 - Dry-run by default. Live organic publish requires durable live intent + hash-bound PolicyActivationGrant.
 - `influenzer-tick-all` scores pending HoM briefs into drafts or explicit kills; it ignores CLI `--live` for publish. Only `scheduler.live_enabled=true` authorizes live mutation.
-- Local loop: `influenzer-tick --interval 300` (or `--once`). No LaunchAgent. No live social from this path.
+- Always-on loop (Mac mini): `influenzer-tick --interval 300` or `influenzer tick-loop`. `--once` is allowed anywhere. Not a laptop LaunchAgent. No live social from this path.
 - One PublishPlan targets one platform account. Fanout means independent plans.
 - Never place secrets in config/DB/logs; use `credential_ref` only (`env:` / `keychain:`).
 
