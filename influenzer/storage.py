@@ -128,6 +128,36 @@ class StateRepository:
                 conn=c,
             )
 
+    def set_hom_watch(self, project_id: str, repo_slug: str, *, created_at: str) -> None:
+        """Persist the singleton declared watch (one project, one repo)."""
+        with self.transaction() as c:
+            self._require_project(c, project_id)
+            c.execute(
+                """
+                INSERT INTO hom_watch(id, project_id, repo_slug, created_at)
+                VALUES (1, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    project_id=excluded.project_id,
+                    repo_slug=excluded.repo_slug,
+                    created_at=excluded.created_at
+                """,
+                (project_id, repo_slug, created_at),
+            )
+            self._event(project_id, "watch.set", {"repo": repo_slug}, conn=c)
+
+    def get_hom_watch(self) -> dict[str, str] | None:
+        """Return the declared watch, or None. v1 is one project → one repo."""
+        row = self.conn.execute(
+            "SELECT project_id, repo_slug, created_at FROM hom_watch WHERE id=1"
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "project_id": row["project_id"],
+            "repo": row["repo_slug"],
+            "created_at": row["created_at"],
+        }
+
     def save_project(self, project: Project, *, event_type: str = "project.created", event_payload: Any | None = None) -> None:
         if project.brand.project_id != project.project_id:
             raise CrossProjectError("brand profile belongs to another project")

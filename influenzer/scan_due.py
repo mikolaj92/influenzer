@@ -115,6 +115,28 @@ def window_elapsed(last: str | None, now: str, *, window_days: int) -> bool:
     return now_dt - last_dt >= timedelta(days=window_days)
 
 
+def scan_due_reason(
+    repo: StateRepository,
+    *,
+    project_id: str,
+    repo_slug: str,
+    now: str | None = None,
+    window_days: int = DEFAULT_WINDOW_DAYS,
+) -> str | None:
+    """Silence reason if scan-due would not look. None means due. Does not call gh."""
+    slug = repo_slug.strip()
+    clock = now or utc_now()
+    if invalid_repo_reason(slug):
+        return "repo must be owner/name"
+    blocked = open_story_reason(repo, project_id)
+    if blocked:
+        return blocked
+    last = last_scan_at(repo, project_id, slug)
+    if not window_elapsed(last, clock, window_days=window_days):
+        return "not due"
+    return None
+
+
 def scan_github_if_due(
     repo: StateRepository,
     *,
@@ -127,14 +149,15 @@ def scan_github_if_due(
     """Compose existing scan only when due. Does not call gh itself."""
     slug = repo_slug.strip()
     clock = now or utc_now()
-    if invalid_repo_reason(slug):
-        return host_silence("repo must be owner/name", project_id=project_id, repo_slug=slug)
-    blocked = open_story_reason(repo, project_id)
+    blocked = scan_due_reason(
+        repo,
+        project_id=project_id,
+        repo_slug=slug,
+        now=clock,
+        window_days=window_days,
+    )
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
-    last = last_scan_at(repo, project_id, slug)
-    if not window_elapsed(last, clock, window_days=window_days):
-        return host_silence("not due", project_id=project_id, repo_slug=slug)
     out = scan_github(repo, project_id=project_id, repo_slug=slug, gh=gh, now=clock)
     repo.record_github_scan(project_id, slug, scanned_at=clock)
     return out
@@ -177,6 +200,7 @@ __all__ = [
     "brief_mentions_repo",
     "last_scan_at",
     "main",
+    "scan_due_reason",
     "scan_github_if_due",
     "window_elapsed",
 ]

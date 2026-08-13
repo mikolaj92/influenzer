@@ -48,7 +48,7 @@ python -m influenzer.cli --config /tmp/influenzer/config.json angle
 
 `brief scan --project-id ID --repo owner/name` reads public GitHub signals through a `gh` subprocess (merged PRs, releases, tags) and stores **at most one** pending brief (`source=github-scan`), or stays silent. Commit-noise, waitlists, missing `gh`/auth, an empty survey, or an already-pending story are silence — not a crash. Scan does not publish, does not enable live social, and does not score; `tick-all` still scores pending briefs.
 
-`brief scan-due` (or `brief scan --if-due`) is the same compose **only when due**: a pending brief or unprocessed social draft is silence; a successful look (or github-scan brief) newer than 7 days (overridable) is `not due` and does not call `gh`. `influenzer pass --project-id ID --repo owner/name` is **one CMO look**: that scan-due, then score pending briefs, then at most one wearable angle. Verdict stays the gate. The always-on host can invoke that coarse path on a weekly-ish clock. Tick still does not survey GitHub.
+`brief scan-due` (or `brief scan --if-due`) is the same compose **only when due**: a pending brief or unprocessed social draft is silence; a successful look (or github-scan brief) newer than 7 days (overridable) is `not due` and does not call `gh`. `influenzer pass --project-id ID --repo owner/name` is **one CMO look**: that scan-due, then score pending briefs, then at most one wearable angle. Verdict stays the gate. Declare the look with `influenzer watch set --project-id ID --repo owner/name`. The interval loop still scores every time; when that watch exists and scan-due would consider it due, it runs `hom_pass` once. `--once` stays score-only unless `--pass-if-due`.
 
 `tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It still does not auto-publish. `influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
 
@@ -57,18 +57,23 @@ python -m influenzer.cli --config /tmp/influenzer/config.json angle
 The 24/7 operator stays up on an **always-on host** (a Mac mini or similar), not a laptop LaunchAgent. There is no plist in this repo. This repo does not SSH or deploy; a human starts the process on the box that already has `state.db`. On **mini-m4-0**, hop on and start the existing dry-run tick: [`docs/mini-m4-0.md`](docs/mini-m4-0.md).
 
 ```bash
-# on the mini — interval loop against local SQLite state.db
+# on the mini — declare the one watch, then keep the interval loop up
+uv run influenzer --config ~/.hermes/influenzer/config.json watch set \
+  --project-id app-1 --repo owner/name
+# interval loop against local SQLite state.db
 # (fails closed if this machine is a battery laptop)
 uv run influenzer-tick --interval 300
 # same keep-up:
 contrib/always-on-tick.sh
 # or: influenzer tick-loop --interval 300
 
-# one shot (same mutator as influenzer-tick-all; allowed on any machine)
+# one shot (score-only like influenzer-tick-all; does not scan; allowed on any machine)
 uv run influenzer-tick --once
+# one shot that may hom_pass if the declared watch is due:
+uv run influenzer-tick --once --pass-if-due
 ```
 
-Fala (`mikolaj92/Fala`) may conduct the same one-shot as a **subprocess** organ (`python3 -m influenzer.tick_all` in [`fala-package.toml`](fala-package.toml)), the GitHub scan as `github_survey` → `github_pack` → `influenzer.brief_admit`, the coarse look as `python3 -m influenzer.scan_due` (not on the 5-minute tick), and one CMO cycle as `python3 -m influenzer.hom_pass`. `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` is the weekly-ish look; `influenzer pass` is scan-due → tick → one angle. Domain state stays in `state.db`. Do **not** install a LaunchAgent on a laptop.
+Fala (`mikolaj92/Fala`) may conduct the score-only one-shot as a **subprocess** organ (`python3 -m influenzer.tick_all` in [`fala-package.toml`](fala-package.toml)), the GitHub scan as `github_survey` → `github_pack` → `influenzer.brief_admit`, the coarse look as `python3 -m influenzer.scan_due` (not on the 5-minute Fala tick), and one CMO cycle as `python3 -m influenzer.hom_pass`. Watch set is host CLI only — no Fala organ. `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` is the weekly-ish look; `influenzer pass` is scan-due → tick → one angle. Domain state stays in `state.db`. Do **not** install a LaunchAgent on a laptop.
 
 ## Configure
 
@@ -99,7 +104,8 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 - **hom_draft** — scored brief → costume-native one-arena `body`, or silence. Does not score, pick the arena, survey GitHub, write `state.db`, or publish. Host compose is `apply_brief` / tick. Fala may run `python3 -m influenzer.hom_draft`.
 - **hom_outbox** — `state.db` → at most one wearable draft packet, or silence. Newest wearable by `created_at`, then `draft_id`. Does not score, dress, survey GitHub, call `gh`, publish, enable live, send mail, or write SQLite. Host compose is `influenzer angle`. Fala may run `python3 -m influenzer.hom_outbox`.
 - **hom_verdict** — hold or pass the current wearable angle. Hold archives that draft so the one-story lock releases and scan-due may run again. Pass records fit and does not post, enable live, or call adapters. Host compose is `influenzer verdict hold` / `influenzer verdict pass`. Fala may run `python3 -m influenzer.hom_verdict`.
-- **hom_pass** — one CMO look: `scan_due` → tick (score pending briefs) → `hom_outbox` (at most one angle). Reuses those functions; does not copy survey/pack/admit/score/dress/outbox. Does not verdict, publish, enable live, call `gh`, know Heimdall, or run every tick interval. Host compose is `influenzer pass --project-id ID --repo owner/name`. Fala may run `python3 -m influenzer.hom_pass`.
+- **hom_pass** — one CMO look: `scan_due` → tick (score pending briefs) → `hom_outbox` (at most one angle). Reuses those functions; does not copy survey/pack/admit/score/dress/outbox. Does not verdict, publish, enable live, call `gh`, know Heimdall, or run every tick interval. Host compose is `influenzer pass --project-id ID --repo owner/name`. The interval loop may invoke this once when a declared watch is due. Fala may run `python3 -m influenzer.hom_pass`.
+- **hom_watch** — declare one project → one repo (`influenzer watch set` / `watch show`). Persisted in `state.db`. The interval tick reuses `scan_due_reason` and runs existing `hom_pass` when due; otherwise it only scores. `--once` does not scan unless `--pass-if-due`. No Fala organ.
 - **scan_due** — same as scan (0 or 1 brief) only when the coarse window elapsed, else silence. Reuses `scan_github`; does not call `gh`, score, dress, publish, enable live, or run every tick interval. Host compose is `influenzer brief scan-due`. Fala may run `python3 -m influenzer.scan_due`.
 - **uv** is the Python env/tooling. Mojo is not used here — the HoM copy is fail-closed rules/data in Python.
 - Local only. No hosted service, no Ads spend, no live social in this path. 24/7 tick is an always-on host process, not a laptop LaunchAgent.
@@ -114,11 +120,12 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer brief ingest/show/scan` | HoM brief in; GitHub scan writes 0 or 1 pending brief; tick scores to draft or kill |
 | `influenzer brief scan-due` | Same as scan only when the coarse window elapsed; else silence. Does not score. |
 | `influenzer pass` | One CMO look: scan-due, score pending briefs, at most one angle. Does not publish. Verdict stays the gate. |
+| `influenzer watch set/show` | Declare the one project+repo the interval tick may look at. Explicit CLI only. |
 | `influenzer angle` | One wearable draft from `state.db`, or silence. Does not publish. |
 | `influenzer verdict` | Hold or pass the current angle. Hold releases the one-story lock. Pass does not post. |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
 | `influenzer-tick-all` | Score pending briefs; due-plan mutator (dry-run default) |
-| `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini (not a laptop LaunchAgent) |
+| `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini. Scores every time; may `hom_pass` when a declared watch is due. `--once` is score-only unless `--pass-if-due`. |
 
 ## Platforms (v1 dry-run/contract)
 
