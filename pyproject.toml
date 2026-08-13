@@ -14,6 +14,7 @@ dev = []
 [project.scripts]
 influenzer = "influenzer.cli:main"
 influenzer-tick-all = "influenzer.tick_all:main"
+influenzer-tick = "influenzer.tick:main"
 
 [build-system]
 requires = ["hatchling"]

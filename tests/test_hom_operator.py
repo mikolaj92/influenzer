@@ -17,7 +17,7 @@ from influenzer.hom import (
     is_ship_artifact,
     score_brief,
 )
-from influenzer.playbook import ARENAS, CANON_URL, ArenaId, StoryKind, Verdict
+from influenzer.playbook import ARENAS, CANON_URL, SOCIAL_ARENAS, ArenaId, StoryKind, Verdict
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from influenzer.tick_all import main as tick_all_main
@@ -166,7 +166,7 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.draft.costume, "agora")
         self.assertIn("rising thread", decision.draft.body)
 
-    def test_default_without_tryable_is_github_workshop(self) -> None:
+    def test_default_without_tryable_is_changelog_not_a_social_draft(self) -> None:
         brief = self._brief(
             claims_ship=False,
             tryable=False,
@@ -174,9 +174,172 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(Fact(text="explored adapter dry-run envelopes"),),
         )
         decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "exploration_not_a_post")
+        self.assertIsNone(decision.draft)
+
+    def test_decision_without_user_facing_change_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            story_kind=StoryKind.DECISION,
+            facts=(Fact(text="we picked SQLite over a hosted store"),),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "decision_not_user_facing")
+        self.assertIsNone(decision.draft)
+
+    def test_commit_noise_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            story_kind=StoryKind.MAJOR,
+            facts=(Fact(text="chore: bump deps"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "commit_noise_changelog")
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_waitlist_ship_claim_is_killed(self) -> None:
+        brief = self._brief(
+            facts=(Fact(text="join the waitlist, coming soon", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_press_release_tone_on_hn_is_killed(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(text="we are excited to announce a game-changer", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "press_release_tone")
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_youtube_without_package_is_killed(self) -> None:
+        brief = self._brief(preferred_arena=ArenaId.YOUTUBE)
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "cinema_missing_package")
+
+    def test_shorts_without_hook_is_killed(self) -> None:
+        brief = self._brief(preferred_arena=ArenaId.SHORTS)
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "fair_missing_hook")
+
+    def test_reddit_without_named_room_is_killed(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            preferred_arena=ArenaId.REDDIT,
+            facts=(Fact(text="I struggled with subprocess timeouts looking like success"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "reddit_no_room")
+
+    def test_x_without_tryable_is_killed_not_an_empty_feed_original(self) -> None:
+        brief = self._brief(
+            tryable=False,
+            claims_ship=False,
+            preferred_arena=ArenaId.X,
+            facts=(Fact(text="thinking about posting a launch thread"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "x_empty_feed")
+
+    def test_bluesky_without_artifact_is_killed(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            preferred_arena=ArenaId.BLUESKY,
+            facts=(Fact(text="vibe posting about the operator"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "bluesky_vibe_without_artifact")
+
+    def test_mastodon_ship_claim_is_killed_as_pr_tone(self) -> None:
+        brief = self._brief(preferred_arena=ArenaId.MASTODON)
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "mastodon_pr_tone")
+
+    def test_linkedin_one_fact_is_killed_as_court_not_ready(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.LINKEDIN,
+            facts=(Fact(text="shipped"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "court_not_ready")
+
+    def test_hn_without_clickable_url_is_killed(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            facts=(Fact(text="a working demo exists on my laptop"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "hn_not_tryable")
+
+    def test_hard_issue_defaults_to_github_workshop_not_social(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            story_kind=StoryKind.HARD_ISSUE,
+            facts=(
+                Fact(text="I struggled with timeouts looking like success"),
+                Fact(text="unknown plus reconcile is the rule now"),
+            ),
+        )
+        decision = apply_brief(brief)
         assert decision.draft is not None
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
         self.assertEqual(decision.draft.arena, ArenaId.GITHUB)
         self.assertEqual(decision.draft.costume, "workshop")
+
+    def test_youtube_with_package_drafts_cinema_only(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.YOUTUBE,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(kind="package", text="title plus thumb in 0.5s: one-angle operator tick"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertEqual(decision.draft.arena, ArenaId.YOUTUBE)
+        self.assertEqual(decision.draft.costume, "cinema")
+
+    def test_thin_x_brief_without_artifact_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.X,
+            facts=(Fact(text="shipped it"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "thin_brief")
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_every_arena_has_a_fail_closed_gate(self) -> None:
+        from influenzer.playbook import ARENA_GATES
+
+        self.assertEqual(set(ARENA_GATES), set(ARENAS))
+        self.assertTrue(ARENA_GATES[ArenaId.DISCORD].always_kill)
+        self.assertNotIn(ArenaId.GITHUB, SOCIAL_ARENAS)
 
     def test_scoring_is_deterministic(self) -> None:
         brief = self._brief()
@@ -316,7 +479,7 @@ class TickBriefPathTests(unittest.TestCase):
                     "tryable": True,
                     "preferred_arena": "reddit",
                     "facts": [
-                        {"kind": "pain", "text": "subprocess timeouts looked like success"},
+                        {"kind": "pain", "text": "subprocess timeouts looked like success in r/SideProject"},
                         {"kind": "fix", "text": "unknown plus reconcile, no blind retry"},
                     ],
                 }

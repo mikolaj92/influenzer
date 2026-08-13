@@ -6,6 +6,7 @@ This module is the machine-readable copy the plugin applies without freeform vib
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -218,14 +219,207 @@ def parse_arena(value: str | None) -> ArenaId | None:
     return ArenaId(value)
 
 
+# --- Fail-closed tables. First matching gate wins; silence is a correct decision. ---
+
+# Borrowed-attention surfaces. A draft here is a social post, not the GitHub website.
+SOCIAL_ARENAS: frozenset[ArenaId] = frozenset(
+    {
+        ArenaId.X,
+        ArenaId.LINKEDIN,
+        ArenaId.YOUTUBE,
+        ArenaId.SHORTS,
+        ArenaId.HN,
+        ArenaId.REDDIT,
+        ArenaId.BLUESKY,
+        ArenaId.MASTODON,
+    }
+)
+
+# Ship claims must point at a PR, release, or issue — not a vibe, landing page, or commit.
+SHIP_ARTIFACT_RE = re.compile(
+    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
+    r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
+)
+
+WAITLIST_RE = re.compile(
+    r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
+)
+PRESS_RELEASE_RE = re.compile(
+    r"(?i)\b(?:excited to announce|humbled to announce|we are (?:excited|pleased|proud) to|"
+    r"game[- ]changer|revolutionary|disrupt(?:ing|s)? the)\b"
+)
+COMMIT_NOISE_RE = re.compile(
+    r"(?i)^\s*(?:chore|typo|lint|ci|wip|bump\s+(?:version|deps)|fix(?:es)?\s+tests|merge\s+branch)\b"
+)
+SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
+CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
+FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
+
+# Social drafts need more than a single thin signal unless a ship artifact is attached.
+MIN_SOCIAL_FACTS = 2
+MIN_FACT_CHARS = 12
+
+HN_STORY_KINDS: frozenset[StoryKind] = frozenset({StoryKind.MAJOR, StoryKind.HARD_ISSUE})
+WORKSHOP_STORY_KINDS: frozenset[StoryKind] = frozenset(
+    {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE, StoryKind.DECISION}
+)
+NEWSLETTER_STORY_KINDS: frozenset[StoryKind] = frozenset(
+    {StoryKind.MAJOR, StoryKind.DECISION, StoryKind.FAILURE}
+)
+
+
+@dataclass(frozen=True)
+class ArenaGate:
+    """Named fail-closed checks for one arena. Missing proof kills; it does not draft."""
+
+    reason: str
+    always_kill: bool = False
+    require_tryable: bool = False
+    require_clickable_url: bool = False
+    require_ship_artifact: bool = False
+    require_subreddit: bool = False
+    require_package: bool = False
+    require_hook: bool = False
+    forbid_ship_claim: bool = False
+    min_facts: int = 0
+    allowed_story_kinds: frozenset[StoryKind] | None = None
+    mismatch_verdict: Verdict = Verdict.KILL
+
+
+ARENA_GATES: dict[ArenaId, ArenaGate] = {
+    ArenaId.DISCORD: ArenaGate(reason="discord_pre_pmf", always_kill=True),
+    ArenaId.HN: ArenaGate(
+        reason="hn_not_tryable",
+        require_tryable=True,
+        require_clickable_url=True,
+        allowed_story_kinds=HN_STORY_KINDS,
+    ),
+    ArenaId.X: ArenaGate(
+        reason="x_empty_feed",
+        require_tryable=True,
+        allowed_story_kinds=frozenset(
+            {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE}
+        ),
+    ),
+    ArenaId.LINKEDIN: ArenaGate(
+        reason="court_not_ready",
+        min_facts=2,
+        allowed_story_kinds=frozenset(
+            {StoryKind.MAJOR, StoryKind.DECISION, StoryKind.FAILURE}
+        ),
+    ),
+    ArenaId.YOUTUBE: ArenaGate(
+        reason="cinema_missing_package",
+        require_package=True,
+        allowed_story_kinds=frozenset(
+            {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE}
+        ),
+    ),
+    ArenaId.SHORTS: ArenaGate(
+        reason="fair_missing_hook",
+        require_hook=True,
+        allowed_story_kinds=frozenset(
+            {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE}
+        ),
+    ),
+    ArenaId.REDDIT: ArenaGate(
+        reason="reddit_no_room",
+        require_subreddit=True,
+        allowed_story_kinds=frozenset(
+            {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE}
+        ),
+    ),
+    ArenaId.BLUESKY: ArenaGate(
+        reason="bluesky_vibe_without_artifact",
+        require_ship_artifact=True,
+        allowed_story_kinds=frozenset({StoryKind.MAJOR, StoryKind.HARD_ISSUE}),
+    ),
+    ArenaId.MASTODON: ArenaGate(
+        reason="mastodon_pr_tone",
+        forbid_ship_claim=True,
+        allowed_story_kinds=frozenset({StoryKind.HARD_ISSUE, StoryKind.FAILURE}),
+    ),
+    ArenaId.NEWSLETTER: ArenaGate(
+        reason="newsletter_no_user_facing_change",
+        allowed_story_kinds=NEWSLETTER_STORY_KINDS,
+    ),
+    ArenaId.GITHUB: ArenaGate(
+        reason="workshop_not_a_story",
+        allowed_story_kinds=WORKSHOP_STORY_KINDS,
+        mismatch_verdict=Verdict.CHANGELOG_ONLY,
+    ),
+}
+
+
+def is_social_arena(arena: ArenaId | str | None) -> bool:
+    if arena is None:
+        return False
+    key = arena if isinstance(arena, ArenaId) else ArenaId(arena)
+    return key in SOCIAL_ARENAS
+
+
+def is_ship_artifact_url(url: str | None) -> bool:
+    if not url:
+        return False
+    return bool(SHIP_ARTIFACT_RE.fullmatch(url.strip()))
+
+
+def looks_like_commit_noise(text: str) -> bool:
+    return bool(COMMIT_NOISE_RE.search(text.strip()))
+
+
+def looks_like_waitlist(text: str) -> bool:
+    return bool(WAITLIST_RE.search(text))
+
+
+def looks_like_press_release(text: str) -> bool:
+    return bool(PRESS_RELEASE_RE.search(text))
+
+
+def has_named_subreddit(text: str) -> bool:
+    return bool(SUBREDDIT_RE.search(text))
+
+
+def has_cinema_package(text: str) -> bool:
+    return bool(CINEMA_PACKAGE_RE.search(text))
+
+
+def has_fair_hook(text: str) -> bool:
+    return bool(FAIR_HOOK_RE.search(text))
+
+
+def arena_gate(arena: ArenaId | str) -> ArenaGate:
+    key = arena if isinstance(arena, ArenaId) else ArenaId(arena)
+    return ARENA_GATES[key]
+
+
 __all__ = [
     "ANGLES",
+    "ARENA_GATES",
     "ARENAS",
+    "ArenaGate",
     "ArenaId",
     "ArenaPlay",
     "CANON_URL",
+    "COMMIT_NOISE_RE",
+    "HN_STORY_KINDS",
+    "MIN_FACT_CHARS",
+    "MIN_SOCIAL_FACTS",
+    "NEWSLETTER_STORY_KINDS",
+    "SHIP_ARTIFACT_RE",
+    "SOCIAL_ARENAS",
     "StoryKind",
     "Verdict",
+    "WORKSHOP_STORY_KINDS",
+    "arena_gate",
     "arena_play",
+    "has_cinema_package",
+    "has_fair_hook",
+    "has_named_subreddit",
+    "is_ship_artifact_url",
+    "is_social_arena",
+    "looks_like_commit_noise",
+    "looks_like_press_release",
+    "looks_like_waitlist",
     "parse_arena",
 ]
