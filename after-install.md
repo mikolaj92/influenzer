@@ -13,7 +13,7 @@
    ```
 3. Add content under one project only — never share bodies across profiles accidentally.
 4. Ingest **briefs** (many facts). `influenzer-tick-all` (or `influenzer-tick --once`) scores them: kill, changelog-only, or one-arena draft. Borderline briefs stay silent. Drafts are not published.
-5. On the always-on host (Mac mini), keep the tick up: `uv run influenzer-tick --interval 300` or `contrib/always-on-tick.sh`. Battery laptops fail closed for the interval loop. Do not install a LaunchAgent on a laptop. `--once` is fine anywhere.
+5. On the always-on host (Mac mini), keep the tick up: `uv run influenzer-tick --interval 300` or `contrib/always-on-tick.sh`. Battery laptops fail closed for the interval loop. Do not install a LaunchAgent on a laptop. `--once` is fine anywhere. On **mini-m4-0**, follow [`docs/mini-m4-0.md`](docs/mini-m4-0.md).
 6. Keep `scheduler.live_enabled` false until grants and dry-run adapters are verified.
 7. Platform credentials stay in env/keychain refs, never in config.
 8. HoM canon: https://github.com/mikolaj92/influenzer-playbook
