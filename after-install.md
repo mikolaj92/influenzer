@@ -1,14 +1,16 @@
 # After install — Influenzer
 
+From this checkout after `uv sync`. After `uv tool install git+https://github.com/mikolaj92/influenzer`, the same commands are `influenzer …` on PATH (drop `uv run`).
+
 1. Initialize a workspace:
    ```bash
-   python -m influenzer.cli init
+   uv run influenzer init
    ```
 2. Create an **app** project and a **builder** project (separate BrandProfiles):
    ```bash
-   python -m influenzer.cli project create --id app-1 --slug my-app --name "My App" \
+   uv run influenzer project create --id app-1 --slug my-app --name "My App" \
      --display-name "My App" --voice product --audience customers --maintainer you --kind app
-   python -m influenzer.cli project create --id builder-1 --slug me --name Me \
+   uv run influenzer project create --id builder-1 --slug me --name Me \
      --display-name Me --voice builder --audience builders --maintainer you --kind builder
    ```
 3. Add content under one project only — never share bodies across profiles accidentally.

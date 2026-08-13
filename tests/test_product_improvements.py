@@ -134,6 +134,13 @@ class InfluenzerInitDemoTests(unittest.TestCase):
         self.assertTrue((root / "plugin.yaml").exists())
         plugin = (root / "plugin.yaml").read_text(encoding="utf-8")
         self.assertIn("name: influenzer", plugin)
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("hermes plugins install", readme)
+        self.assertIn("uv sync", readme)
+        self.assertIn("uv run influenzer", readme)
+        after = (root / "after-install.md").read_text(encoding="utf-8")
+        self.assertIn("uv run influenzer", after)
+        self.assertNotIn("python -m influenzer.cli", after)
 
 
 if __name__ == "__main__":
