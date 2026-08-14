@@ -640,6 +640,23 @@ NEGATED_SOURCE_AVAILABLE_RE = re.compile(
     r"|\bto\s+nie\s+(?:jest\s+)?(?:busl|sspl|commons\s+clause|fair[\s-]?code|source-available)\b"
     r")"
 )
+# A LICENSE file is the only honest proof for an OSS sticker.
+# "MIT License" in a sentence is not a file. Silence, not a badge.
+LICENSE_FILE_NAME_RE = re.compile(r"(?i)^licen[cs]e(?:\.(?:md|txt|rst))?$")
+LICENSE_FILE_RE = re.compile(
+    r"(?:"
+    r"(?<![A-Za-z])LICEN[CS]E(?:\.(?:md|txt|rst))?(?![A-Za-z])"
+    r"|(?i:\blicen[cs]e\.(?:md|txt|rst)\b)"
+    r"|(?i:\blicen[cs]e\s+file\b)"
+    r"|(?i:\bplik(?:u)?\s+licen[cs]e\b)"
+    r")"
+)
+_LICENSE_FAMILY_BEFORE_RE = re.compile(
+    r"(?i)(?:mit|apache(?:-?\d+(?:\.\d+)?)?|bsd|gpl|lgpl|agpl|isc|mpl|"
+    r"mozilla(?:\s+public)?|business\s+source|server[\s-]+side\s+public|"
+    r"public|proprietary|commercial|dual|open[\s-]?source|"
+    r"source[\s-]?available)\s+$"
+)
 QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
 _QUOTED_SPAN_RE = re.compile(
     r'"([^"]{1,240})"|\u201c([^\u201d]{1,240})\u201d|\u201e([^\u201d]{1,240})\u201d|\u00ab([^\u00bb]{1,240})\u00bb'
@@ -1226,6 +1243,35 @@ def looks_like_source_available_as_oss(text: str) -> bool:
     return looks_like_open_source_claim(text)
 
 
+def _url_points_at_license_file(url: str) -> bool:
+    path = urlparse(url.strip()).path or ""
+    name = path.rstrip("/").rsplit("/", 1)[-1]
+    return bool(name and LICENSE_FILE_NAME_RE.fullmatch(name))
+
+
+def looks_like_license_file(text: str) -> bool:
+    """True when the text names a LICENSE file, not a license family."""
+    if not text or not text.strip():
+        return False
+    if LICENSE_FILE_NAME_RE.fullmatch(text.strip()):
+        return True
+    if any(_url_points_at_license_file(match.group(0)) for match in _URL_IN_TEXT_RE.finditer(text)):
+        return True
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    for match in LICENSE_FILE_RE.finditer(cleaned):
+        if _LICENSE_FAMILY_BEFORE_RE.search(cleaned[: match.start()]):
+            continue
+        return True
+    return False
+
+
+def looks_like_open_source_without_license(text: str) -> bool:
+    """OSS sticker without a LICENSE file. Silence, not a badge."""
+    if not looks_like_open_source_claim(text):
+        return False
+    return not looks_like_license_file(text)
+
+
 def strip_person_mentions(text: str) -> str:
     """Drop @login summons. URLs stay. Empty after strip is silence."""
     parts: list[str] = []
@@ -1335,7 +1381,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, an OSS sticker without a LICENSE file, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -1361,6 +1407,16 @@ def unquotable_reason(
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if looks_like_source_available_as_oss(blob):
         return "source_available_not_oss"
+    evidence = "\n".join(
+        part
+        for _kind, text, url in packed
+        for part in (text, url or "")
+        if part
+    )
+    if extra:
+        evidence = f"{evidence}\n{extra}" if evidence else extra
+    if looks_like_open_source_without_license(evidence):
+        return "oss_without_license"
     if looks_like_foreign_wave(packed):
         return "foreign_wave"
     if extra and looks_like_foreign_wave((*packed, ("signal", extra, None))):
@@ -1447,6 +1503,8 @@ __all__ = [
     "MENTION_RE",
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
+    "LICENSE_FILE_NAME_RE",
+    "LICENSE_FILE_RE",
     "LISTICLE_TITLE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
@@ -1503,7 +1561,9 @@ __all__ = [
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
     "looks_like_hire_fundraise",
+    "looks_like_license_file",
     "looks_like_open_source_claim",
+    "looks_like_open_source_without_license",
     "looks_like_source_available_as_oss",
     "looks_like_source_available_license",
     "ranking_urls_only",

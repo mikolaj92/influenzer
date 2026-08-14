@@ -1,32 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=129 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=127 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #129 — Roadmap to nie ship
+Issue: #127 — Open source tylko gdy w repo jest LICENSE
 
 ## Goal
 
-Roadmap to nie ship. „Coming Q3”, „soon”, „on the roadmap” w tytule/faktach bez działającego artefaktu = cisza społeczna. Changelog wolno. Para za waitlistą, to kalendarz nie lista mailowa.
+„Open source” w kącie tylko gdy w repo jest LICENSE. Bez pliku licencji nie mówimy że to OSS. Albo cisza, albo body bez tego słowa. Uczciwość, nie naklejka.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `ROADMAP_RE` + `looks_like_roadmap`
-- `influenzer/hom.py` — score: social/ship claim = kill, else changelog
-- `influenzer/hom_draft.py` — undressable even if a fake score says draft
-- `tests/test_hom_operator.py`, `tests/test_hom_draft.py`
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q --tb=short`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Do not treat a tryable ship as social copy just because a date is mentioned in changelog.
-- Do not match “as soon as”, “too soon”, “soon after”, `roadmap.md`, or hyphenated “soon-to-be”.
+- (none stated)
 
 ## Notes
 
-- Same fail-closed split as waitlist: ship claim or social arena → kill; otherwise changelog.
-- Bare “soon” only as a title/sentence, or after coming/shipping/launching/…
-- Collector boundary: none. No collection.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
