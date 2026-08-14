@@ -1,37 +1,34 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=106 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=105 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #106 — gh leci listą argv, nigdy przez shell
+Issue: #105 — GhRunner: pozytywna allowlista, tylko odczyt
 
 ## Goal
 
-gh leci listą argv, nigdy przez shell. Slug watcha walidowany zanim trafi do procesu. Żadnej interpolacji stringa z bazy.
+GhRunner has a positive allowlist: read-only catalog (`repo view`, `pr list`,
+`release list`, GET `api`). Any other argv is silence, not a comment, label,
+close, or push. The catalog is the latch in the runner, like the effector
+catalog — compose does not decide what may spawn.
 
 ## Files likely touched
 
-- `github_survey/gh.py` — `run_gh` is the only `gh` spawn; lock argv list + `shell=False`, refuse a shell string or a bad slug before spawn
-- `influenzer/hom_watch.py` — a poisoned watch slug from the database is silence, not a process
-- `tests/test_github_survey.py` — argv list, never shell; bad slug is silence
-- `tests/test_hom_watch.py` — poisoned `hom_watch.repo_slug` does not reach gh
-
-`github_survey` must not import Influenzer. Isolation lives next to `run_gh`.
+- `github_survey/gh.py` — allowlist + `run_gh` latch
+- `tests/test_github_survey.py` — read catalog vs write argv
 
 ## Test plan
 
-- `uv run python -m pytest tests/test_github_survey.py tests/test_hom_watch.py -q`
+- `python -m unittest tests.test_github_survey tests.test_github_feedback`
 
 ## Non-goals
 
-- Adapter subprocess argv (`influenzer/adapters/subprocess_harness.py`)
-- GET allowlist in GhRunner (#105)
-- Child env allowlist (#107) and cwd isolation (#108)
-- Letting `github_survey` import `influenzer`
+- Env allowlist (#107), cwd isolation (#108), argv-vs-shell (#106)
+- Teaching survey/feedback new GitHub endpoints
+- Writing comments, labels, closes, or pushes
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Fail-closed: gh only as an argv list; a bad watch slug is silence and does not reach the process; a string from the database does not compose a command.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Localize seed `comment/label/close/push` was token noise. GhRunner lives in
+  `github_survey/gh.py`; that is the latch, same as #106–#108.
+- Collector boundary: no unbounded collection in this patch.

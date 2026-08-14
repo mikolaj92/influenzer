@@ -6,6 +6,10 @@ checkout. A cwd outside that empty temp is silence, not a spawn.
 gh is always an argv list, never a shell string. A watch slug is validated
 before it reaches the process. A string from the database does not compose
 a command.
+
+GhRunner has a positive allowlist: read-only catalog (repo view, pr list,
+release list, GET api). An argv outside that catalog is silence, not a
+comment, label, close, or push. The catalog is the latch, not compose.
 """
 
 from __future__ import annotations
@@ -22,6 +26,10 @@ from typing import Any
 
 GH_TIMEOUT_S = 20.0
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_LIMIT_RE = re.compile(r"^[1-9]\d{0,2}$")
+_FIELDS_RE = re.compile(r"^[A-Za-z0-9_]+(?:,[A-Za-z0-9_]+)*$")
+_SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+_SLUG_PATH = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 REPO_JSON_FIELDS = "nameWithOwner,isPrivate,url,description,homepageUrl"
 PR_JSON_FIELDS = "number,title,url,mergedAt,body"
 RELEASE_JSON_FIELDS = "tagName,name,isDraft,isPrerelease,publishedAt"
@@ -164,6 +172,125 @@ def isolated_gh_argv(argv: object) -> bool:
     return True
 
 
+def _api_query(raw: str) -> dict[str, str] | None:
+    if not raw:
+        return {}
+    query: dict[str, str] = {}
+    for part in raw.split("&"):
+        if "=" not in part:
+            return None
+        key, value = part.split("=", 1)
+        if not key or key in query:
+            return None
+        query[key] = value
+    return query
+
+
+def _allowlisted_api_path(path: str) -> bool:
+    """True only for a GET repos/... read. Method flags and writes are silence."""
+    if not isinstance(path, str) or not path or path.startswith("/") or ".." in path:
+        return False
+    resource, separator, query = path.partition("?")
+    if not resource or resource.endswith("/"):
+        return False
+    params = _api_query(query) if separator else {}
+    if params is None:
+        return False
+    if re.fullmatch(rf"repos/{_SLUG_PATH}/readme", resource):
+        return params == {}
+    if re.fullmatch(rf"repos/{_SLUG_PATH}/tags", resource):
+        return set(params) <= {"per_page"} and all(_LIMIT_RE.fullmatch(value) for value in params.values())
+    if re.fullmatch(rf"repos/{_SLUG_PATH}/issues/comments", resource) or re.fullmatch(
+        rf"repos/{_SLUG_PATH}/pulls/comments", resource
+    ):
+        allowed = {"per_page", "since"}
+        if not set(params) <= allowed:
+            return False
+        if "per_page" in params and not _LIMIT_RE.fullmatch(params["per_page"]):
+            return False
+        if "since" in params and not _SINCE_RE.fullmatch(params["since"]):
+            return False
+        return True
+    return False
+
+
+def _flag_pairs(tokens: Sequence[str], *, allowed: frozenset[str]) -> dict[str, str] | None:
+    if len(tokens) % 2 != 0:
+        return None
+    pairs: dict[str, str] = {}
+    for index in range(0, len(tokens), 2):
+        flag, value = tokens[index], tokens[index + 1]
+        if flag not in allowed or flag in pairs or not isinstance(value, str) or value.startswith("-"):
+            return None
+        pairs[flag] = value
+    return pairs
+
+
+def _allowlisted_repo_view(rest: Sequence[str]) -> bool:
+    if rest[:2] != ["repo", "view"] or len(rest) < 3:
+        return False
+    if invalid_repo_reason(rest[2]) is not None:
+        return False
+    if len(rest) == 3:
+        return True
+    return len(rest) == 5 and rest[3] == "--json" and bool(_FIELDS_RE.fullmatch(rest[4]))
+
+
+def _allowlisted_pr_list(rest: Sequence[str]) -> bool:
+    if rest[:2] != ["pr", "list"]:
+        return False
+    pairs = _flag_pairs(rest[2:], allowed=frozenset({"--repo", "--state", "--limit", "--json"}))
+    if pairs is None or "--repo" not in pairs:
+        return False
+    if invalid_repo_reason(pairs["--repo"]) is not None:
+        return False
+    if "--state" in pairs and pairs["--state"] != "merged":
+        return False
+    if "--limit" in pairs and not _LIMIT_RE.fullmatch(pairs["--limit"]):
+        return False
+    if "--json" in pairs and not _FIELDS_RE.fullmatch(pairs["--json"]):
+        return False
+    return True
+
+
+def _allowlisted_release_list(rest: Sequence[str]) -> bool:
+    if rest[:2] != ["release", "list"]:
+        return False
+    tokens = list(rest[2:])
+    switches = {"--exclude-drafts", "--exclude-pre-releases"}
+    flags: list[str] = []
+    for token in tokens:
+        if token in switches:
+            continue
+        flags.append(token)
+    pairs = _flag_pairs(flags, allowed=frozenset({"--repo", "--limit", "--json"}))
+    if pairs is None or "--repo" not in pairs:
+        return False
+    if invalid_repo_reason(pairs["--repo"]) is not None:
+        return False
+    if "--limit" in pairs and not _LIMIT_RE.fullmatch(pairs["--limit"]):
+        return False
+    if "--json" in pairs and not _FIELDS_RE.fullmatch(pairs["--json"]):
+        return False
+    return True
+
+
+def allowlisted_gh_argv(argv: object) -> bool:
+    """True only for the read-only catalog. comment/label/close/push is silence."""
+    if not isolated_gh_argv(argv):
+        return False
+    rest = list(argv)[1:]
+    if _allowlisted_repo_view(rest):
+        return True
+    if _allowlisted_pr_list(rest):
+        return True
+    if _allowlisted_release_list(rest):
+        return True
+    if rest[:1] == ["api"] and len(rest) == 2:
+        return _allowlisted_api_path(rest[1])
+    return False
+
+
 def _remove_gh_cwd(cwd: str | None) -> None:
     if cwd is None:
         return
@@ -180,7 +307,7 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
     cwd: str | None = None
     try:
         child_argv = gh_argv(argv)
-        if child_argv is None or not isolated_gh_argv(child_argv):
+        if child_argv is None or not isolated_gh_argv(child_argv) or not allowlisted_gh_argv(child_argv):
             return GhCall(returncode=0, stdout="", stderr="")
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
