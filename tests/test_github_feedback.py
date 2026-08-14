@@ -119,6 +119,19 @@ class CollectFeedbackTests(unittest.TestCase):
         out = self._collect({"repo": GhCall(0, "not-json")})
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+
+    def test_decode_error_from_runner_is_silence_not_crash(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")
+
+        with patch("subprocess.run", side_effect=AssertionError("feedback must not call subprocess")):
+            out = collect_feedback(REPO, gh=boom, now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
 
 
 class FeedbackBlockBoundaryTests(unittest.TestCase):

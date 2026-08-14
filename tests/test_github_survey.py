@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from github_survey import GhCall, classify_gh_argv, run_gh, survey_public_repo
+from github_survey.gh import decode_gh_bytes, loads_json, required_json
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -69,6 +70,18 @@ class SurveySilenceTests(unittest.TestCase):
         out = self._survey({"repo": GhCall(0, "not-json")})
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("brief_id", out)
+
+    def test_decode_error_from_runner_is_silence_not_crash(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")
+
+        with patch("subprocess.run", side_effect=AssertionError("survey must not call subprocess")):
+            out = survey_public_repo(REPO, gh=boom, now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
 
     def test_ship_survey_is_ok_json(self) -> None:
         out = self._survey(ship_script())
@@ -95,3 +108,44 @@ class RunGhTests(unittest.TestCase):
             call = run_gh(["repo", "view", REPO])
         self.assertFalse(call.missing)
         self.assertEqual(call.returncode, 124)
+
+    def test_run_gh_decode_error_is_empty_not_a_crash(self) -> None:
+        with patch(
+            "subprocess.run",
+            side_effect=UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad"),
+        ):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "")
+        data, reason = required_json(call)
+        self.assertIsNone(data)
+        self.assertEqual(reason, "empty_survey")
+
+    def test_run_gh_non_utf8_stdout_is_empty_not_a_crash(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["gh"], returncode=0, stdout=b"\xff\xfe not utf8", stderr=b""
+        )
+        with patch("subprocess.run", return_value=completed):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "")
+        data, reason = required_json(call)
+        self.assertIsNone(data)
+        self.assertEqual(reason, "empty_survey")
+
+    def test_run_gh_bad_json_bytes_are_empty_not_a_crash(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["gh"], returncode=0, stdout=b"not-json", stderr=b""
+        )
+        with patch("subprocess.run", return_value=completed):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.stdout, "not-json")
+        data, reason = required_json(call)
+        self.assertIsNone(data)
+        self.assertEqual(reason, "empty_survey")
+
+    def test_loads_json_rejects_bad_bytes_without_raising(self) -> None:
+        self.assertEqual(decode_gh_bytes(b"\xff"), "")
+        self.assertIsNone(loads_json(b"\xff"))
+        self.assertIsNone(loads_json("not-json"))
+        self.assertEqual(loads_json(b'{"ok": true}'), {"ok": True})

@@ -222,7 +222,9 @@ def collect_feedback(
     clock = parse_now(now)
     try:
         collected, reason = collect_comments(slug, gh=runner, now=clock)
-    except (OSError, TypeError, ValueError, json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _silence("empty_feedback", repo=slug)
+    except (OSError, TypeError, ValueError):
         return _silence("scan_failed", repo=slug)
     if reason:
         return _silence(reason, repo=slug)

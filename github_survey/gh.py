@@ -1,4 +1,4 @@
-"""Injectable ``gh`` subprocess. Missing binary or auth is silence, not a crash."""
+"""Injectable ``gh`` subprocess. Missing binary, auth, bad JSON, or non-UTF8 is silence, not a crash."""
 
 from __future__ import annotations
 
@@ -33,12 +33,23 @@ def invalid_repo_reason(repo_slug: str) -> str | None:
     return None
 
 
+def decode_gh_bytes(blob: bytes | str | None) -> str:
+    """UTF-8 only. Invalid bytes are empty, not a raised decode."""
+    if blob is None:
+        return ""
+    if isinstance(blob, str):
+        return blob
+    try:
+        return blob.decode("utf-8")
+    except UnicodeDecodeError:
+        return ""
+
+
 def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
     try:
         completed = subprocess.run(
             ["gh", *argv],
             capture_output=True,
-            text=True,
             timeout=timeout,
             check=False,
         )
@@ -48,10 +59,12 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         return GhCall(returncode=127, stdout="", stderr="gh unavailable", missing=True)
     except subprocess.TimeoutExpired:
         return GhCall(returncode=124, stdout="", stderr="gh timeout")
+    except UnicodeDecodeError:
+        return GhCall(returncode=0, stdout="", stderr="")
     return GhCall(
         returncode=int(completed.returncode),
-        stdout=completed.stdout or "",
-        stderr=completed.stderr or "",
+        stdout=decode_gh_bytes(completed.stdout),
+        stderr=decode_gh_bytes(completed.stderr),
     )
 
 
@@ -75,10 +88,14 @@ def classify_gh_argv(argv: Sequence[str]) -> str:
     return "other"
 
 
-def loads_json(blob: str) -> Any | None:
+def loads_json(blob: str | bytes | bytearray | None) -> Any | None:
+    if isinstance(blob, (bytes, bytearray)):
+        blob = decode_gh_bytes(bytes(blob))
+    if not isinstance(blob, str):
+        return None
     try:
         return json.loads(blob)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return None
 
 
