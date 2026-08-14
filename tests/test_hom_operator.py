@@ -47,6 +47,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_login_gate,
     looks_like_roadmap,
     looks_like_source_available_as_oss,
     looks_like_source_available_license,
@@ -767,6 +768,41 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertFalse(looks_like_hire_fundraise(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
+    def test_login_gate_is_not_tryable(self) -> None:
+        gated = (
+            "behind a login",
+            "behind an authentication wall",
+            "login required",
+            "sign in to continue",
+            "log in to try",
+            "create an account to access",
+            "HEAD 401",
+            "GET 403",
+            "401/403",
+            "401 unauthorized",
+            "403 forbidden",
+            "za logowaniem",
+            "wymaga logowania",
+            "bramka logowania",
+        )
+        for text in gated:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_login_gate(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "login form validates a password",
+            "sign-in page is a product feature",
+            "auth token refresh stays local",
+            "must account for the timeout",
+            "HTTP 200 on the demo",
+            "404 is a dead link, not this gate",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_login_gate(text))
+
     def test_roadmap_is_a_calendar_not_a_ship(self) -> None:
         vapor = (
             "coming Q3",
@@ -1114,6 +1150,54 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_login_gate_ship_claim_is_killed(self) -> None:
+        gated = (
+            "behind a login",
+            "HEAD 401",
+            "GET 403",
+            "za logowaniem",
+            "wymaga logowania",
+        )
+        for text in gated:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "login_gate_not_tryable")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_login_gate_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="behind a login", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "login_gate_not_tryable")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_login_gate_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="login form validates a password"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_roadmap_ship_claim_is_killed(self) -> None:
         vapor = (

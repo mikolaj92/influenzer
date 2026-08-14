@@ -65,6 +65,7 @@ from influenzer.playbook import (
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
+    looks_like_login_gate,
     looks_like_roadmap,
     looks_like_waitlist,
     strip_open_source_claim,
@@ -217,6 +218,7 @@ def _proof_url(bits: CopyBits) -> str | None:
 def _undressable_blob(bits: CopyBits) -> bool:
     return (
         looks_like_waitlist(bits.blob)
+        or looks_like_login_gate(bits.blob)
         or looks_like_roadmap(bits.blob)
         or looks_like_press_release(bits.blob)
         or looks_like_world_commentary(bits.blob)

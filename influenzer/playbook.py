@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -367,6 +367,26 @@ RANKING_DUMP_RE = re.compile(
 
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
+)
+# A login wall is not a tryable artifact. HEAD/GET 401/403 = a stranger
+# cannot run it. Silence on Show HN / ship claims. This is a gate, not a
+# 404 corpse. Pair of waitlist: mailing list vs bramka.
+# A login form as a product feature stays; a gated demo does not.
+LOGIN_GATE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bbehind\s+(?:a\s+|an\s+)?(?:login|sign[- ]?in|auth(?:entication)?|paywall)\b"
+    r"|\b(?:login|sign[- ]?in|auth(?:entication)?)\s+(?:wall|gate|required|gated)\b"
+    r"|\b(?:requires?|must)\s+(?:a\s+|an\s+)?(?:login|log[- ]?in|sign[- ]?in)\b"
+    r"|\b(?:requires?|must)\s+an?\s+account\b"
+    r"|\b(?:log|sign)\s*[- ]?in\s+to\s+(?:continue|view|access|see|try|run|use)\b"
+    r"|\b(?:create\s+an?\s+account|register|sign\s*up)\s+to\s+(?:continue|view|access|see|try|run|use)\b"
+    r"|\b(?:head|get)(?:\s*/\s*get)?\s+(?:returned\s+)?(?:401|403)\b"
+    r"|\b(?:401|403)\s*/\s*(?:403|401)\b"
+    r"|\b(?:401|403)\s+(?:unauthorized|forbidden)\b"
+    r"|\bza\s+logowaniem\b"
+    r"|\bwymaga\s+logowania\b"
+    r"|\bbramk[aąę]\s+logowania\b"
+    r")"
 )
 # A calendar is not a ship. Coming Q3 / soon / on the roadmap without a
 # tryable artifact is social silence. Changelog may keep the date.
@@ -987,6 +1007,13 @@ def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
 
+def looks_like_login_gate(text: str) -> bool:
+    """True for a login wall / HEAD-GET 401/403. A stranger must run it without logging in."""
+    if not text or not text.strip():
+        return False
+    return bool(LOGIN_GATE_RE.search(text))
+
+
 def looks_like_roadmap(text: str) -> bool:
     """True for Coming Q3 / soon / on the roadmap. A calendar is not a ship."""
     if not text or not text.strip():
@@ -1530,6 +1557,7 @@ __all__ = [
     "LICENSE_FILE_NAME_RE",
     "LICENSE_FILE_RE",
     "LISTICLE_TITLE_RE",
+    "LOGIN_GATE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
@@ -1604,6 +1632,7 @@ __all__ = [
     "looks_like_emoji_title",
     "looks_like_superlative",
     "looks_like_store_pitch",
+    "looks_like_login_gate",
     "looks_like_roadmap",
     "looks_like_waitlist",
     "parse_arena",
