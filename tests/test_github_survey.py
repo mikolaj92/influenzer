@@ -7,7 +7,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 from github_survey import GhCall, classify_gh_argv, run_gh, survey_public_repo
-from github_survey.gh import decode_gh_bytes, isolated_gh_cwd, loads_json, required_json
+from github_survey.gh import (
+    GH_CHILD_ENV_ALLOWLIST,
+    decode_gh_bytes,
+    gh_child_env,
+    isolated_gh_cwd,
+    isolated_gh_env,
+    loads_json,
+    required_json,
+)
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -198,6 +206,65 @@ class RunGhTests(unittest.TestCase):
         with patch("tempfile.mkdtemp", return_value=str(Path.home())), patch(
             "subprocess.run", side_effect=fake_run
         ):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "")
+        self.assertEqual(call.stderr, "")
+
+    def test_child_env_is_allowlist_not_host_world(self) -> None:
+        host = {
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/Users/host",
+            "LANG": "C",
+            "GH_TOKEN": "gh-ok",
+            "AWS_SECRET_ACCESS_KEY": "host-secret",
+            "SOCIAL_TOKEN": "do-not-inherit",
+            "SSH_AUTH_SOCK": "/tmp/ssh",
+        }
+        child = gh_child_env(host)
+        self.assertEqual(child["PATH"], "/usr/bin:/bin")
+        self.assertEqual(child["GH_TOKEN"], "gh-ok")
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", child)
+        self.assertNotIn("SOCIAL_TOKEN", child)
+        self.assertNotIn("SSH_AUTH_SOCK", child)
+        self.assertTrue(set(child).issubset(GH_CHILD_ENV_ALLOWLIST))
+        self.assertTrue(isolated_gh_env(child))
+        self.assertFalse(isolated_gh_env({**child, "AWS_SECRET_ACCESS_KEY": "host-secret"}))
+        self.assertFalse(isolated_gh_env({"HOME": "/Users/host"}))
+
+    def test_run_gh_passes_allowlisted_env_not_host_secrets(self) -> None:
+        seen: list[dict[str, str]] = []
+
+        def fake_run(*args, **kwargs):
+            env = kwargs["env"]
+            seen.append(dict(env))
+            self.assertTrue(isolated_gh_env(env))
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", env)
+            self.assertNotIn("SOCIAL_TOKEN", env)
+            return subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=b"{}", stderr=b"")
+
+        leaky = {
+            "PATH": "/usr/bin:/bin",
+            "HOME": str(Path.home()),
+            "AWS_SECRET_ACCESS_KEY": "host-secret",
+            "SOCIAL_TOKEN": "do-not-inherit",
+        }
+        with patch.dict("os.environ", leaky, clear=True), patch("subprocess.run", side_effect=fake_run):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "{}")
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(set(seen[0]), {"PATH", "HOME"})
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", seen[0])
+
+    def test_env_outside_allowlist_is_silence(self) -> None:
+        def fake_run(*args, **kwargs):
+            raise AssertionError("gh must not spawn when env is not allowlisted")
+
+        with patch(
+            "github_survey.gh.gh_child_env",
+            return_value={"PATH": "/bin", "AWS_SECRET_ACCESS_KEY": "leak"},
+        ), patch("subprocess.run", side_effect=fake_run):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.returncode, 0)
         self.assertEqual(call.stdout, "")

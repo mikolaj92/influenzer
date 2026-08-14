@@ -2,16 +2,20 @@
 
 The child cwd is an empty temporary directory, never HOME and never the host
 checkout. A cwd outside that empty temp is silence, not a spawn.
+
+The child environment is an allowlist, never the host world. Env outside that
+allowlist does not reach the process. An unusable allowlist is silence, not a spawn.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +25,25 @@ REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 REPO_JSON_FIELDS = "nameWithOwner,isPrivate,url,description,homepageUrl"
 PR_JSON_FIELDS = "number,title,url,mergedAt,body"
 RELEASE_JSON_FIELDS = "tagName,name,isDraft,isPrerelease,publishedAt"
+# Only what gh needs to run and authenticate. Host secrets stay in the parent.
+GH_CHILD_ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TZ",
+        "TMPDIR",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_HOST",
+        "GH_ENTERPRISE_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GH_CONFIG_DIR",
+    }
+)
+_ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True)
@@ -121,6 +144,30 @@ def isolated_gh_cwd(path: Path) -> bool:
     )
 
 
+def isolated_gh_env(environ: Mapping[str, str] | None) -> bool:
+    """True only for an allowlisted child env that still has PATH."""
+    if not isinstance(environ, Mapping):
+        return False
+    if any(not isinstance(key, str) or not _ENV_NAME.fullmatch(key) for key in environ):
+        return False
+    if any(key not in GH_CHILD_ENV_ALLOWLIST for key in environ):
+        return False
+    if any(not isinstance(value, str) for value in environ.values()):
+        return False
+    return bool(environ.get("PATH"))
+
+
+def gh_child_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Copy only the allowlist. Host secrets stay in the parent."""
+    source = os.environ if environ is None else environ
+    child = {
+        key: value
+        for key, value in source.items()
+        if key in GH_CHILD_ENV_ALLOWLIST and isinstance(value, str)
+    }
+    return child
+
+
 def _remove_gh_cwd(cwd: str | None) -> None:
     if cwd is None:
         return
@@ -139,12 +186,16 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
+        child_env = gh_child_env()
+        if not isolated_gh_env(child_env):
+            return GhCall(returncode=0, stdout="", stderr="")
         completed = subprocess.run(
             ["gh", *argv],
             capture_output=True,
             timeout=timeout,
             check=False,
             cwd=cwd,
+            env=child_env,
         )
     except FileNotFoundError:
         return GhCall(returncode=127, stdout="", stderr="gh not found", missing=True)

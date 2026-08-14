@@ -1,35 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=171 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=107 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #171 — Martwy plik w release nie jest shipem
+Issue: #107 — Dziecko gh dostaje allowlistę env, nie cały świat
 
 ## Goal
 
-A listed release asset whose download is 404/410 is silence, not a ship.
-Do not promise a binary that is not there.
+Dziecko gh dostaje allowlistę env, nie cały świat. Żadnego przecieku sekretów hosta do procesu. Tylko to, czego gh musi mieć.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — fail-closed `DEAD_RELEASE_ASSET_RE` / `looks_like_dead_release_asset`
-- `influenzer/hom.py` — ship/social kill, otherwise changelog
-- `influenzer/hom_draft.py` — undress even if a score says draft
-- `tests/test_hom_operator.py`
-- `tests/test_hom_draft.py`
+- `github_survey/gh.py` — `run_gh` is the only `gh` spawn; it inherited the full host env
+- `tests/test_github_survey.py` — assert allowlist, reject host secrets, fail closed
+
+`github_survey` must not import Influenzer. Isolation lives next to `run_gh`.
 
 ## Test plan
 
-- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
+- `uv run python -m pytest tests/test_github_survey.py -q`
 
 ## Non-goals
 
-- Empty release / empty tag (#170)
-- Generic dead link without a listed asset (#92)
-- Live HTTP HEAD of GitHub assets
-- Survey/pack collectors
+- Adapter subprocess env (`influenzer/adapters/subprocess_harness.py`)
+- cwd isolation (#108)
+- argv/shell (#106) and GET allowlist (#105)
+- Letting `github_survey` import `influenzer.security`
 
 ## Notes
 
-- Same shape as login-wall / waitlist: text evidence in the brief, not a network check.
-- Bare `HEAD 404` stays out of this gate so #92 can own a generic corpse.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Fail-closed: env outside the allowlist does not reach the child; a leaky env is silence (no spawn).
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
