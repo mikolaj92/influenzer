@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -269,6 +269,17 @@ STORE_HOSTS: frozenset[str] = frozenset(
 )
 STORE_PITCH_RE = re.compile(
     r"(?i)\b(?:download the app|app store|google play|play store|testflight)\b"
+)
+# A launch board is not click-and-run. Product Hunt / BetaList as the only URL
+# is silence on seminar. A card next to a repo can stay as evidence.
+LAUNCH_HOSTS: frozenset[str] = frozenset(
+    {
+        "producthunt.com",
+        "betalist.com",
+    }
+)
+LAUNCH_PITCH_RE = re.compile(
+    r"(?i)\b(?:launch(?:ed|ing)?\s+on\s+(?:ph|product\s*hunt)|product\s*hunt|betalist)\b"
 )
 # A magazine title is not a Show HN. "N ways", "you won't believe",
 # or a trailing bang is silence on seminar. Curiosity, not a listicle.
@@ -910,6 +921,11 @@ def is_blog_host_url(url: str | None) -> bool:
     return _host_in(url, BLOG_HOSTS)
 
 
+def is_launch_host_url(url: str | None) -> bool:
+    """True for a Product Hunt / BetaList URL. A launch board is not a tryable demo."""
+    return _host_in(url, LAUNCH_HOSTS)
+
+
 def is_news_host_url(url: str | None) -> bool:
     """True for a newspaper / TV / wire host. A headline is not a tryable demo."""
     return _host_in(url, NEWS_HOSTS)
@@ -946,6 +962,10 @@ def ranking_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
 
 def looks_like_store_pitch(text: str) -> bool:
     return bool(STORE_PITCH_RE.search(text))
+
+
+def looks_like_launch_pitch(text: str) -> bool:
+    return bool(LAUNCH_PITCH_RE.search(text))
 
 
 def looks_like_listicle_title(text: str) -> bool:
@@ -1547,6 +1567,8 @@ __all__ = [
     "HASHTAG_RE",
     "HIRE_FUNDRAISE_RE",
     "HN_STORY_KINDS",
+    "LAUNCH_HOSTS",
+    "LAUNCH_PITCH_RE",
     "NEGATED_OPEN_SOURCE_RE",
     "NEGATED_SOURCE_AVAILABLE_RE",
     "OPEN_SOURCE_CLAIM_RE",
@@ -1590,6 +1612,7 @@ __all__ = [
     "has_quote_mark",
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
+    "is_launch_host_url",
     "is_merge_log_texts",
     "is_news_host_url",
     "is_private_channel_url",
@@ -1632,6 +1655,7 @@ __all__ = [
     "looks_like_emoji_title",
     "looks_like_superlative",
     "looks_like_store_pitch",
+    "looks_like_launch_pitch",
     "looks_like_login_gate",
     "looks_like_roadmap",
     "looks_like_waitlist",

@@ -29,6 +29,7 @@ from influenzer.playbook import (
     has_fair_hook,
     has_named_subreddit,
     is_blog_host_url,
+    is_launch_host_url,
     is_merge_log_texts,
     is_news_host_url,
     is_ranking_host_url,
@@ -54,6 +55,7 @@ from influenzer.playbook import (
     news_urls_only,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    looks_like_launch_pitch,
     looks_like_superlative,
     looks_like_login_gate,
     looks_like_roadmap,
@@ -290,7 +292,7 @@ def _facts_blob(brief: Brief) -> str:
 
 
 def _has_clickable_url(brief: Brief) -> bool:
-    """A tryable demo URL. A film, store, or blog host is not click-and-run."""
+    """A tryable demo URL. A film, store, blog, or launch board is not click-and-run."""
     for fact in brief.facts:
         url = (fact.artifact_url or "").strip()
         if is_ship_artifact(url):
@@ -300,6 +302,7 @@ def _has_clickable_url(brief: Brief) -> bool:
             and not is_video_host_url(url)
             and not is_store_host_url(url)
             and not is_blog_host_url(url)
+            and not is_launch_host_url(url)
             and not is_ranking_host_url(url)
             and not is_news_host_url(url)
         ):
@@ -335,6 +338,16 @@ def _blog_only_urls(brief: Brief) -> bool:
     if any(is_ship_artifact(url) for url in urls):
         return False
     return all(is_blog_host_url(url) for url in urls)
+
+
+def _launch_only_urls(brief: Brief) -> bool:
+    """True when every artifact URL is Product Hunt / BetaList and none is a repo."""
+    urls = [url.strip() for url in brief_artifacts(brief) if url and url.strip()]
+    if not urls:
+        return False
+    if any(is_ship_artifact(url) for url in urls):
+        return False
+    return all(is_launch_host_url(url) for url in urls)
 
 
 def _ranking_only_urls(brief: Brief) -> bool:
@@ -402,6 +415,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "hn_not_a_store"
     if arena is ArenaId.HN and _blog_only_urls(brief):
         return Verdict.KILL, "hn_not_a_blog"
+    if arena is ArenaId.HN and (_launch_only_urls(brief) or looks_like_launch_pitch(store_blob)):
+        return Verdict.KILL, "hn_not_an_aggregator"
     if arena is ArenaId.HN and _ranking_only_urls(brief):
         return Verdict.KILL, "ranking_not_an_artifact"
     if arena is ArenaId.HN and _news_only_urls(brief):
