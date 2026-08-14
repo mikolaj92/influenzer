@@ -416,6 +416,33 @@ CONTEST_RE = re.compile(
     r"\bdo\s+wygrania\b"
     r")"
 )
+# A 1/n serial is not an angle. Numbering / thread / storm is silence.
+# One post, not a serial. OS thread-safe / pthread is not a format.
+THREAD_NUMBER_RE = re.compile(
+    r"(?:"
+    r"^\s*\d+\s*/|"
+    r"\b\d+\s*/\s*n\b|"
+    r"\b\d+\s*/\s*\d+\b"
+    r")",
+    re.I | re.M,
+)
+_ALWAYS_ON_RE = re.compile(r"(?i)\b24\s*/\s*7\b")
+THREAD_WORD_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:tweet[- ]?)?storms?\b|"
+    r"\bthreads?\b|"
+    r"\bw[aą]t(?:ek|ku|kiem|kowi|ki|k[oó]w|kach|kom|kami)\b|"
+    r"\U0001F9F5"
+    r")"
+)
+_THREAD_TECH_RE = re.compile(
+    r"(?i)(?:"
+    r"\bpthreads?\b|"
+    r"\bmultithread(?:ed|ing)?\b|"
+    r"\bthread(?:s|ing|ed)?[- ](?:safe|safety|pool|local|sanitizer)\b|"
+    r"\b(?:main|worker|os|background|ui|event|io|green|native|daemon)\s+threads?\b"
+    r")"
+)
 # A wall of hashtags is not a costume. More than one-two tags, or a
 # trailing tag tail, is silence. Court and agora are not an SEO catalog.
 HASHTAG_RE = re.compile(r"(?<![A-Za-z0-9/])#([A-Za-z][A-Za-z0-9_]{1,39})\b")
@@ -684,6 +711,16 @@ def looks_like_contest(text: str) -> bool:
     return bool(CONTEST_RE.search(cleaned))
 
 
+def looks_like_thread(text: str) -> bool:
+    """True for a 1/n serial, thread, or storm. One post, not a serial."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    numbered = _ALWAYS_ON_RE.sub(" ", cleaned)
+    if THREAD_NUMBER_RE.search(numbered):
+        return True
+    leftover = _THREAD_TECH_RE.sub(" ", cleaned)
+    return bool(THREAD_WORD_RE.search(leftover))
+
+
 def looks_like_hashtag_wall(text: str) -> bool:
     """True when copy dumps tags or ends on a tag-only tail. One inline tag can stay."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -815,7 +852,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a tag wall, a summon, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a tag wall, a summon, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -834,6 +871,10 @@ def unquotable_reason(
         return "contest"
     if extra and looks_like_contest(extra):
         return "contest"
+    if any(looks_like_thread(text) for text in operator_texts):
+        return "thread"
+    if extra and looks_like_thread(extra):
+        return "thread"
     if any(looks_like_hashtag_wall(text) for text in operator_texts):
         return "hashtag_wall"
     if extra and looks_like_hashtag_wall(extra):
@@ -882,6 +923,8 @@ __all__ = [
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "CONTEST_RE",
+    "THREAD_NUMBER_RE",
+    "THREAD_WORD_RE",
     "ENGAGEMENT_BAIT_RE",
     "HASHTAG_RE",
     "HN_STORY_KINDS",
@@ -923,6 +966,7 @@ __all__ = [
     "looks_like_commit_noise",
     "looks_like_dunk",
     "looks_like_contest",
+    "looks_like_thread",
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
     "looks_like_invented_opinion",

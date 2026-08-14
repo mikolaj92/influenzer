@@ -1,32 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=135 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=136 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #135 — Konkurs nie jest kątem
+Issue: #136 — Wątek 1/n nie jest kątem
 
 ## Goal
 
-Konkurs nie jest kątem. Giveaway, raffle, „RT to win”, nagroda za follow = cisza. To nie produkt.
+Wątek 1/n nie jest kątem. Numeracja, „thread”, storm = cisza. Jeden post, nie serial.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — contest detector (`CONTEST_RE`, `looks_like_contest`) and `unquotable_reason`
-- `influenzer/hom.py` — score a contest brief as kill
-- `influenzer/hom_draft.py` — refuse to dress a leaked contest draft
+- `influenzer/playbook.py` — detect 1/n / thread / storm; exempt OS thread-safe / pthread / 24/7
+- `influenzer/hom.py` — kill briefs whose facts are a serial
+- `influenzer/hom_draft.py` — refuse to dress a leaked serial even if score says draft
 - `tests/test_hom_operator.py` — detector + score kill
 - `tests/test_hom_draft.py` — undressable even when score says draft
 
 ## Test plan
 
-- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
+- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py tests/test_hom_verdict.py tests/test_hom_pass.py tests/test_policy.py tests/test_hom_feedback.py`
 
 ## Non-goals
 
-- Do not treat "follow the README" / "star the repo after you try it" as a contest.
-- Do not start collection or publish.
+- Does not change one-story-at-a-time admit (`#44`) or camp-the-HN-thread (`#50`).
+- Does not invent a thread publisher. One post, or silence.
 
 ## Notes
 
-- Same fail-closed shape as #114 (engagement bait) and #130 (hire/fundraise): playbook regex, score kill, dress silence.
-- Neighbors: #28 (no begging for stars/RT) is a gesture ask; this issue is a contest, not a gesture.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.

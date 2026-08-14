@@ -421,6 +421,69 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("giveaway", decision.draft.body.lower())
         self.assertNotIn("raffle", decision.draft.body.lower())
 
+    def test_thread_serial_is_undressable_even_when_score_says_draft(self) -> None:
+        serials = (
+            "1/7 local tick scores briefs",
+            "1/n local tick scores briefs",
+            "a launch thread for the local tick",
+            "tweetstorm about the local tick",
+        )
+        for text in serials:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("1/7", dumped)
+                self.assertNotIn("1/n", dumped)
+                self.assertNotIn("thread", dumped.lower())
+                self.assertNotIn("tweetstorm", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
+
+    def test_product_copy_without_a_thread_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="thread-safe local tick"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("thread-safe", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("1/", decision.draft.body)
+        self.assertNotIn("tweetstorm", decision.draft.body.lower())
+
     def test_feedback_question_can_still_dress(self) -> None:
         excerpt = "How do I install this when uv is missing?"
         brief = _ship_brief(
