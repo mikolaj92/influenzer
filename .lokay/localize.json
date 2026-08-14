@@ -1,0 +1,20 @@
+{
+  "paths": [
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
+    "tests/test_hom_operator.py",
+    "tests/test_hom_draft.py"
+  ],
+  "source": "deterministic",
+  "seed_paths": ["YouTube/Vimeo/Loom"],
+  "matched_tokens": ["YouTube", "Vimeo", "Loom", "influenzer"],
+  "notes": [
+    "Agentless-style localization: deterministic paths only (no embeddings).",
+    "Refined after inspection: seminar clickable-URL gate, not cinema packaging.",
+    "YouTube/Vimeo/Loom as the only URL is silence; film next to a repo stays evidence."
+  ],
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__125-show-hn-nie-jest-odcinkiem-925407af",
+  "wrote": true,
+  "localize_rel": ".lokay/localize.json"
+}
