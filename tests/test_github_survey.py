@@ -7,7 +7,15 @@ from pathlib import Path
 from unittest.mock import patch
 
 from github_survey import GhCall, classify_gh_argv, run_gh, survey_public_repo
-from github_survey.gh import decode_gh_bytes, gh_argv, isolated_gh_argv, isolated_gh_cwd, loads_json, required_json
+from github_survey.gh import (
+    allowlisted_gh_argv,
+    decode_gh_bytes,
+    gh_argv,
+    isolated_gh_argv,
+    isolated_gh_cwd,
+    loads_json,
+    required_json,
+)
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -240,3 +248,57 @@ class RunGhTests(unittest.TestCase):
         self.assertEqual(bad.stdout, "")
         self.assertEqual(injected.returncode, 0)
         self.assertEqual(injected.stdout, "")
+
+    def test_allowlist_is_read_only_catalog_not_compose(self) -> None:
+        self.assertTrue(allowlisted_gh_argv(["gh", "repo", "view", REPO]))
+        self.assertTrue(allowlisted_gh_argv(["gh", "repo", "view", REPO, "--json", "url"]))
+        self.assertTrue(
+            allowlisted_gh_argv(["gh", "pr", "list", "--repo", REPO, "--state", "merged", "--limit", "20", "--json", "url"])
+        )
+        self.assertTrue(
+            allowlisted_gh_argv(
+                ["gh", "release", "list", "--repo", REPO, "--limit", "10", "--exclude-drafts", "--json", "tagName"]
+            )
+        )
+        self.assertTrue(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/readme"]))
+        self.assertTrue(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/tags?per_page=20"]))
+        self.assertTrue(
+            allowlisted_gh_argv(
+                ["gh", "api", f"repos/{REPO}/issues/comments?per_page=100&since=2026-08-06T06:00:00Z"]
+            )
+        )
+        self.assertTrue(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/pulls/comments?per_page=100"]))
+        self.assertFalse(allowlisted_gh_argv(["repo", "view", REPO]))
+        self.assertFalse(allowlisted_gh_argv(["gh", "auth", "status"]))
+        self.assertFalse(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/readme", "-X", "GET"]))
+        self.assertFalse(allowlisted_gh_argv(["gh", "api", f"POST:/repos/{REPO}/issues/1/comments"]))
+
+    def test_write_argv_is_silence_not_a_comment(self) -> None:
+        def fake_run(*args, **kwargs):
+            raise AssertionError("gh must not spawn comment/label/close/push")
+
+        writes = (
+            ["issue", "comment", REPO, "1", "--body", "hi"],
+            ["pr", "comment", "1", "--body", "hi"],
+            ["api", f"repos/{REPO}/issues/1/comments", "-X", "POST", "-f", "body=hi"],
+            ["api", f"repos/{REPO}/issues/comments", "-f", "body=hi"],
+            ["issue", "create", "--repo", REPO, "--title", "x", "--body", "y"],
+            ["pr", "create", "--repo", REPO, "--title", "x", "--body", "y"],
+            ["label", "create", "ship", "--repo", REPO],
+            ["issue", "close", "1", "--repo", REPO],
+            ["pr", "close", "1", "--repo", REPO],
+            ["pr", "merge", "1", "--repo", REPO],
+            ["release", "create", "v1.0.0", "--repo", REPO],
+            ["repo", "sync", REPO],
+            ["auth", "login"],
+            ["api", "user"],
+            ["api", f"repos/{REPO}/dispatches", "-X", "POST"],
+        )
+        with patch("subprocess.run", side_effect=fake_run):
+            for argv in writes:
+                with self.subTest(argv=argv):
+                    self.assertFalse(allowlisted_gh_argv(["gh", *argv]))
+                    call = run_gh(argv)
+                    self.assertEqual(call.returncode, 0)
+                    self.assertEqual(call.stdout, "")
+                    self.assertEqual(call.stderr, "")
