@@ -46,6 +46,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_roadmap,
     looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
@@ -270,6 +271,36 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertTrue(looks_like_superlative(text))
         self.assertFalse(looks_like_superlative("Local tick scores briefs and emits a draft"))
         self.assertFalse(looks_like_superlative("first local tick on this machine"))
+
+    def test_roadmap_is_a_calendar_not_a_ship(self) -> None:
+        calendars = (
+            "Coming Q3",
+            "coming in Q4",
+            "shipping soon",
+            "available soon",
+            "on the roadmap",
+            "on our product roadmap",
+            "planned for Q2",
+            "slated for FY2026",
+            "launching this quarter",
+            "na roadmapie",
+            "wkrótce",
+            "w planach",
+            "planowane na Q3",
+        )
+        for text in calendars:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_roadmap(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "as soon as the install finishes, run the demo",
+            "soon-to-be-deleted scratch file",
+            "roadmap.md lists what already shipped",
+            "the operator scores briefs locally",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_roadmap(text))
 
     def test_dunk_is_mockery_not_naming_a_predecessor(self) -> None:
         dunks = (
@@ -978,6 +1009,53 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_roadmap_ship_claim_is_killed(self) -> None:
+        calendars = (
+            "Coming Q3",
+            "shipping soon",
+            "on the roadmap",
+            "na roadmapie",
+            "wkrótce",
+        )
+        for text in calendars:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "roadmap_not_a_ship")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_roadmap_without_a_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="Coming Q3, on the roadmap"),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "roadmap_not_a_ship")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_a_roadmap_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="as soon as the install finishes, run the demo"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_superlative_without_tryable_artifact_is_killed(self) -> None:
         slogans = (

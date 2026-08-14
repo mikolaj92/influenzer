@@ -58,6 +58,7 @@ from influenzer.playbook import (
     looks_like_person_mention,
     looks_like_press_release,
     looks_like_private_conversation,
+    looks_like_roadmap,
     looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
@@ -203,6 +204,7 @@ def _proof_url(bits: CopyBits) -> str | None:
 def _undressable_blob(bits: CopyBits) -> bool:
     return (
         looks_like_waitlist(bits.blob)
+        or looks_like_roadmap(bits.blob)
         or looks_like_press_release(bits.blob)
         or looks_like_world_commentary(bits.blob)
     )
@@ -447,6 +449,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
         or looks_like_private_conversation(bits.blob)
+        or looks_like_roadmap(bits.blob)
         or looks_like_world_commentary(bits.blob)
     ):
         return None
@@ -468,6 +471,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
         or looks_like_private_conversation(body)
+        or looks_like_roadmap(body)
         or looks_like_world_commentary(body)
     ):
         return None

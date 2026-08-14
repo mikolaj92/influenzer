@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap calendar, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -368,6 +368,26 @@ RANKING_DUMP_RE = re.compile(
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
 )
+# A calendar is not a ship. Coming Q3 / soon / on the roadmap
+# without a tryable artifact is social silence. Changelog is allowed.
+# Steam behind a waitlist is a date, not a mailing list.
+_AS_SOON_AS_RE = re.compile(r"(?i)\bas\s+soon\s+as\b")
+ROADMAP_RE = re.compile(
+    r"(?i)(?:"
+    r"\bon\s+(?:the|our|a)\s+(?:product\s+)?roadmap\b|"
+    r"\bcoming\s+(?:in\s+|this\s+|next\s+)?(?:q[1-4]|fy\s*\d{2,4}|20\d{2}|quarter)\b|"
+    r"\b(?:launch(?:ing|es)?|ship(?:ping|s)?|available|arriving|releasing|out|dropping|live)\s+"
+    r"(?:in\s+|this\s+|next\s+)?(?:q[1-4]|fy\s*\d{2,4}|20\d{2}|quarter|soon)\b|"
+    r"\b(?:planned|slated|targeted|scheduled)\s+for\s+(?:q[1-4]|fy\s*\d{2,4}|20\d{2}|this\s+quarter|next\s+quarter)\b|"
+    r"\bna\s+(?:naszej\s+)?roadmap(?:ie)?\b|"
+    r"\bw\s+(?:naszej\s+)?roadmap(?:ie)?\b|"
+    r"\bwkr[oó]tce\b|"
+    r"\bw\s+planach\b|"
+    r"\bplanowane\s+na\s+q[1-4]\b|"
+    r"\b(?:na|w)\s+q[1-4]\b"
+    r")"
+)
+SOON_RE = re.compile(r"(?i)(?<![\w-])soon(?![\w-])")
 PRESS_RELEASE_RE = re.compile(
     r"(?i)\b(?:excited to announce|humbled to announce|we are (?:excited|pleased|proud) to|"
     r"game[- ]changer|revolutionary|disrupt(?:ing|s)? the)\b"
@@ -875,6 +895,16 @@ def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
 
+def looks_like_roadmap(text: str) -> bool:
+    """True for Coming Q3 / soon / on the roadmap. A calendar is not a ship."""
+    if not text or not text.strip():
+        return False
+    if ROADMAP_RE.search(text):
+        return True
+    cleaned = _AS_SOON_AS_RE.sub(" ", text)
+    return bool(SOON_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     return bool(PRESS_RELEASE_RE.search(text))
 
@@ -1317,7 +1347,10 @@ __all__ = [
     "STORE_HOSTS",
     "STORE_PITCH_RE",
     "SUPERLATIVE_RE",
+    "ROADMAP_RE",
+    "SOON_RE",
     "VIDEO_HOSTS",
+    "WAITLIST_RE",
     "WORLD_COMMENTARY_RE",
     "StoryKind",
     "Verdict",
@@ -1357,6 +1390,7 @@ __all__ = [
     "looks_like_invented_opinion",
     "looks_like_person_mention",
     "looks_like_private_conversation",
+    "looks_like_roadmap",
     "looks_like_world_commentary",
     "metric_tokens",
     "news_urls_only",
