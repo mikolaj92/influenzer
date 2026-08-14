@@ -31,6 +31,7 @@ from influenzer.playbook import (
     is_video_host_url,
     invented_metric_reason,
     looks_like_dunk,
+    looks_like_emoji_title,
     looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_shouty_title,
@@ -172,6 +173,27 @@ class PlaybookCopyTests(unittest.TestCase):
         for title in allowed:
             with self.subTest(title=title):
                 self.assertFalse(looks_like_shouty_title(title))
+
+    def test_emoji_title_is_pictograph_not_ascii_or_arrow(self) -> None:
+        bait = (
+            "Local tick scores briefs 🚀",
+            "Show HN: Local tick scores briefs ✨",
+            "\U0001f389 Local tick scores briefs",
+            "Local tick \U0001f600 scores briefs",
+            "Local tick scores briefs ⭐",
+        )
+        for title in bait:
+            with self.subTest(title=title):
+                self.assertTrue(looks_like_emoji_title(title))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Show HN: CLI scores briefs",
+            "README one-liner \u2192 GIF \u2192 working quickstart",
+            "C++ scores briefs",
+        )
+        for title in allowed:
+            with self.subTest(title=title):
+                self.assertFalse(looks_like_emoji_title(title))
 
     def test_blog_host_is_medium_substack_devto_hashnode_not_a_repo(self) -> None:
         blogs = (
@@ -906,6 +928,23 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, "shouty_title")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_emoji_title_is_silence_on_hn_and_github(self) -> None:
+        title = "Local tick scores briefs \U0001f680"
+        for arena in (ArenaId.HN, ArenaId.GITHUB):
+            with self.subTest(arena=arena.value):
+                brief = self._brief(
+                    preferred_arena=arena,
+                    facts=(
+                        Fact(text=title, artifact_url=SHIP_REPO),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "emoji_title")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 

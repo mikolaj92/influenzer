@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip.",
             "Sit on the repo during the spike (issues, Discussions).",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no listicle, no shouty CAPS.",
+            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -274,6 +274,18 @@ STORE_PITCH_RE = re.compile(
 # or a trailing bang is silence on seminar. Curiosity, not a listicle.
 LISTICLE_TITLE_RE = re.compile(
     r"(?i)(?:\b(?:\d+|n)\s+ways\b|you\s+(?:won'?t|will\s+not)\s+believe)"
+)
+# A carnival title is not a Show HN or a README one-liner. Emoji is silence
+# on seminar/workshop. Arrows and ASCII stay; this is a sign, not length.
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F300-\U0001FAFF"  # pictographs, faces, transport, supplemental
+    "\U0001F1E6-\U0001F1FF"  # flags
+    "\U00002600-\U000026FF"  # misc symbols
+    "\U00002700-\U000027BF"  # dingbats
+    "\U0000FE0F"  # emoji presentation
+    "\U00002B50"  # star
+    "]"
 )
 # An article is not click-and-run. Medium / Substack / dev.to / hashnode as
 # the only URL is silence on seminar. A blog next to a repo can stay as evidence.
@@ -562,6 +574,14 @@ def looks_like_shouty_title(text: str) -> bool:
     return all(ch.isupper() for ch in letters)
 
 
+def looks_like_emoji_title(text: str) -> bool:
+    """True when the title wears emoji. Seminar and workshop are not a fair."""
+    title = text.strip()
+    if title.lower().startswith("show hn:"):
+        title = title.split(":", 1)[1].strip()
+    return bool(title and _EMOJI_RE.search(title))
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -797,6 +817,7 @@ __all__ = [
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
     "looks_like_shouty_title",
+    "looks_like_emoji_title",
     "looks_like_superlative",
     "looks_like_store_pitch",
     "looks_like_waitlist",
