@@ -1,6 +1,7 @@
 {
   "paths": [
     "influenzer",
+    "influenzer/adapters/subprocess_harness.py",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -10,7 +11,6 @@
     "influenzer/adapters/http_fake.py",
     "influenzer/adapters/platforms.py",
     "influenzer/adapters/registry.py",
-    "influenzer/adapters/subprocess_harness.py",
     "influenzer/brief_admit.py",
     "influenzer/brief_scan.py",
     "influenzer/campaigns.py",
@@ -44,6 +44,7 @@
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
+    "proces",
     "influenzer"
   ],
   "notes": [
@@ -51,7 +52,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__171-martwy-plik-w-release-nie-jest-shipem-7c298770",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__109-state.db-i-config-s-0600-katalog-0700-c8756c1f",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

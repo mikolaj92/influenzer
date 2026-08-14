@@ -13,6 +13,7 @@ import re
 import shutil
 import socket
 import ssl
+import stat
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -32,6 +33,14 @@ class CredentialError(SecurityError):
 
 class FetchError(SecurityError):
     """A URL or response failed the outbound-fetch policy."""
+
+
+class WorkspacePermissionError(SecurityError):
+    """Workspace file or directory is looser than 0600/0700."""
+
+
+PRIVATE_FILE_MODE = 0o600
+PRIVATE_DIR_MODE = 0o700
 
 
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -182,11 +191,88 @@ def redact(value: str, secrets: Sequence[str] = ()) -> str:
     return output
 
 
+def path_mode(path: Path) -> int:
+    return stat.S_IMODE(Path(path).stat().st_mode)
+
+
+def _has_group_or_other(path: Path) -> bool:
+    return bool(path_mode(path) & 0o077)
+
+
+def require_private_file(path: Path) -> None:
+    """Fail closed when a file is looser than 0600."""
+    target = Path(path)
+    if not target.is_file() or _has_group_or_other(target):
+        raise WorkspacePermissionError("workspace file must be 0600")
+
+
+def require_private_dir(path: Path) -> None:
+    """Fail closed when a directory is looser than 0700."""
+    target = Path(path)
+    if not target.is_dir() or _has_group_or_other(target):
+        raise WorkspacePermissionError("workspace directory must be 0700")
+
+
+def ensure_private_dir(path: Path) -> Path:
+    """Create ``path`` as 0700. Existing looser directories refuse to start."""
+    target = Path(path)
+    if not target.exists():
+        if target.parent != target:
+            ensure_private_dir(target.parent)
+        try:
+            os.mkdir(target, PRIVATE_DIR_MODE)
+        except FileExistsError:
+            pass
+    require_private_dir(target)
+    return target
+
+
+def create_private_file(path: Path) -> Path:
+    """Create an empty 0600 file when missing. Existing files are left to the caller."""
+    target = Path(path)
+    if target.exists():
+        return target
+    try:
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, PRIVATE_FILE_MODE)
+    except FileExistsError:
+        return target
+    os.close(fd)
+    return target
+
+
+def write_private_text(path: Path, text: str) -> None:
+    """Write UTF-8 as 0600. An existing looser file is silence, not a rewrite."""
+    target = Path(path)
+    ensure_private_dir(target.parent)
+    encoded = text.encode("utf-8")
+    if target.exists():
+        require_private_file(target)
+        target.write_bytes(encoded)
+        require_private_file(target)
+        return
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, PRIVATE_FILE_MODE)
+    try:
+        os.write(fd, encoded)
+    finally:
+        os.close(fd)
+    require_private_file(target)
+
+
+def require_workspace_permissions(home: Path, *, config_file: Path | None = None, state_db: Path | None = None) -> None:
+    """Refuse to start when home, config, or state.db are world/group readable."""
+    require_private_dir(home)
+    if config_file is not None and Path(config_file).exists():
+        require_private_file(config_file)
+        require_private_dir(Path(config_file).parent)
+    if state_db is not None and Path(state_db).exists():
+        require_private_file(state_db)
+
+
 @contextlib.contextmanager
 def isolated_home() -> Iterator[Path]:
     """Yield a mode-0700 temporary HOME and remove it on every exit path."""
     path = Path(tempfile.mkdtemp(prefix="influenzer-home-"))
-    path.chmod(0o700)
+    path.chmod(PRIVATE_DIR_MODE)
     try:
         yield path
     finally:
@@ -386,8 +472,12 @@ validate_url = validate_fetch_url
 
 __all__ = [
     "CredentialError", "CredentialProvider", "EnvCredentialProvider", "FetchError",
-    "FetchResponse", "KeychainCredentialProvider", "SecurityError", "build_child_env",
-    "child_environment", "fetch_url", "isolated_home", "manifest_for_child", "parse_credential_ref",
-    "redact", "resolve_credential", "resolve_public_addresses", "safe_fetch", "validate_content_length",
+    "FetchResponse", "KeychainCredentialProvider", "PRIVATE_DIR_MODE", "PRIVATE_FILE_MODE",
+    "SecurityError", "WorkspacePermissionError", "build_child_env", "child_environment",
+    "create_private_file", "ensure_private_dir", "fetch_url", "isolated_home",
+    "manifest_for_child", "parse_credential_ref", "path_mode", "redact",
+    "require_private_dir", "require_private_file", "require_workspace_permissions",
+    "resolve_credential", "resolve_public_addresses", "safe_fetch", "validate_content_length",
     "validate_content_type", "validate_fetch_url", "validate_redirect_url", "validate_url",
+    "write_private_text",
 ]
