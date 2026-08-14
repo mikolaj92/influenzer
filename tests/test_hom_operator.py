@@ -48,6 +48,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_dead_release_asset,
     looks_like_login_gate,
     looks_like_roadmap,
     looks_like_source_available_as_oss,
@@ -829,6 +830,48 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_login_gate(text))
 
+    def test_dead_release_asset_is_not_a_ship(self) -> None:
+        corpses = (
+            "asset on the list 404",
+            "asset on the release list 410",
+            "file on the list gone",
+            "plik na liscie 404",
+            "plik na liście 410",
+            "release asset is 404",
+            "release asset returned 410",
+            "404 on the release asset",
+            "410 for the download",
+            "browser_download_url 404",
+            "dead release asset",
+            "dead asset",
+            "martwy plik",
+            "pobranie 404",
+            "pobranie 410",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dead_release_asset(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "404 is a dead link, not this gate",
+            "HEAD 404",
+            "GET 410",
+            "404/410",
+            "HEAD 401",
+            "GET 403",
+            "401/403",
+            "behind a login",
+            "HTTP 200 on the demo",
+            "release notes list the binary",
+            "asset list is complete",
+            "download the tarball from the release",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_dead_release_asset(text))
+
     def test_roadmap_is_a_calendar_not_a_ship(self) -> None:
         vapor = (
             "coming Q3",
@@ -1218,6 +1261,54 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="login form validates a password"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_dead_release_asset_ship_claim_is_killed(self) -> None:
+        corpses = (
+            "asset on the list 404",
+            "release asset is 404",
+            "browser_download_url 410",
+            "martwy plik",
+            "pobranie 404",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_RELEASE),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "dead_release_asset")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_dead_release_asset_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="asset on the list 404", artifact_url=SHIP_RELEASE),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "dead_release_asset")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_dead_release_asset_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="download the tarball from the release"),
             ),
         )
         score = score_brief(brief)

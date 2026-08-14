@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -397,6 +397,27 @@ LOGIN_GATE_RE = re.compile(
     r"|\bza\s+logowaniem\b"
     r"|\bwymaga\s+logowania\b"
     r"|\bbramk[aąę]\s+logowania\b"
+    r")"
+)
+# A listed release asset that 404s/410s is not a ship. The file is on
+# the list; download is gone. Silence. Do not promise a binary that
+# is not there. Pair of empty release: empty tag vs listed corpse.
+# A 401/403 login wall is a different gate. A generic dead link without
+# an asset/download is not this gate.
+DEAD_RELEASE_ASSET_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:asset|binary|file|download|plik)\s+"
+    r"(?:on\s+(?:the\s+)?(?:release\s+)?list|na\s+li[sś]cie)\b"
+    r".{0,48}\b(?:404|410|gone|martw)\b"
+    r"|\b(?:404|410|gone)\b.{0,48}\b(?:asset|binary|file|download|plik)\s+"
+    r"(?:on\s+(?:the\s+)?(?:release\s+)?list|na\s+li[sś]cie)\b"
+    r"|\b(?:release\s+)?(?:asset|binary|download)(?:\s+url)?\s+"
+    r"(?:is\s+|returned\s+|returns?\s+)?(?:404|410)\b"
+    r"|\b(?:404|410)\s+(?:on|for|from)\s+(?:the\s+)?(?:release\s+)?(?:asset|binary|download|plik)\b"
+    r"|\bbrowser_download(?:_url)?\s+(?:returned\s+|is\s+|returns?\s+)?(?:404|410)\b"
+    r"|\bdead\s+(?:release\s+)?(?:asset|file|binary)\b"
+    r"|\bmartw[yiae]\s+plik\b"
+    r"|\bpobranie\s+(?:returned\s+)?(?:404|410)\b"
     r")"
 )
 # A calendar is not a ship. Coming Q3 / soon / on the roadmap without a
@@ -1034,6 +1055,13 @@ def looks_like_login_gate(text: str) -> bool:
     return bool(LOGIN_GATE_RE.search(text))
 
 
+def looks_like_dead_release_asset(text: str) -> bool:
+    """True for a listed release asset whose download is 404/410. A missing file is not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(DEAD_RELEASE_ASSET_RE.search(text))
+
+
 def looks_like_roadmap(text: str) -> bool:
     """True for Coming Q3 / soon / on the roadmap. A calendar is not a ship."""
     if not text or not text.strip():
@@ -1579,6 +1607,7 @@ __all__ = [
     "LICENSE_FILE_NAME_RE",
     "LICENSE_FILE_RE",
     "LISTICLE_TITLE_RE",
+    "DEAD_RELEASE_ASSET_RE",
     "LOGIN_GATE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
@@ -1656,6 +1685,7 @@ __all__ = [
     "looks_like_superlative",
     "looks_like_store_pitch",
     "looks_like_launch_pitch",
+    "looks_like_dead_release_asset",
     "looks_like_login_gate",
     "looks_like_roadmap",
     "looks_like_waitlist",
