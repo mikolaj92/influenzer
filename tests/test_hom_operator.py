@@ -36,6 +36,7 @@ from influenzer.playbook import (
     looks_like_hashtag_wall,
     looks_like_invented_opinion,
     looks_like_listicle_title,
+    looks_like_thread_serial,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
@@ -407,6 +408,45 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_hashtag_wall(text))
 
+    def test_thread_serial_is_numbering_or_storm_not_one_post(self) -> None:
+        serials = (
+            "1/n Local tick scores briefs",
+            "1/7 this is a launch",
+            "(1/5) local tick",
+            "1/ n local tick",
+            "part 1/n of the launch",
+            "part 1 of 7",
+            "tweetstorm about the local tick",
+            "a tweet storm on the operator",
+            "storm incoming",
+            "launch thread about the local tick",
+            "tweet thread on the operator",
+            "posting a thread about the local tick",
+            "thread: local tick scores briefs",
+            "thread #1 local tick",
+            "thread 1 local tick",
+            "a thread about the local tick",
+        )
+        for text in serials:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_thread_serial(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "thread_serial",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "I camp the thread. Human username.",
+            "other people's rising threads, not an empty feed",
+            "thread-safe local tick",
+            "needle and thread",
+            "thinking about posting a launch note",
+            "first hour is the clock",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_thread_serial(text))
+
 
 class ScoreBriefTests(unittest.TestCase):
     def _brief(self, **overrides: object) -> Brief:
@@ -698,6 +738,43 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_thread_serial_is_killed(self) -> None:
+        serials = (
+            "1/n Local tick scores briefs",
+            "launch thread about the local tick",
+            "tweetstorm about the local tick",
+            "thread: local tick scores briefs",
+        )
+        for text in serials:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "thread_serial")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_one_post_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="I camp the thread. Human username."),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn("camp the thread", decision.draft.body)
+        self.assertNotIn("1/", decision.draft.body)
+
     def test_one_inline_hashtag_can_still_draft(self) -> None:
         brief = self._brief(
             preferred_arena=ArenaId.HN,
@@ -861,7 +938,7 @@ class ScoreBriefTests(unittest.TestCase):
             tryable=False,
             claims_ship=False,
             preferred_arena=ArenaId.X,
-            facts=(Fact(text="thinking about posting a launch thread"),),
+            facts=(Fact(text="thinking about posting a launch note"),),
         )
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)

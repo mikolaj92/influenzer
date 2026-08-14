@@ -404,6 +404,23 @@ _HASHTAG_TAIL_RE = re.compile(
     r"(?:^|\s)(?:#[A-Za-z][A-Za-z0-9_]{1,39}[\s,.;:!?]*)+$"
 )
 MAX_HASHTAGS = 2
+# A 1/n serial is not an angle. Numbering, a launch/tweet thread, or a
+# storm is silence. One post, not a serial. Sitting in an HN thread is
+# not this: "camp the thread" / "rising threads" can stay.
+THREAD_SERIAL_RE = re.compile(
+    r"(?i)(?:"
+    r"(?:^|[\n(\[])\s*\d{1,2}\s*/(?:\s*(?:n|\d{1,2})\b|\s)|"
+    r"\b\d{1,2}\s*/\s*n\b|"
+    r"\bpart\s+\d{1,2}(?:\s*/\s*(?:n|\d{1,2})|\s+of\s+(?:n|\d{1,2}))\b|"
+    r"\b\d{1,2}\s+of\s+(?:n|\d{1,2})\b|"
+    r"\b(?:tweet\s*[- ]?)?storms?\b|"
+    r"\b(?:launch|tweet|twitter|x)\s+threads?\b|"
+    r"\bpost(?:ing|ed)?\s+(?:a\s+)?threads?\b|"
+    r"\bthreads?\s*[:#]|"
+    r"\bthreads?\s+\d{1,2}\b|"
+    r"\bthread\s+(?:about|on)\b"
+    r")"
+)
 # A number in the costume must already be a fact. Dress does not add
 # "10x", "1M users", or benchmarks. No number in facts → no number in body.
 METRIC_TOKEN_RE = re.compile(
@@ -667,6 +684,12 @@ def looks_like_hashtag_wall(text: str) -> bool:
     return False
 
 
+def looks_like_thread_serial(text: str) -> bool:
+    """True for 1/n numbering, a launch/tweet thread, or a storm. One post, not a serial."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(THREAD_SERIAL_RE.search(cleaned))
+
+
 def metric_tokens(text: str) -> frozenset[str]:
     """Claim numbers a costume may repeat: 10x, 1M users, 50%, 100k."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -762,7 +785,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a tag wall, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a tag wall, a 1/n serial, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -781,6 +804,10 @@ def unquotable_reason(
         return "hashtag_wall"
     if extra and looks_like_hashtag_wall(extra):
         return "hashtag_wall"
+    if any(looks_like_thread_serial(text) for text in operator_texts):
+        return "thread_serial"
+    if extra and looks_like_thread_serial(extra):
+        return "thread_serial"
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if quote_without_sourced_excerpt(blob, excerpts):
         return "quote_without_excerpt"
@@ -838,6 +865,7 @@ __all__ = [
     "STORE_HOSTS",
     "STORE_PITCH_RE",
     "SUPERLATIVE_RE",
+    "THREAD_SERIAL_RE",
     "VIDEO_HOSTS",
     "StoryKind",
     "Verdict",
@@ -870,6 +898,7 @@ __all__ = [
     "looks_like_emoji_title",
     "looks_like_superlative",
     "looks_like_store_pitch",
+    "looks_like_thread_serial",
     "looks_like_waitlist",
     "parse_arena",
     "quote_without_sourced_excerpt",
