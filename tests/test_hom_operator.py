@@ -27,6 +27,7 @@ from influenzer.playbook import (
     StoryKind,
     Verdict,
     is_blog_host_url,
+    is_news_host_url,
     is_ranking_host_url,
     is_store_host_url,
     is_video_host_url,
@@ -45,6 +46,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
@@ -664,6 +666,57 @@ class PlaybookCopyTests(unittest.TestCase):
                 )
             )
         )
+
+    def test_world_commentary_is_headlines_not_a_product(self) -> None:
+        takes = (
+            "hot take on today's headlines",
+            "my take on the election",
+            "thoughts on the news of the day",
+            "breaking news: markets opened red",
+            "political brief without a ship",
+            "cultural brief: awards night",
+            "news of the day, no repo",
+            "komentarz świata: wybory",
+            "brief polityczny bez artefaktu",
+            "brief kulturalny: festiwal",
+            "news dnia bez repo",
+            "felieton o polityce dnia",
+            "https://www.nytimes.com/2026/08/14/world/europe.html",
+            "https://tvn24.pl/polska/wybory a take",
+        )
+        for text in takes:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_world_commentary(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "world_commentary",
+                )
+        self.assertTrue(is_news_host_url("https://www.bbc.com/news/world-123"))
+        self.assertTrue(is_news_host_url("https://www.nytimes.com/2026/08/14/world.html"))
+        self.assertTrue(is_news_host_url("https://tvn24.pl/polska/wybory"))
+        self.assertFalse(is_news_host_url(SHIP_PR))
+        self.assertFalse(is_news_host_url("https://example.com/nytimes"))
+        self.assertFalse(is_news_host_url("https://nytimes.com.evil.com/world"))
+        self.assertEqual(
+            unquotable_reason(
+                (("signal", "read the clipping", "https://www.reuters.com/world/"),)
+            ),
+            "world_commentary",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "newsletter cadence stays weekly",
+            "Show HN: local tick scores briefs",
+            "star the repo after you try it",
+            "Unlike Loki, this scores briefs locally",
+            "my take on the timeout bug",
+            "hot take: dry-run stays default",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_world_commentary(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_private_conversation_is_slack_mail_or_dm_not_a_public_issue(self) -> None:
         dumps = (
@@ -1306,6 +1359,61 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "private_conversation")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_world_commentary_is_killed(self) -> None:
+        takes = (
+            "hot take on today's headlines",
+            "brief polityczny bez artefaktu",
+            "news of the day, no repo",
+            "komentarz świata: wybory",
+            "https://www.nytimes.com/2026/08/14/world/europe.html",
+        )
+        for text in takes:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "world_commentary")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_news_url_without_repo_is_killed_even_with_a_ship_claim(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(
+                    text="read the clipping",
+                    artifact_url="https://www.reuters.com/world/europe/",
+                ),
+                Fact(text="strangers can click the article today"),
+            ),
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertIn(score.reason, {"world_commentary", "ship_claim_missing_artifact"})
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_world_commentary_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_anonymized_slack_excerpt_is_still_killed(self) -> None:
         brief = self._brief(

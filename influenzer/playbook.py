@@ -298,6 +298,30 @@ BLOG_HOSTS: frozenset[str] = frozenset(
         "hashnode.dev",
     }
 )
+# A newspaper is not a ship. NYT / BBC / TVN as the only URL is silence.
+# A clipping next to a repo can stay as evidence. Commentary is not an angle.
+NEWS_HOSTS: frozenset[str] = frozenset(
+    {
+        "nytimes.com",
+        "washingtonpost.com",
+        "bbc.com",
+        "bbc.co.uk",
+        "cnn.com",
+        "reuters.com",
+        "apnews.com",
+        "theguardian.com",
+        "foxnews.com",
+        "wsj.com",
+        "bloomberg.com",
+        "politico.com",
+        "npr.org",
+        "aljazeera.com",
+        "tvn24.pl",
+        "wyborcza.pl",
+        "polsatnews.pl",
+        "notesfrompoland.com",
+    }
+)
 # A ranking dump is not a tryable artifact. HN front / star-history /
 # shields / stargazers as the only URL is silence. The website is the repo,
 # not a vanity chart. A chart next to a repo can stay as evidence.
@@ -486,6 +510,40 @@ PRIVATE_CONVERSATION_RE = re.compile(
     r"\bprywatn(?:a|ej|ą|e|y)\s+(?:rozmow\w*|wiadomo[sś][cć]\w*|konwers\w*|czat\w*)\b"
     r")",
     re.I | re.M,
+)
+# A world take is not a product angle. Politics / culture / news of the day
+# without a repo artifact is silence. We say what we build, not headlines.
+WORLD_COMMENTARY_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:hot|spicy)\s+take\s+on\s+(?:the\s+)?(?:news|headline|headlines|election|elections|politics)\b|"
+    r"\bhot[- ]take\s+on\s+(?:the\s+)?(?:news|headline|headlines|election|politics)\b|"
+    r"\bmy\s+(?:hot\s+)?take\s+on\s+(?:the\s+)?(?:news|headline|headlines|election|elections|politics)\b|"
+    r"\bthoughts\s+on\s+(?:the\s+)?(?:news|headline|headlines|election|elections)\b|"
+    r"\bwhat\s+i\s+think\s+(?:about|of)\s+(?:the\s+)?(?:news|headline|headlines|election)\b|"
+    r"\bnews\s+of\s+the\s+day\b|"
+    r"\btoday'?s\s+(?:news|headlines?|politics)\b|"
+    r"\bbreaking\s+news\b|"
+    r"\bheadline\s+(?:of\s+the\s+day|today|reaction|take)\b|"
+    r"\breact(?:ion|ing)?\s+to\s+(?:the\s+)?(?:news|headline|headlines|election)\b|"
+    r"\bcurrent\s+events?\b|"
+    r"\bworld\s+(?:news|politics|affairs|events?)\b|"
+    r"\bgeopolitic"
+    r"|\bpolitic(?:s|al)\s+(?:brief|take|hot[- ]?take|commentary|hotline|news)\b"
+    r"|\bcultur(?:al|e)\s+(?:brief|take|hot[- ]?take|commentary|news|wars?)\b"
+    r"|\bop[- ]?ed\b"
+    r"|\beditorial\s+(?:on|about)\b"
+    r"|\bkomentarz\s+(?:\u015bwiata|swiata|dnia|polityczn|kulturaln)"
+    r"|\bbrief\s+polityczn"
+    r"|\bbrief\s+kulturaln"
+    r"|\bnews\s+dnia\b"
+    r"|\bwiadomo[sś][cć]i\s+dnia\b"
+    r"|\bpolityk(?:a|i|ę)\s+(?:dnia|\u015bwiata|swiata)\b"
+    r"|\bkultura\s+dnia\b"
+    r"|\bfelieton\b"
+    r"|\b(?:komentarz|brief|take)\s+(?:o\s+)?wybor"
+    r"|\belection\s+(?:day|night|results?)\b"
+    r"|\bpresidential\s+election\b"
+    r")"
 )
 QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
 _QUOTED_SPAN_RE = re.compile(
@@ -718,6 +776,21 @@ def is_store_host_url(url: str | None) -> bool:
 def is_blog_host_url(url: str | None) -> bool:
     """True for a Medium / Substack / dev.to / hashnode URL. A blog is not a tryable demo."""
     return _host_in(url, BLOG_HOSTS)
+
+
+def is_news_host_url(url: str | None) -> bool:
+    """True for a newspaper / TV / wire host. A headline is not a tryable demo."""
+    return _host_in(url, NEWS_HOSTS)
+
+
+def news_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
+    """True when every artifact URL is a news clipping and none is a repo."""
+    cleaned = [url.strip() for url in urls if url and url.strip()]
+    if not cleaned:
+        return False
+    if any(is_ship_artifact_url(url) for url in cleaned):
+        return False
+    return all(is_news_host_url(url) for url in cleaned)
 
 
 def is_ranking_host_url(url: str | None) -> bool:
@@ -1008,6 +1081,16 @@ def looks_like_private_conversation(text: str) -> bool:
     return bool(PRIVATE_CONVERSATION_RE.search(cleaned))
 
 
+def looks_like_world_commentary(text: str) -> bool:
+    """True for a political / cultural / news-of-the-day take. Not a product."""
+    if not text or not text.strip():
+        return False
+    if any(is_news_host_url(match.group(0)) for match in _URL_IN_TEXT_RE.finditer(text)):
+        return True
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(WORLD_COMMENTARY_RE.search(cleaned))
+
+
 def strip_person_mentions(text: str) -> str:
     """Drop @login summons. URLs stay. Empty after strip is silence."""
     parts: list[str] = []
@@ -1117,7 +1200,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -1130,6 +1213,11 @@ def unquotable_reason(
         looks_like_private_conversation(extra) or is_private_channel_url(extra)
     ):
         return "private_conversation"
+    for _kind, text, url in packed:
+        if looks_like_world_commentary(text) or is_news_host_url(url):
+            return "world_commentary"
+    if extra and (looks_like_world_commentary(extra) or is_news_host_url(extra)):
+        return "world_commentary"
     if looks_like_foreign_wave(packed):
         return "foreign_wave"
     if extra and looks_like_foreign_wave((*packed, ("signal", extra, None))):
@@ -1217,6 +1305,7 @@ __all__ = [
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
+    "NEWS_HOSTS",
     "NEWSLETTER_STORY_KINDS",
     "PRIVATE_CHANNEL_HOSTS",
     "PRIVATE_CONVERSATION_RE",
@@ -1229,6 +1318,7 @@ __all__ = [
     "STORE_PITCH_RE",
     "SUPERLATIVE_RE",
     "VIDEO_HOSTS",
+    "WORLD_COMMENTARY_RE",
     "StoryKind",
     "Verdict",
     "WORKSHOP_STORY_KINDS",
@@ -1242,6 +1332,7 @@ __all__ = [
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_merge_log_texts",
+    "is_news_host_url",
     "is_private_channel_url",
     "is_public_issue_url",
     "is_ranking_host_url",
@@ -1266,7 +1357,9 @@ __all__ = [
     "looks_like_invented_opinion",
     "looks_like_person_mention",
     "looks_like_private_conversation",
+    "looks_like_world_commentary",
     "metric_tokens",
+    "news_urls_only",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",

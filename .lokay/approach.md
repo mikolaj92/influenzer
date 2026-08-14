@@ -1,31 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=133 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=131 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #133 — Nie wpinamy produktu w cudzą falę
+Issue: #131 — Komentarz świata nie jest kątem produktu
 
 ## Goal
 
-Nie wpinamy produktu w cudzą falę. Reply pod postem, który nie jest o naszym watchu/shipie = cisza. Sam parent URL nie wystarczy. To nie dunk i nie echo — to kradzież fali.
+Komentarz świata nie jest kątem produktu. Brief polityczny, kulturalny, news dnia bez artefaktu z repo = cisza. Mówimy co budujemy, nie co myślimy o headlines.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — detect a reply under a foreign parent
-- `influenzer/hom.py` — score that shape as silence
+- `influenzer/playbook.py` — world-commentary detector (politics / culture / news-of-the-day + news hosts)
+- `influenzer/hom.py` — fail-closed score: headlines without a product angle = kill
 - `influenzer/hom_draft.py` — refuse to dress a leaked draft of the same shape
 - `tests/test_hom_operator.py`, `tests/test_hom_draft.py`
 
 ## Test plan
 
-- Reply under a post that is not our watch/ship is killed
-- A parent URL alone is not enough
-- A parent about our ship can still draft
-- Existing dunk / empty-feed / costume tests stay green
+- `uv run pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
 
 ## Non-goals
 
-- Live publish, X empty-feed gate (#27), reply-without-new-thought (#41)
+- Do not start collecting headlines or polling news feeds.
+- Do not treat a product brief (ship + tryable repo) as world commentary.
 
 ## Notes
 
