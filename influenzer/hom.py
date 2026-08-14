@@ -55,6 +55,7 @@ from influenzer.playbook import (
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
+    looks_like_roadmap,
     looks_like_waitlist,
     ranking_urls_only,
     unquotable_reason,
@@ -452,6 +453,10 @@ def score_brief(brief: Brief) -> Score:
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "waitlist_not_tryable")
         return _changelog(brief, "waitlist_not_tryable")
+    if looks_like_roadmap(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "roadmap_not_a_ship")
+        return _changelog(brief, "roadmap_not_a_ship")
     if looks_like_superlative(blob) and not (
         brief.tryable and any(is_ship_artifact(url) for url in brief_artifacts(brief))
     ):
