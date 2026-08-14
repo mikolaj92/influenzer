@@ -41,6 +41,7 @@ from influenzer.playbook import (
     looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_person_mention,
+    looks_like_private_conversation,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
@@ -597,6 +598,70 @@ class PlaybookCopyTests(unittest.TestCase):
             )
         )
 
+    def test_private_conversation_is_slack_mail_or_dm_not_a_public_issue(self) -> None:
+        dumps = (
+            "Slack dump: a stranger said the Windows install fails",
+            "from Slack: the timeout looks like success",
+            "in an anonymized Slack thread a user said the install fails",
+            "zrzut Slacka: timeout wygląda jak sukces",
+            "from an email: the Windows install fails",
+            "email dump of a user saying the install fails",
+            "zrzut maila: Windows install fails",
+            "From: anon@example.com\nThe Windows install fails",
+            "in a DM a user said the Windows install fails",
+            "direct message: the timeout looks like success",
+            "zrzut DMa: timeout wygląda jak sukces",
+            "prywatna rozmowa: timeout wygląda jak sukces",
+            "in an anonymized DM a user said the install fails",
+            "https://acme.slack.com/archives/C123/p123 a user said the install fails",
+            "https://mail.google.com/mail/u/0/#inbox/FMfc a user said the install fails",
+        )
+        for text in dumps:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_private_conversation(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "private_conversation",
+                )
+        self.assertEqual(
+            unquotable_reason(
+                (("excerpt", '"the Windows install fails"', "https://acme.slack.com/archives/C123/p1"),)
+            ),
+            "private_conversation",
+        )
+        self.assertEqual(
+            unquotable_reason(
+                (("excerpt", '"the Windows install fails"', "https://mail.google.com/mail/u/0/#inbox/FMfc"),)
+            ),
+            "private_conversation",
+        )
+        self.assertEqual(
+            unquotable_reason(
+                (("excerpt", '"the Windows install fails"', "https://example.com/blog/windows-install"),)
+            ),
+            "quote_without_excerpt",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Slack integration posts the draft to a workspace",
+            "email notifications stay off until a human passes",
+            "hello@example.com is the support inbox",
+            "demo of the local tick",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_private_conversation(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+        self.assertIsNone(
+            unquotable_reason(
+                (
+                    ("issue_comment", "@bob: the Windows install fails", FEEDBACK_COMMENT),
+                    ("signal", 'A stranger said "the Windows install fails"', SHIP_PR),
+                )
+            )
+        )
+
 
 class ScoreBriefTests(unittest.TestCase):
     def _brief(self, **overrides: object) -> Brief:
@@ -1099,6 +1164,45 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "person_mention")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_private_conversation_is_killed(self) -> None:
+        dumps = (
+            "Slack dump: a stranger said the Windows install fails",
+            "from an email: the Windows install fails",
+            "in a DM a user said the Windows install fails",
+            "zrzut Slacka, nawet anonimizowany",
+            "prywatna rozmowa: timeout wygląda jak sukces",
+        )
+        for text in dumps:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "private_conversation")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_anonymized_slack_excerpt_is_still_killed(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(
+                    kind="excerpt",
+                    text='anon said "the Windows install fails"',
+                    artifact_url="https://acme.slack.com/archives/C123/p1",
+                ),
+                Fact(text="strangers can click and run the demo today", artifact_url=SHIP_PR),
+            )
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "private_conversation")
         self.assertIsNone(score.arena)
         self.assertIsNone(compose_draft(brief, score))
 

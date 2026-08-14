@@ -44,6 +44,7 @@ from influenzer.playbook import (
     looks_like_emoji_title,
     looks_like_hashtag_wall,
     looks_like_listicle_title,
+    looks_like_private_conversation,
     looks_like_press_release,
     looks_like_shouty_title,
     looks_like_store_pitch,
@@ -453,6 +454,8 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "ranking_not_an_artifact")
     if looks_like_hashtag_wall(blob):
         return _kill(brief, "hashtag_wall")
+    if looks_like_private_conversation(blob):
+        return _kill(brief, "private_conversation")
     if brief.story_kind is StoryKind.EXPLORATION:
         if is_social_arena(brief.preferred_arena):
             return _kill(brief, "exploration_not_a_post")
