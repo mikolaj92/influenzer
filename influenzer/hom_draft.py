@@ -67,6 +67,7 @@ from influenzer.playbook import (
     looks_like_superlative,
     looks_like_roadmap,
     looks_like_waitlist,
+    strip_open_source_claim,
     strip_person_mentions,
     unquotable_reason,
 )
@@ -156,11 +157,20 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
     package_text: str | None = None
     hook_text: str | None = None
     subreddit: str | None = None
+    evidence = "\n".join(
+        part
+        for fact in brief.facts
+        for part in (fact.text, fact.artifact_url or "")
+        if part
+    )
+    drop_oss_sticker = looks_like_open_source_without_license(evidence)
     for fact in brief.facts:
         text = fact.text.strip()
         if not text or _is_artifact_stub(fact):
             continue
         wearable = strip_person_mentions(text)
+        if drop_oss_sticker:
+            wearable = strip_open_source_claim(wearable)
         if not wearable:
             continue
         kind = fact.kind.strip().lower()
@@ -212,7 +222,6 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
         or looks_like_source_available_as_oss(bits.blob)
-        or looks_like_open_source_without_license(bits.blob)
     )
 
 
@@ -458,7 +467,6 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
         or looks_like_source_available_as_oss(bits.blob)
-        or looks_like_open_source_without_license(bits.blob)
     ):
         return None
     if unquotable_reason(triples):
@@ -482,9 +490,12 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_world_commentary(body)
         or looks_like_hire_fundraise(body)
         or looks_like_source_available_as_oss(body)
-        or looks_like_open_source_without_license(body)
     ):
         return None
+    if looks_like_open_source_without_license(body):
+        body = strip_open_source_claim(body)
+        if not body:
+            return None
     play = arena_play(score.arena)
     clock = now or utc_now()
     return Draft(

@@ -641,7 +641,7 @@ NEGATED_SOURCE_AVAILABLE_RE = re.compile(
     r")"
 )
 # A LICENSE file is the only honest proof for an OSS sticker.
-# "MIT License" in a sentence is not a file. Silence, not a badge.
+# "MIT License" in a sentence is not a file. Drop the word, or stay silent.
 LICENSE_FILE_NAME_RE = re.compile(r"(?i)^licen[cs]e(?:\.(?:md|txt|rst))?$")
 LICENSE_FILE_RE = re.compile(
     r"(?:"
@@ -1266,10 +1266,44 @@ def looks_like_license_file(text: str) -> bool:
 
 
 def looks_like_open_source_without_license(text: str) -> bool:
-    """OSS sticker without a LICENSE file. Silence, not a badge."""
+    """OSS sticker without a LICENSE file. Drop the word, or stay silent."""
     if not looks_like_open_source_claim(text):
         return False
     return not looks_like_license_file(text)
+
+
+def _strip_open_source_chunk(chunk: str) -> str:
+    """Drop a positive OSS sticker. Honest denial stays."""
+    kept: list[str] = []
+
+    def _hold(match: re.Match[str]) -> str:
+        kept.append(match.group(0))
+        return f"\x00{len(kept) - 1}\x00"
+
+    protected = NEGATED_OPEN_SOURCE_RE.sub(_hold, chunk)
+    stripped = OPEN_SOURCE_CLAIM_RE.sub(" ", protected)
+    for index, phrase in enumerate(kept):
+        stripped = stripped.replace(f"\x00{index}\x00", phrase)
+    return stripped
+
+
+def strip_open_source_claim(text: str) -> str:
+    """Drop an OSS sticker. Honest denial and URLs stay. Empty after strip is silence."""
+    if not text or not looks_like_open_source_claim(text):
+        return text
+    parts: list[str] = []
+    last = 0
+    for match in _URL_IN_TEXT_RE.finditer(text):
+        parts.append(_strip_open_source_chunk(text[last:match.start()]))
+        parts.append(match.group(0))
+        last = match.end()
+    parts.append(_strip_open_source_chunk(text[last:]))
+    cleaned = "".join(parts)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" *\n *", "\n", cleaned)
+    cleaned = re.sub(r" +([,.;:])", r"\1", cleaned)
+    cleaned = re.sub(r"[ \t]*[\u2014\u2013-][ \t]*(?=\n|$)", "", cleaned)
+    return cleaned.strip(" \t,;:\u2014\u2013-")
 
 
 def strip_person_mentions(text: str) -> str:
@@ -1381,7 +1415,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, an OSS sticker without a LICENSE file, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -1407,16 +1441,6 @@ def unquotable_reason(
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if looks_like_source_available_as_oss(blob):
         return "source_available_not_oss"
-    evidence = "\n".join(
-        part
-        for _kind, text, url in packed
-        for part in (text, url or "")
-        if part
-    )
-    if extra:
-        evidence = f"{evidence}\n{extra}" if evidence else extra
-    if looks_like_open_source_without_license(evidence):
-        return "oss_without_license"
     if looks_like_foreign_wave(packed):
         return "foreign_wave"
     if extra and looks_like_foreign_wave((*packed, ("signal", extra, None))):
@@ -1585,6 +1609,7 @@ __all__ = [
     "parse_arena",
     "quote_without_sourced_excerpt",
     "quoted_spans",
+    "strip_open_source_claim",
     "strip_person_mentions",
     "unquotable_reason",
 ]

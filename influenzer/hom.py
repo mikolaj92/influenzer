@@ -48,7 +48,6 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_hire_fundraise,
     looks_like_private_conversation,
-    looks_like_open_source_without_license,
     looks_like_source_available_as_oss,
     looks_like_press_release,
     looks_like_world_commentary,
@@ -484,8 +483,6 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "hire_fundraise")
     if looks_like_source_available_as_oss(blob):
         return _kill(brief, "source_available_not_oss")
-    if looks_like_open_source_without_license(blob):
-        return _kill(brief, "oss_without_license")
     if brief.story_kind is StoryKind.EXPLORATION:
         if is_social_arena(brief.preferred_arena):
             return _kill(brief, "exploration_not_a_post")
