@@ -578,6 +578,49 @@ HIRE_FUNDRAISE_RE = re.compile(
     r"|\bwyjazd\s+(?:zespołu|firmowy|integracyjn)"
     r")"
 )
+# Source-available is not OSS. BUSL / Commons Clause / fair code / SSPL
+# plus the word "open source" is a license lie. Silence, not a badge.
+# Saying source-available is allowed. Honest denial is not a sticker.
+SOURCE_AVAILABLE_LICENSE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bbusl\b"
+    r"|\bbusiness\s+source\s+licen[cs]e\b"
+    r"|\bcommons\s+clause\b"
+    r"|\bfair[\s-]?code\b"
+    r"|\bsspl\b"
+    r"|\bserver[\s-]+side\s+public\s+licen[cs]e\b"
+    r"|\bsource-available\b"
+    r"|\bsource\s+available\s+licen[cs]e\b"
+    r")"
+)
+OPEN_SOURCE_CLAIM_RE = re.compile(
+    r"(?i)(?:"
+    r"\bopen[\s-]?source\b"
+    r"|\bopensource\b"
+    r"|\bfoss\b"
+    r"|\boss\b"
+    r"|\botwart(?:e|y|ego|ym|ą)\s+(?:oprogramowanie|kod(?:zie)?)\b"
+    r"|\bkod(?:u|zie)?\s+otwart"
+    r")"
+)
+NEGATED_OPEN_SOURCE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bnot\s+(?:an?\s+)?open[\s-]?source\b"
+    r"|\bisn(?:['’])?t\s+open[\s-]?source\b"
+    r"|\baren(?:['’])?t\s+open[\s-]?source\b"
+    r"|\bnot\s+(?:an?\s+)?(?:foss|oss)\b"
+    r"|\bnie\s+(?:jest\s+|są\s+|wołamy\s+|nazywamy\s+)?open[\s-]?source\b"
+    r"|\bto\s+nie\s+(?:jest\s+)?(?:oss|foss|open[\s-]?source)\b"
+    r")"
+)
+NEGATED_SOURCE_AVAILABLE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bnot\s+(?:an?\s+)?(?:busl|sspl|commons\s+clause|fair[\s-]?code|source-available)\b"
+    r"|\bisn(?:['’])?t\s+(?:busl|sspl|commons\s+clause|fair[\s-]?code|source-available)\b"
+    r"|\bnie\s+(?:jest\s+)?(?:busl|sspl|commons\s+clause|fair[\s-]?code|source-available)\b"
+    r"|\bto\s+nie\s+(?:jest\s+)?(?:busl|sspl|commons\s+clause|fair[\s-]?code|source-available)\b"
+    r")"
+)
 QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
 _QUOTED_SPAN_RE = re.compile(
     r'"([^"]{1,240})"|\u201c([^\u201d]{1,240})\u201d|\u201e([^\u201d]{1,240})\u201d|\u00ab([^\u00bb]{1,240})\u00bb'
@@ -1132,6 +1175,31 @@ def looks_like_hire_fundraise(text: str) -> bool:
     return bool(HIRE_FUNDRAISE_RE.search(cleaned))
 
 
+def looks_like_source_available_license(text: str) -> bool:
+    """True for BUSL / Commons Clause / fair code / SSPL / source-available. Not OSS."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    remainder = NEGATED_SOURCE_AVAILABLE_RE.sub(" ", cleaned)
+    return bool(SOURCE_AVAILABLE_LICENSE_RE.search(remainder))
+
+
+def looks_like_open_source_claim(text: str) -> bool:
+    """True when the text still claims OSS after honest denials are stripped."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    remainder = NEGATED_OPEN_SOURCE_RE.sub(" ", cleaned)
+    return bool(OPEN_SOURCE_CLAIM_RE.search(remainder))
+
+
+def looks_like_source_available_as_oss(text: str) -> bool:
+    """Source-available license plus an OSS sticker. Silence, not a badge."""
+    if not looks_like_source_available_license(text):
+        return False
+    return looks_like_open_source_claim(text)
+
+
 def strip_person_mentions(text: str) -> str:
     """Drop @login summons. URLs stay. Empty after strip is silence."""
     parts: list[str] = []
@@ -1241,7 +1309,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -1264,6 +1332,9 @@ def unquotable_reason(
             return "hire_fundraise"
     if extra and looks_like_hire_fundraise(extra):
         return "hire_fundraise"
+    blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
+    if looks_like_source_available_as_oss(blob):
+        return "source_available_not_oss"
     if looks_like_foreign_wave(packed):
         return "foreign_wave"
     if extra and looks_like_foreign_wave((*packed, ("signal", extra, None))):
@@ -1343,6 +1414,9 @@ __all__ = [
     "HASHTAG_RE",
     "HIRE_FUNDRAISE_RE",
     "HN_STORY_KINDS",
+    "NEGATED_OPEN_SOURCE_RE",
+    "NEGATED_SOURCE_AVAILABLE_RE",
+    "OPEN_SOURCE_CLAIM_RE",
     "MAX_HASHTAGS",
     "MENTION_RE",
     "FEEDBACK_EXCERPT_KINDS",
@@ -1361,6 +1435,7 @@ __all__ = [
     "RANKING_HOSTS",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
+    "SOURCE_AVAILABLE_LICENSE_RE",
     "STORE_HOSTS",
     "STORE_PITCH_RE",
     "SUPERLATIVE_RE",
@@ -1401,6 +1476,9 @@ __all__ = [
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
     "looks_like_hire_fundraise",
+    "looks_like_open_source_claim",
+    "looks_like_source_available_as_oss",
+    "looks_like_source_available_license",
     "ranking_urls_only",
     "looks_like_invented_opinion",
     "looks_like_person_mention",

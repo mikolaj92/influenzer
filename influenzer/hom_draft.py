@@ -59,6 +59,7 @@ from influenzer.playbook import (
     looks_like_person_mention,
     looks_like_press_release,
     looks_like_private_conversation,
+    looks_like_source_available_as_oss,
     looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
@@ -207,6 +208,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_press_release(bits.blob)
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
+        or looks_like_source_available_as_oss(bits.blob)
     )
 
 
@@ -451,6 +453,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_private_conversation(bits.blob)
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
+        or looks_like_source_available_as_oss(bits.blob)
     ):
         return None
     if unquotable_reason(triples):
@@ -473,6 +476,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_private_conversation(body)
         or looks_like_world_commentary(body)
         or looks_like_hire_fundraise(body)
+        or looks_like_source_available_as_oss(body)
     ):
         return None
     play = arena_play(score.arena)

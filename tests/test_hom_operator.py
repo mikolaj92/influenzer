@@ -47,6 +47,8 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_source_available_as_oss,
+    looks_like_source_available_license,
     looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
@@ -762,6 +764,57 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_hire_fundraise(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_source_available_plus_open_source_is_a_license_lie(self) -> None:
+        lies = (
+            "BUSL open source",
+            "Business Source License, open-source release",
+            "Commons Clause FOSS",
+            "fair code OSS",
+            "fair-code open source",
+            "SSPL open source",
+            "Server Side Public License is open source",
+            "source-available open source",
+            "source available license, otwarte oprogramowanie",
+        )
+        for text in lies:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_source_available_license(text))
+                self.assertTrue(looks_like_source_available_as_oss(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "source_available_not_oss",
+                )
+        honest = (
+            "source-available",
+            "BUSL",
+            "Business Source License",
+            "Commons Clause",
+            "fair code",
+            "SSPL",
+            "Server Side Public License",
+            "source available license",
+            "not open source, BUSL",
+            "to nie OSS, source-available",
+        )
+        for text in honest:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_source_available_license(text))
+                self.assertFalse(looks_like_source_available_as_oss(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "open source",
+            "MIT License — open source",
+            "source available on GitHub",
+            "not BUSL, this is open source",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_source_available_as_oss(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_private_conversation_is_slack_mail_or_dm_not_a_public_issue(self) -> None:
@@ -1496,6 +1549,63 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.DRAFT)
         self.assertEqual(score.arena, ArenaId.HN)
         self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_source_available_plus_open_source_is_killed(self) -> None:
+        lies = (
+            "BUSL open source",
+            "Commons Clause FOSS",
+            "fair code OSS",
+            "SSPL open source",
+            "source-available open source",
+        )
+        for text in lies:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "source_available_not_oss")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+        brief = self._brief(
+            facts=(
+                Fact(text="BUSL", artifact_url=SHIP_PR),
+                Fact(text="open source"),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "source_available_not_oss")
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_source_available_without_oss_sticker_can_still_draft(self) -> None:
+        honest = (
+            "source-available",
+            "BUSL",
+            "not open source, BUSL",
+            "MIT License — open source",
+        )
+        for text in honest:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.DRAFT)
+                self.assertEqual(score.arena, ArenaId.HN)
+                self.assertIsNotNone(compose_draft(brief, score))
 
     def test_anonymized_slack_excerpt_is_still_killed(self) -> None:
         brief = self._brief(
