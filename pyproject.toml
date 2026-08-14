@@ -9,7 +9,7 @@ authors = [{ name = "mikolaj92" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = []
+dev = ["pytest>=8"]
 
 [project.scripts]
 influenzer = "influenzer.cli:main"
