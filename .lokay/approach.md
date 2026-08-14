@@ -1,33 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=113 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=112 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #113 — Ściana hashtagów to nie kostium
+Issue: #112 — Draft nie pinguje ludzi
 
 ## Goal
 
-Ściana hashtagów to nie kostium. Draft z dumpem tagów (więcej niż jeden-dwa, albo sam ogonek tagów) = cisza. Dwór i agora nie są katalogiem SEO.
+Draft nie pinguje ludzi. Żadnego znaku at plus login w body. Nie zaciągamy kogoś do wątku. Strip albo cisza.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_hashtag_wall`; court/agora wave lines
-- `influenzer/hom.py` — score kill `hashtag_wall`
-- `influenzer/hom_draft.py` — dress silence on blob and body
-- `tests/test_hom_operator.py` — detector + score
-- `tests/test_hom_draft.py` — dress fail-closed on HN/X/LinkedIn
+- `influenzer/playbook.py` — detect `@login`, strip it, fail-closed on operator summons
+- `influenzer/hom_draft.py` — strip mentions from wearable copy; silence leftover summons
+- `tests/test_hom_draft.py`
+- `tests/test_hom_operator.py`
 
 ## Test plan
 
-- `python3 -m pytest tests/test_hom_draft.py tests/test_hom_operator.py -q --tb=short`
+- `python -m pytest tests/test_hom_draft.py tests/test_hom_operator.py tests/test_hom_pass.py tests/test_hom_feedback.py tests/test_hom_outbox.py`
 
 ## Non-goals
 
-- Do not invent a new costume. One or two inline tags can stay.
-- Do not treat `#190` / URL fragments as tags.
+- Do not change github_feedback ingest (`@login:` stays as source attribution).
+- Do not treat emails or URL paths (`medium.com/@someone`) as pings.
 
 ## Notes
 
-- Same fail-closed pattern as #114 (engagement bait) and #116 (dunking).
-- Neighbor of #45 (voice) and #63 (format): court and agora stay insight/reply, not an SEO catalog.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Fail-closed: operator `@login` in a signal = kill / undressable. Feedback `@login:` prefix is stripped from the dressed body.

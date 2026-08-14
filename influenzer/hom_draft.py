@@ -49,11 +49,13 @@ from influenzer.playbook import (
     looks_like_hashtag_wall,
     looks_like_listicle_title,
     looks_like_merged_pr_fact,
+    looks_like_person_mention,
     looks_like_press_release,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
     looks_like_waitlist,
+    strip_person_mentions,
     unquotable_reason,
 )
 
@@ -144,15 +146,18 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
         text = fact.text.strip()
         if not text or _is_artifact_stub(fact):
             continue
+        wearable = strip_person_mentions(text)
+        if not wearable:
+            continue
         kind = fact.kind.strip().lower()
-        if kind == "package" or (package_text is None and has_cinema_package(text)):
-            package_text = text
-        if kind == "hook" or (hook_text is None and has_fair_hook(text)):
-            hook_text = text
-        found_room = _SUBREDDIT_RE.search(text)
+        if kind == "package" or (package_text is None and has_cinema_package(wearable)):
+            package_text = wearable
+        if kind == "hook" or (hook_text is None and has_fair_hook(wearable)):
+            hook_text = wearable
+        found_room = _SUBREDDIT_RE.search(wearable)
         if kind == "subreddit" or (subreddit is None and found_room):
-            subreddit = found_room.group(0) if found_room else text
-        texts.append(text)
+            subreddit = found_room.group(0) if found_room else wearable
+        texts.append(wearable)
     if not texts:
         return None
     one_liner = texts[0]
@@ -201,10 +206,12 @@ def _merge_log_bits(bits: CopyBits) -> bool:
 
 
 def _body_or_none(body: str) -> str | None:
-    text = body.strip()
+    text = strip_person_mentions(body)
     if not text:
         return None
     if any(marker in text for marker in _FORBIDDEN_IN_BODY):
+        return None
+    if looks_like_person_mention(text):
         return None
     return text
 
@@ -428,6 +435,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_dunk(body)
         or looks_like_engagement_bait(body)
         or looks_like_hashtag_wall(body)
+        or looks_like_person_mention(body)
     ):
         return None
     play = arena_play(score.arena)

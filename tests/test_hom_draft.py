@@ -372,6 +372,7 @@ class HomDraftCostumeTests(unittest.TestCase):
         assert decision.draft is not None
         self.assertIn(excerpt, decision.draft.body)
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("@bob", decision.draft.body)
         self.assertNotIn("Agree?", decision.draft.body)
 
     def test_hashtag_wall_is_undressable_even_when_score_says_draft(self) -> None:
@@ -480,6 +481,44 @@ class HomDraftCostumeTests(unittest.TestCase):
         assert decision.draft is not None
         self.assertIn(excerpt, decision.draft.body)
         self.assertIn(f'"{excerpt}"', decision.draft.body)
+        self.assertNotIn("@bob", decision.draft.body)
+
+    def test_operator_mention_is_undressable_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            facts=(
+                Fact(text="@alice try this local tick", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "hn",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                    "canon_url": ARENAS[ArenaId.HN].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        dumped = json.dumps(payload)
+        self.assertNotIn("@alice", dumped)
+        self.assertNotIn("Show HN:", dumped)
 
     def test_hn_refuses_merged_pr_title_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(
