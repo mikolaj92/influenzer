@@ -299,6 +299,61 @@ PRESS_RELEASE_RE = re.compile(
 SUPERLATIVE_RE = re.compile(
     r"(?i)\b(?:revolutionary|world'?s\s+first|world-first|ai[- ]powered)\b"
 )
+# Mocking another project is silence. Naming a predecessor and the difference,
+# or saying it is worth helping them, is fine. Dunking is not.
+DUNK_PHRASE_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:dunk(?:s|ing)?(?:\s+on)?|roast(?:s|ing)?|laugh(?:s|ing)?\s+at)\b|"
+    r"\b(?:their|that|the\s+other)\s+"
+    r"(?:project|tool|repo|competitor|predecessor|clone|alternative)\s+"
+    r"(?:is\s+)?(?:trash|garbage|a\s+joke|dead|a\s+dumpster\s+fire|a\s+clown|a\s+toy|sucks)\b|"
+    r"\b(?:that|their)\s+(?:trash|garbage|joke|dumpster[- ]fire|clown|toy)\b|"
+    r"\b(?:trash|garbage|joke|dead|dumpster[- ]fire|clown|toy)\s+"
+    r"(?:of\s+a\s+)?(?:project|tool|repo|competitor|predecessor|clone)\b"
+    r")"
+)
+DUNK_NAMED_RE = re.compile(
+    r"(?i)\b(?P<name>[A-Za-z][\w.-]*)\s+"
+    r"(?:sucks|is\s+trash|is\s+garbage|is\s+a\s+joke|is\s+dead|"
+    r"is\s+a\s+dumpster\s+fire|is\s+a\s+clown(?:\s+project)?|"
+    r"is\s+a\s+toy(?:\s+project)?)\b"
+)
+_DUNK_SUBJECT_STOP = frozenset(
+    {
+        "this",
+        "it",
+        "that",
+        "the",
+        "our",
+        "my",
+        "your",
+        "we",
+        "they",
+        "install",
+        "timeout",
+        "demo",
+        "build",
+        "test",
+        "post",
+        "feed",
+        "spike",
+        "launch",
+        "thread",
+        "format",
+        "account",
+        "tool",
+        "repo",
+        "project",
+        "clone",
+        "hn",
+        "api",
+        "cli",
+        "ci",
+        "readme",
+        "github",
+        "python",
+    }
+)
 COMMIT_NOISE_RE = re.compile(
     r"(?i)^\s*(?:chore|typo|lint|ci|wip|bump\s+(?:version|deps)|fix(?:es)?\s+tests|merge\s+branch)\b"
 )
@@ -539,6 +594,17 @@ def looks_like_superlative(text: str) -> bool:
     return bool(SUPERLATIVE_RE.search(text))
 
 
+def looks_like_dunk(text: str) -> bool:
+    """True when copy mocks another project. Contrast or help is not a dunk."""
+    if DUNK_PHRASE_RE.search(text):
+        return True
+    for match in DUNK_NAMED_RE.finditer(text):
+        name = match.group("name")
+        if len(name) > 1 and name.casefold() not in _DUNK_SUBJECT_STOP:
+            return True
+    return False
+
+
 def looks_like_invented_opinion(text: str) -> bool:
     """True for unsourced praise such as 'users love'. Not a quote."""
     return bool(INVENTED_OPINION_RE.search(text))
@@ -687,6 +753,8 @@ __all__ = [
     "BLOG_HOSTS",
     "CANON_URL",
     "COMMIT_NOISE_RE",
+    "DUNK_NAMED_RE",
+    "DUNK_PHRASE_RE",
     "HN_STORY_KINDS",
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
@@ -722,6 +790,7 @@ __all__ = [
     "invented_metric_reason",
     "is_video_host_url",
     "looks_like_commit_noise",
+    "looks_like_dunk",
     "looks_like_invented_opinion",
     "metric_tokens",
     "looks_like_listicle_title",
