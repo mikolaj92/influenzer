@@ -39,6 +39,7 @@ from influenzer.playbook import (
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
+    is_blog_host_url,
     is_merge_log_texts,
     is_store_host_url,
     is_video_host_url,
@@ -114,6 +115,7 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
             url.startswith("https://")
             and not is_video_host_url(url)
             and not is_store_host_url(url)
+            and not is_blog_host_url(url)
             and url not in found
         ):
             found.append(url)
@@ -225,7 +227,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
         return None
     url = _proof_url(bits)
-    if not url or is_video_host_url(url) or is_store_host_url(url):
+    if not url or is_video_host_url(url) or is_store_host_url(url) or is_blog_host_url(url):
         return None
     if looks_like_store_pitch("\n".join((bits.one_liner, *bits.rest))):
         return None

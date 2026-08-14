@@ -271,6 +271,47 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("Show HN:", json.dumps(payload))
         self.assertNotIn("apps.apple.com", json.dumps(payload.get("body") or ""))
 
+    def test_hn_blog_only_url_is_undressable_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            claims_ship=False,
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(
+                    text="read the writeup",
+                    artifact_url="https://medium.com/@someone/we-shipped-a-thing-abc123",
+                ),
+                Fact(text="strangers can click the article today"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "hn",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                    "canon_url": ARENAS[ArenaId.HN].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        self.assertNotIn("Show HN:", json.dumps(payload))
+        self.assertNotIn("medium.com", json.dumps(payload.get("body") or ""))
+
     def test_hn_without_tryable_url_is_undressable_not_a_label_dump(self) -> None:
         brief = _ship_brief(
             facts=(Fact(text="a working demo exists on my laptop"), Fact(text="strangers can run it locally")),

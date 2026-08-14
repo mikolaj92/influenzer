@@ -270,6 +270,17 @@ STORE_HOSTS: frozenset[str] = frozenset(
 STORE_PITCH_RE = re.compile(
     r"(?i)\b(?:download the app|app store|google play|play store|testflight)\b"
 )
+# An article is not click-and-run. Medium / Substack / dev.to / hashnode as
+# the only URL is silence on seminar. A blog next to a repo can stay as evidence.
+BLOG_HOSTS: frozenset[str] = frozenset(
+    {
+        "medium.com",
+        "substack.com",
+        "dev.to",
+        "hashnode.com",
+        "hashnode.dev",
+    }
+)
 
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
@@ -425,6 +436,11 @@ def is_store_host_url(url: str | None) -> bool:
     return _host_in(url, STORE_HOSTS)
 
 
+def is_blog_host_url(url: str | None) -> bool:
+    """True for a Medium / Substack / dev.to / hashnode URL. A blog is not a tryable demo."""
+    return _host_in(url, BLOG_HOSTS)
+
+
 def looks_like_store_pitch(text: str) -> bool:
     return bool(STORE_PITCH_RE.search(text))
 
@@ -480,6 +496,7 @@ __all__ = [
     "ArenaGate",
     "ArenaId",
     "ArenaPlay",
+    "BLOG_HOSTS",
     "CANON_URL",
     "COMMIT_NOISE_RE",
     "HN_STORY_KINDS",
@@ -500,6 +517,7 @@ __all__ = [
     "has_cinema_package",
     "has_fair_hook",
     "has_named_subreddit",
+    "is_blog_host_url",
     "is_merge_log_texts",
     "is_ship_artifact_url",
     "is_social_arena",
