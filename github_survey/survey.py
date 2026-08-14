@@ -1,4 +1,8 @@
-"""Collect public merged PRs / releases / tags / README. No storage."""
+"""Collect public merged PRs / releases / tags / README. No storage.
+
+Survey is gh api only. git clone / worktree on the host is silence.
+Mini is not a checkout cache.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +10,7 @@ import argparse
 import base64
 import json
 import os
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -14,7 +19,10 @@ from github_survey.gh import (
     PR_JSON_FIELDS,
     RELEASE_JSON_FIELDS,
     REPO_JSON_FIELDS,
+    GhCall,
     GhRunner,
+    allowlisted_gh_argv,
+    gh_argv,
     invalid_repo_reason,
     optional_json,
     required_json,
@@ -22,6 +30,62 @@ from github_survey.gh import (
 )
 
 LOOKBACK_DAYS = 7
+_GIT_HEADS = frozenset({"git", "git-clone", "git-worktree"})
+_CLONE_OR_WORKTREE = frozenset({"clone", "worktree"})
+
+
+def _look_argv_tokens(argv: object) -> list[str] | None:
+    if isinstance(argv, (bytes, bytearray)):
+        try:
+            argv = argv.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+    if isinstance(argv, str):
+        return argv.split()
+    if isinstance(argv, Sequence):
+        tokens: list[str] = []
+        for item in argv:
+            if isinstance(item, (bytes, bytearray)):
+                try:
+                    tokens.append(item.decode("utf-8"))
+                except UnicodeDecodeError:
+                    return None
+            elif isinstance(item, str):
+                tokens.append(item)
+            else:
+                return None
+        return tokens
+    return None
+
+
+def look_argv_is_clone_or_worktree(argv: object) -> bool:
+    """True when argv would run git, clone, or make a worktree on the host."""
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return True
+    lowered = [token.lower() for token in tokens]
+    if not lowered:
+        return False
+    if lowered[0] in _GIT_HEADS:
+        return True
+    if any(token in _CLONE_OR_WORKTREE for token in lowered):
+        return True
+    return any(token.startswith("--work-tree") for token in lowered)
+
+
+def look_api_only_gh(gh: GhRunner | None = None) -> GhRunner:
+    """Survey/feedback only through gh api. clone/worktree is silence, not a spawn."""
+    runner = run_gh if gh is None else gh
+
+    def _api_only(argv: Sequence[str]) -> GhCall:
+        if look_argv_is_clone_or_worktree(argv):
+            return GhCall(returncode=0, stdout="", stderr="")
+        child = gh_argv(argv)
+        if child is None or not allowlisted_gh_argv(child):
+            return GhCall(returncode=0, stdout="", stderr="")
+        return runner(argv)
+
+    return _api_only
 
 
 def parse_github_time(value: str | None) -> datetime | None:
@@ -142,7 +206,7 @@ def survey_public_repo(
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return _silence("repo must be owner/name", repo=slug)
-    runner = gh if gh is not None else run_gh
+    runner = look_api_only_gh(gh)
     clock = parse_now(now)
     try:
         survey, reason = collect_survey(slug, gh=runner, now=clock)

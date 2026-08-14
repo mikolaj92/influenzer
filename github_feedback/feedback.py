@@ -1,4 +1,8 @@
-"""Collect public issue/PR comments. No storage. No replies."""
+"""Collect public issue/PR comments. No storage. No replies.
+
+Feedback is gh api only. git clone / worktree on the host is silence.
+Mini is not a checkout cache.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +22,7 @@ from github_survey.gh import (
     required_json,
     run_gh,
 )
-from github_survey.survey import LOOKBACK_DAYS, in_window, parse_now
+from github_survey.survey import LOOKBACK_DAYS, in_window, look_api_only_gh, parse_now
 
 SOURCE = "github-feedback"
 MAX_FACTS = 8
@@ -218,7 +222,7 @@ def collect_feedback(
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return _silence("repo must be owner/name", repo=slug)
-    runner = gh if gh is not None else run_gh
+    runner = look_api_only_gh(run_gh if gh is None else gh)
     clock = parse_now(now)
     try:
         collected, reason = collect_comments(slug, gh=runner, now=clock)
