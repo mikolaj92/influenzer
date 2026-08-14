@@ -26,6 +26,7 @@ from influenzer.playbook import (
     ArenaId,
     StoryKind,
     Verdict,
+    is_blog_host_url,
     is_store_host_url,
     is_video_host_url,
     looks_like_store_pitch,
@@ -124,6 +125,26 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertTrue(looks_like_store_pitch("download the app on TestFlight"))
         self.assertTrue(looks_like_store_pitch("Get it on the App Store"))
         self.assertFalse(looks_like_store_pitch("a stranger can click and run the demo"))
+
+    def test_blog_host_is_medium_substack_devto_hashnode_not_a_repo(self) -> None:
+        blogs = (
+            "https://medium.com/@someone/we-shipped-a-thing-abc123",
+            "https://someone.medium.com/we-shipped-a-thing-abc123",
+            "https://someone.substack.com/p/we-shipped-a-thing",
+            "https://dev.to/someone/we-shipped-a-thing",
+            "https://someone.hashnode.dev/we-shipped-a-thing",
+            "https://hashnode.com/@someone/we-shipped-a-thing",
+        )
+        for url in blogs:
+            with self.subTest(url=url):
+                self.assertTrue(is_blog_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+                self.assertFalse(is_store_host_url(url))
+        self.assertFalse(is_blog_host_url(SHIP_REPO))
+        self.assertFalse(is_blog_host_url("https://example.com/medium"))
+        self.assertFalse(is_blog_host_url("https://notmedium.com/we-shipped"))
+        self.assertFalse(is_blog_host_url("https://medium.com.evil.com/we-shipped"))
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -509,6 +530,51 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertIn(SHIP_REPO, decision.draft.body)
         self.assertNotIn("apps.apple.com", decision.draft.body)
+
+    def test_medium_substack_devto_or_hashnode_as_only_url_is_not_show_hn(self) -> None:
+        blogs = (
+            "https://medium.com/@someone/we-shipped-a-thing-abc123",
+            "https://someone.medium.com/we-shipped-a-thing-abc123",
+            "https://someone.substack.com/p/we-shipped-a-thing",
+            "https://dev.to/someone/we-shipped-a-thing",
+            "https://someone.hashnode.dev/we-shipped-a-thing",
+            "https://hashnode.com/@someone/we-shipped-a-thing",
+        )
+        for url in blogs:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="read the writeup", artifact_url=url),
+                        Fact(text="strangers can click the article today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_a_blog")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_blog_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="writeup as evidence",
+                    artifact_url="https://medium.com/@someone/we-shipped-a-thing-abc123",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("medium.com", decision.draft.body)
 
     def test_hard_issue_defaults_to_github_workshop_not_social(self) -> None:
         brief = self._brief(
