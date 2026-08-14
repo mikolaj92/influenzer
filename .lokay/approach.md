@@ -1,33 +1,38 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=134 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=132 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #134 — Zrzut rankingu nie jest artefaktem
+Issue: #132 — Prywatna rozmowa nie idzie w kąt
 
 ## Goal
 
-Zrzut rankingu nie jest artefaktem. HN front, dashboard, licznik gwiazdek w kącie = cisza. Witryna to repo, nie wykres próżności.
+Prywatna rozmowa nie idzie w kąt. Zrzut Slacka, maila, DMa w body = cisza. Nawet „anonimizowane”. To nie excerpt z publicznego issue.
+
+Fail-closed:
+- Slack / mail / DM in body = silence, even after anonymization.
+- Excerpt only from a public GitHub issue/PR comment.
 
 ## Files likely touched
 
-- `influenzer/playbook.py`
-- `influenzer/hom.py`
-- `influenzer/hom_draft.py`
-- `tests/test_hom_operator.py`
-- `tests/test_hom_draft.py`
+- `influenzer/playbook.py` — private-channel host set, dump detector, public-issue excerpt URL
+- `influenzer/hom.py` — score Slack/mail/DM dumps as kill
+- `influenzer/hom_draft.py` — refuse to dress a leaked private conversation
+- `tests/test_hom_operator.py` — detector + score kills
+- `tests/test_hom_draft.py` — undressable even when score says draft
 
 ## Test plan
 
-- `python -m unittest tests.test_hom_operator tests.test_hom_draft`
+- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py tests/test_hom_feedback.py tests/test_github_feedback.py -q`
 
 ## Non-goals
 
-- Do not start collecting live HN/star charts. The website stays the repo.
+- Do not scrape Slack, mail, or DMs.
+- Do not treat a Slack/webmail URL as a legal excerpt source.
+- Do not kill product talk such as a Slack integration or a support inbox.
 
 ## Notes
 
+- Neighbors: #47 (secret does not leave) and #119 (quote only from feedback with a URL). This issue is the channel, not the token.
+- A Slack / Gmail / Outlook host is not a public issue. Anonymized still counts.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.

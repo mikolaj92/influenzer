@@ -55,6 +55,7 @@ from influenzer.playbook import (
     looks_like_merged_pr_fact,
     looks_like_person_mention,
     looks_like_press_release,
+    looks_like_private_conversation,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
@@ -434,6 +435,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_thread(bits.blob)
         or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
+        or looks_like_private_conversation(bits.blob)
     ):
         return None
     triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
@@ -453,6 +455,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_ranking_dump(body)
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
+        or looks_like_private_conversation(body)
     ):
         return None
     play = arena_play(score.arena)

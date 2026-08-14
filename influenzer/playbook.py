@@ -421,6 +421,51 @@ FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b
 FEEDBACK_EXCERPT_KINDS: frozenset[str] = frozenset(
     {"excerpt", "issue_comment", "pull_comment"}
 )
+# A quote is only legal from a public GitHub issue/PR comment.
+# Slack / mail / DM is a private channel, not an excerpt source.
+_PUBLIC_ISSUE_URL_RE = re.compile(
+    r"^https://github\.com/"
+    r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
+    r"(?:issues|pull)/\d+"
+    r"(?:#(?:issuecomment-\d+|discussion_r\d+|pullrequestreview-\d+|issue-\d+))?$",
+    re.I,
+)
+PRIVATE_CHANNEL_HOSTS: frozenset[str] = frozenset(
+    {
+        "slack.com",
+        "slack-gov.com",
+        "mail.google.com",
+        "gmail.com",
+        "outlook.live.com",
+        "outlook.office.com",
+        "outlook.office365.com",
+    }
+)
+# A private conversation is not an angle. Slack / mail / DM dump
+# is silence, even anonymized. Channel, not token. A Slack
+# integration or a support inbox stays; a zrzut does not.
+PRIVATE_CONVERSATION_RE = re.compile(
+    r"(?:"
+    r"\bslack(?:s|'s)?\s+(?:dump|thread|screenshot|message|msg|dm|export|chat|zrzut)\b|"
+    r"\b(?:from|in|on|via)\s+(?:a\s+|an\s+)?(?:anon(?:ymi|imi)[sz]\w*\s+)?slack\b|"
+    r"\bslack(?:a|u|iem|owi)\b|"
+    r"\bzrzut\s+slack|"
+    r"\bmailto:|"
+    r"^(?:from|fwd|forwarded(?:\s+message)?):|"
+    r"\b(?:from|in|on|forwarded|fwd)\s+(?:an?\s+)?(?:e-?mail|mail)s?\b|"
+    r"\b(?:e-?mail|mail)s?\s+(?:dump|thread|screenshot|zrzut|export)\b|"
+    r"\bzrzut\s+(?:e-?mail|mail)|"
+    r"\bdirect[- ]messages?\b|"
+    r"\b(?:in|from|via|on)\s+(?:a\s+|an\s+)?(?:anon(?:ymi|imi)[sz]\w*\s+)?dms?\b|"
+    r"\bdm(?:s|a|em|ie|ów)?\s+(?:dump|thread|screenshot|zrzut|from|od)\b|"
+    r"\bzrzut\s+dm|"
+    r"\bdm(?:a|em|ie|ów)\b|"
+    r"\bprivate(?:ly)?\s+(?:conversation|message|chat|thread|dm|mail|email|slack)\b|"
+    r"\bprivately\s+(?:messaged|emailed|said|wrote)\b|"
+    r"\bprywatn(?:a|ej|ą|e|y)\s+(?:rozmow\w*|wiadomo[sś][cć]\w*|konwers\w*|czat\w*)\b"
+    r")",
+    re.I | re.M,
+)
 QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
 _QUOTED_SPAN_RE = re.compile(
     r'"([^"]{1,240})"|\u201c([^\u201d]{1,240})\u201d|\u201e([^\u201d]{1,240})\u201d|\u00ab([^\u00bb]{1,240})\u00bb'
@@ -809,6 +854,27 @@ def looks_like_person_mention(text: str) -> bool:
     return bool(MENTION_RE.search(cleaned))
 
 
+def is_public_issue_url(url: str | None) -> bool:
+    """True for a public GitHub issue/PR comment URL. Slack / mail / DM is not."""
+    cleaned = (url or "").strip().rstrip("/")
+    return bool(_PUBLIC_ISSUE_URL_RE.fullmatch(cleaned))
+
+
+def is_private_channel_url(url: str | None) -> bool:
+    """True for a Slack / webmail host. A private channel is not an excerpt."""
+    return _host_in(url, PRIVATE_CHANNEL_HOSTS)
+
+
+def looks_like_private_conversation(text: str) -> bool:
+    """True for a Slack / mail / DM dump. Anonymized still counts. Not a public issue."""
+    if not text or not text.strip():
+        return False
+    if any(is_private_channel_url(match.group(0)) for match in _URL_IN_TEXT_RE.finditer(text)):
+        return True
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(PRIVATE_CONVERSATION_RE.search(cleaned))
+
+
 def strip_person_mentions(text: str) -> str:
     """Drop @login summons. URLs stay. Empty after strip is silence."""
     parts: list[str] = []
@@ -874,11 +940,10 @@ def has_quote_mark(text: str) -> bool:
 
 
 def is_feedback_excerpt_fact(kind: str, artifact_url: str | None) -> bool:
-    """A quote needs an excerpt-shaped fact with a clickable source URL."""
+    """A quote needs an excerpt-shaped fact from a public GitHub issue/PR."""
     if kind.strip().lower() not in FEEDBACK_EXCERPT_KINDS:
         return False
-    url = (artifact_url or "").strip()
-    return url.startswith("https://")
+    return is_public_issue_url(artifact_url)
 
 
 def feedback_excerpt_texts(
@@ -919,12 +984,19 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
         text for kind, text, url in packed if not is_feedback_excerpt_fact(kind, url)
     ]
+    for _kind, text, url in packed:
+        if looks_like_private_conversation(text) or is_private_channel_url(url):
+            return "private_conversation"
+    if extra and (
+        looks_like_private_conversation(extra) or is_private_channel_url(extra)
+    ):
+        return "private_conversation"
     if any(looks_like_invented_opinion(text) for text in operator_texts):
         return "invented_opinion"
     if extra and looks_like_invented_opinion(extra):
@@ -1009,6 +1081,8 @@ __all__ = [
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
     "NEWSLETTER_STORY_KINDS",
+    "PRIVATE_CHANNEL_HOSTS",
+    "PRIVATE_CONVERSATION_RE",
     "QUOTE_MARKS",
     "RANKING_DUMP_RE",
     "RANKING_HOSTS",
@@ -1031,6 +1105,8 @@ __all__ = [
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_merge_log_texts",
+    "is_private_channel_url",
+    "is_public_issue_url",
     "is_ranking_host_url",
     "is_ship_artifact_url",
     "is_social_arena",
@@ -1047,6 +1123,7 @@ __all__ = [
     "ranking_urls_only",
     "looks_like_invented_opinion",
     "looks_like_person_mention",
+    "looks_like_private_conversation",
     "metric_tokens",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
