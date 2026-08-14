@@ -31,6 +31,7 @@ from influenzer.playbook import (
     is_video_host_url,
     looks_like_invented_opinion,
     looks_like_listicle_title,
+    looks_like_shouty_title,
     looks_like_store_pitch,
     quote_without_sourced_excerpt,
     unquotable_reason,
@@ -146,6 +147,27 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(looks_like_listicle_title("Local tick scores briefs and emits a draft"))
         self.assertFalse(looks_like_listicle_title("this is a great way to run ticks"))
         self.assertFalse(looks_like_listicle_title("Wow! Local tick scores briefs"))
+
+    def test_shouty_title_is_whole_title_caps_not_one_or_two_acronyms(self) -> None:
+        bait = (
+            "LOCAL TICK SCORES BRIEFS AND EMITS A DRAFT",
+            "Show HN: LOCAL TICK SCORES BRIEFS AND EMITS A DRAFT",
+            "STRANGERS CAN CLICK AND RUN THE DEMO TODAY",
+        )
+        for title in bait:
+            with self.subTest(title=title):
+                self.assertTrue(looks_like_shouty_title(title))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "CLI scores briefs and emits a draft",
+            "Show HN: CLI scores briefs",
+            "API",
+            "HN CLI",
+            "README GIF",
+        )
+        for title in allowed:
+            with self.subTest(title=title):
+                self.assertFalse(looks_like_shouty_title(title))
 
     def test_blog_host_is_medium_substack_devto_hashnode_not_a_repo(self) -> None:
         blogs = (
@@ -680,6 +702,37 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "hn_not_a_listicle")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_shouty_caps_title_is_silence_on_hn_and_github(self) -> None:
+        title = "LOCAL TICK SCORES BRIEFS AND EMITS A DRAFT"
+        for arena in (ArenaId.HN, ArenaId.GITHUB):
+            with self.subTest(arena=arena.value):
+                brief = self._brief(
+                    preferred_arena=arena,
+                    facts=(
+                        Fact(text=title, artifact_url=SHIP_REPO),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "shouty_title")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_one_or_two_acronym_words_can_still_be_a_title(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="CLI scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN: CLI scores briefs"))
 
     def test_curiosity_title_can_still_be_show_hn(self) -> None:
         brief = self._brief(
