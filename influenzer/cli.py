@@ -12,7 +12,15 @@ from typing import Any
 from urllib.parse import urlencode, urlparse
 
 from influenzer import __version__
-from influenzer.config import Config, load_config, write_config
+from influenzer.config import (
+    Config,
+    WorkspacePermissionError,
+    load_config,
+    open_workspace,
+    permission_exit,
+    prepare_home,
+    write_config,
+)
 from influenzer.domain import (
     AccountStatus,
     Campaign,
@@ -269,9 +277,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
 
 
 def _repo(args: argparse.Namespace) -> StateRepository:
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    (cfg.home / "artifacts" / "sha256").mkdir(parents=True, exist_ok=True)
+    cfg = open_workspace(args.config)
     return StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts")
 
 
@@ -281,6 +287,13 @@ def _fail(reason: str, code: int = 1) -> int:
 
 
 def handle_cli(args: argparse.Namespace) -> int:
+    try:
+        return _dispatch_cli(args)
+    except WorkspacePermissionError:
+        return permission_exit()
+
+
+def _dispatch_cli(args: argparse.Namespace) -> int:
     if getattr(args, "version", False):
         print(__version__)
         return 0
@@ -289,9 +302,9 @@ def handle_cli(args: argparse.Namespace) -> int:
         cfg = load_config(args.config)
         home = Path(args.home) if getattr(args, "home", None) else cfg.home
         config_file = Path(args.config) if args.config else home / "config.json"
-        write_config(config_file, Config(home=home))
-        home.mkdir(parents=True, exist_ok=True)
-        (home / "artifacts" / "sha256").mkdir(parents=True, exist_ok=True)
+        prepared = Config(home=home)
+        prepare_home(prepared)
+        write_config(config_file, prepared)
         # Open once so schema migrates.
         with StateRepository(home / "state.db", artifact_root=home / "artifacts"):
             pass
@@ -787,7 +800,7 @@ def handle_cli(args: argparse.Namespace) -> int:
     if args.command == "pass":
         from influenzer.hom_pass import run_pass
 
-        cfg = load_config(args.config)
+        cfg = open_workspace(args.config)
         with _repo(args) as repo:
             out = run_pass(
                 repo,

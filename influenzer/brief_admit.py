@@ -13,7 +13,7 @@ import argparse
 from collections.abc import Sequence
 from typing import Any
 
-from influenzer.config import load_config
+from influenzer.config import WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
@@ -137,10 +137,12 @@ def main(argv: list[str] | None = None) -> int:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = admit_pack(repo, payload, project_id=args.project_id)
+    try:
+        cfg = open_workspace(args.config)
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = admit_pack(repo, payload, project_id=args.project_id)
+    except WorkspacePermissionError:
+        return permission_exit()
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.brief")
     return 0

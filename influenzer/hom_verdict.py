@@ -17,7 +17,7 @@ import argparse
 import json
 from typing import Any
 
-from influenzer.config import load_config
+from influenzer.config import WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.envelope import noop
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Draft
@@ -85,15 +85,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project-id", help="limit to one project")
     parser.add_argument("--draft-id", help="disambiguate when more than one draft exists")
     args = parser.parse_args(argv)
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = apply_verdict(
-            repo,
-            args.verdict,
-            project_id=args.project_id,
-            draft_id=args.draft_id,
-        )
+    try:
+        cfg = open_workspace(args.config)
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = apply_verdict(
+                repo,
+                args.verdict,
+                project_id=args.project_id,
+                draft_id=args.draft_id,
+            )
+    except WorkspacePermissionError:
+        return permission_exit()
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.verdict")
     return 0

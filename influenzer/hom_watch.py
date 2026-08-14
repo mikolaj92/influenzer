@@ -18,7 +18,7 @@ from typing import Any
 
 from github_survey import invalid_repo_reason
 
-from influenzer.config import Config, load_config
+from influenzer.config import Config, open_workspace
 from influenzer.domain import utc_now
 from influenzer.envelope import fail, noop, ok
 from influenzer.hom_pass import run_pass
@@ -116,8 +116,7 @@ def run_watched_tick(
     now: str | None = None,
 ) -> dict[str, Any]:
     """One interval step against state.db. Does not open runtime.db."""
-    cfg = load_config(config_path)
-    cfg.home.mkdir(parents=True, exist_ok=True)
+    cfg = open_workspace(config_path)
     with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
         return interval_tick(
             repo,

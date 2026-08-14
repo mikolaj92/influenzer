@@ -20,7 +20,7 @@ import argparse
 import json
 from typing import Any
 
-from influenzer.config import Config, load_config
+from influenzer.config import Config, WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
@@ -102,17 +102,19 @@ def main(argv: list[str] | None = None) -> int:
         help="coarse cadence in days (default 7)",
     )
     args = parser.parse_args(argv)
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = run_pass(
-            repo,
-            cfg,
-            project_id=args.project_id,
-            repo_slug=args.repo,
-            now=args.now,
-            window_days=args.window_days,
-        )
+    try:
+        cfg = open_workspace(args.config)
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = run_pass(
+                repo,
+                cfg,
+                project_id=args.project_id,
+                repo_slug=args.repo,
+                now=args.now,
+                window_days=args.window_days,
+            )
+    except WorkspacePermissionError:
+        return permission_exit()
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.pass")
     return 0

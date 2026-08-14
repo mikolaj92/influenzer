@@ -23,7 +23,7 @@ from github_survey import GhRunner, invalid_repo_reason
 
 from influenzer.brief_admit import SOURCE, host_silence, open_story_reason
 from influenzer.brief_scan import scan_github
-from influenzer.config import load_config
+from influenzer.config import WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.domain import utc_now
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Brief
@@ -179,16 +179,18 @@ def main(argv: list[str] | None = None) -> int:
         help="coarse cadence in days (default 7)",
     )
     args = parser.parse_args(argv)
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = scan_github_if_due(
-            repo,
-            project_id=args.project_id,
-            repo_slug=args.repo,
-            now=args.now,
-            window_days=args.window_days,
-        )
+    try:
+        cfg = open_workspace(args.config)
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = scan_github_if_due(
+                repo,
+                project_id=args.project_id,
+                repo_slug=args.repo,
+                now=args.now,
+                window_days=args.window_days,
+            )
+    except WorkspacePermissionError:
+        return permission_exit()
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.brief")
     return 0

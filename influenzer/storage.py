@@ -16,6 +16,7 @@ from .domain import (
     PlatformAccount, PolicyActivationGrant, PolicyVersion, Project, PublishPlan,
     PublicationAttempt, AccountStatus, PlanStatus, AttemptStatus,
 )
+from .config import FILE_MODE, ensure_private_dir, mkdir_private, tighten_private_state
 from .domain import content_hash
 from .hom import Brief, Draft, Score, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
@@ -114,7 +115,7 @@ class ArtifactStore:
 
     def __init__(self, root: str | os.PathLike[str]):
         self.root = Path(root) / "sha256"
-        self.root.mkdir(parents=True, exist_ok=True)
+        mkdir_private(self.root)
 
     def put(self, data: bytes, *, media_type: str = "application/octet-stream") -> dict[str, Any]:
         digest = hashlib.sha256(data).hexdigest()
@@ -124,8 +125,14 @@ class ArtifactStore:
                 raise ArtifactCorruptionError(f"artifact hash collision or corruption: {digest}")
         else:
             temporary = target.with_name(f".{digest}.tmp-{os.getpid()}")
-            temporary.write_bytes(data)
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, FILE_MODE)
+            try:
+                os.write(fd, data)
+            finally:
+                os.close(fd)
+            os.chmod(temporary, FILE_MODE)
             os.replace(temporary, target)
+            os.chmod(target, FILE_MODE)
         return {"digest": digest, "media_type": media_type, "byte_size": len(data), "uri": target.as_uri()}
 
     def verify(self, digest: str) -> bytes:
@@ -143,14 +150,19 @@ class StateRepository:
 
     def __init__(self, db_path: str | os.PathLike[str], *, artifact_root: str | os.PathLike[str] | None = None):
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_private_dir(self.db_path.parent)
         self.artifacts = ArtifactStore(artifact_root or self.db_path.parent / "artifacts")
-        raw = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
-        raw.row_factory = sqlite3.Row
+        mask = os.umask(0o077)
+        try:
+            raw = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
+            raw.row_factory = sqlite3.Row
+            raw.execute("PRAGMA foreign_keys = ON")
+            raw.execute("PRAGMA busy_timeout = 30000")
+            raw.execute("PRAGMA journal_mode = WAL")
+            tighten_private_state(self.db_path)
+        finally:
+            os.umask(mask)
         self.conn = _BindOnlyConnection(raw)
-        self.conn.execute("PRAGMA foreign_keys = ON")
-        self.conn.execute("PRAGMA busy_timeout = 30000")
-        self.conn.execute("PRAGMA journal_mode = WAL")
         migrate(raw)
 
     def close(self) -> None:

@@ -26,6 +26,9 @@ class InfluenzerInitDemoTests(unittest.TestCase):
         cfg = load_config(str(self.config))
         self.assertEqual(cfg.home, self.home)
         self.assertFalse(cfg.scheduler_live_enabled)
+        self.assertEqual(self.home.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.config.stat().st_mode & 0o777, 0o600)
+        self.assertEqual((self.home / "state.db").stat().st_mode & 0o777, 0o600)
 
     def test_project_create_and_show_roundtrip(self) -> None:
         main(["--config", str(self.config), "init", "--home", str(self.home)])

@@ -20,6 +20,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from influenzer.config import WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.hom_watch import run_watched_tick
 from influenzer.host import HostPower, HostUnsuitable, require_always_on_host
 
@@ -130,6 +131,9 @@ def main(
 
     try:
         require_always_on_host(once=bool(args.once), inspect=inspect_host)
+        open_workspace(args.config)
+    except WorkspacePermissionError:
+        return permission_exit()
     except HostUnsuitable as exc:
         print(
             json.dumps(
@@ -155,6 +159,8 @@ def main(
         )
     except KeyboardInterrupt:
         return 0
+    except WorkspacePermissionError:
+        return permission_exit()
     except ValueError as exc:
         print(json.dumps({"status": "failed", "reason": str(exc)}, sort_keys=True))
         return 2

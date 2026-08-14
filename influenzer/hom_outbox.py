@@ -17,7 +17,7 @@ import argparse
 import json
 from typing import Any
 
-from influenzer.config import load_config
+from influenzer.config import WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Draft
@@ -95,10 +95,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", help="path to config.json")
     parser.add_argument("--project-id", help="limit to one project")
     args = parser.parse_args(argv)
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = emit_angle(repo, project_id=args.project_id)
+    try:
+        cfg = open_workspace(args.config)
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = emit_angle(repo, project_id=args.project_id)
+    except WorkspacePermissionError:
+        return permission_exit()
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.angle")
     return 0

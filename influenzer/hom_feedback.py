@@ -22,7 +22,7 @@ from github_feedback import collect_feedback
 from github_survey import GhRunner, invalid_repo_reason
 
 from influenzer.brief_admit import already_told, open_story_reason
-from influenzer.config import load_config
+from influenzer.config import WorkspacePermissionError, open_workspace, permission_exit
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
@@ -165,18 +165,20 @@ def main(argv: list[str] | None = None) -> int:
             loaded = {}
         if isinstance(loaded, dict) and loaded:
             payload = loaded
-    cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        if payload is not None:
-            out = admit_feedback(repo, payload, project_id=args.project_id, now=args.now)
-        else:
-            out = collect_and_admit(
-                repo,
-                project_id=args.project_id,
-                repo_slug=args.repo,
-                now=args.now,
-            )
+    try:
+        cfg = open_workspace(args.config)
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            if payload is not None:
+                out = admit_feedback(repo, payload, project_id=args.project_id, now=args.now)
+            else:
+                out = collect_and_admit(
+                    repo,
+                    project_id=args.project_id,
+                    repo_slug=args.repo,
+                    now=args.now,
+                )
+    except WorkspacePermissionError:
+        return permission_exit()
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.brief")
     return 0
