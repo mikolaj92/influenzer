@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -297,6 +297,48 @@ BLOG_HOSTS: frozenset[str] = frozenset(
         "hashnode.com",
         "hashnode.dev",
     }
+)
+# A ranking dump is not a tryable artifact. HN front / star-history /
+# shields / stargazers as the only URL is silence. The website is the repo,
+# not a vanity chart. A chart next to a repo can stay as evidence.
+RANKING_HOSTS: frozenset[str] = frozenset(
+    {
+        "news.ycombinator.com",
+        "hn.algolia.com",
+        "star-history.com",
+        "star-history.t9t.io",
+        "shields.io",
+        "img.shields.io",
+        "gitstar-ranking.com",
+    }
+)
+_GITHUB_VANITY_RE = re.compile(
+    r"^https://github\.com/"
+    r"(?:trending(?:/.*)?|"
+    r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
+    r"(?:stargazers|watchers)(?:/.*)?)"
+    r"$",
+    re.I,
+)
+# HN front, star counter in the corner, vanity chart. Not a product angle.
+# "star the repo after you try it" and a product dashboard stay.
+RANKING_DUMP_RE = re.compile(
+    r"(?i)(?:"
+    r"\bhn\s+front(?:\s+page)?\b|"
+    r"\bhacker\s+news\s+front(?:\s+page)?\b|"
+    r"\bfront\s+page\s+of\s+(?:hn|hacker\s+news)\b|"
+    r"\b(?:on|at)\s+the\s+(?:hn|hacker\s+news)\s+front\b|"
+    r"(?:#1|\bnumber\s+one|\btop)\s+on\s+(?:hn|hacker\s+news)\b|"
+    r"\bstar[- ]?(?:count|counter|badge|chart|history|dashboard)\b|"
+    r"\bstars?\s+in\s+the\s+corner\b|"
+    r"\blicznik\s+gwiazdek\b|"
+    r"\bgwiazd(?:ek|ki)\s+w\s+k[aą]cie\b|"
+    r"\bzrzut\s+rankingu\b|"
+    r"\branking\s+dump\b|"
+    r"\bwykres\s+(?:pr[oó][zż]no[ś]ci|gwiazdek|rankingu)\b|"
+    r"\bvanity\s+(?:chart|graph|dashboard|metric)\b|"
+    r"\bstargazers?\b"
+    r")"
 )
 
 WAITLIST_RE = re.compile(
@@ -612,6 +654,25 @@ def is_blog_host_url(url: str | None) -> bool:
     return _host_in(url, BLOG_HOSTS)
 
 
+def is_ranking_host_url(url: str | None) -> bool:
+    """True for HN / star-history / shields / stargazers. A chart is not a tryable demo."""
+    if _host_in(url, RANKING_HOSTS):
+        return True
+    if not url:
+        return False
+    return bool(_GITHUB_VANITY_RE.fullmatch(url.strip().rstrip("/")))
+
+
+def ranking_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
+    """True when every artifact URL is a ranking dump and none is a repo."""
+    cleaned = [url.strip() for url in urls if url and url.strip()]
+    if not cleaned:
+        return False
+    if any(is_ship_artifact_url(url) for url in cleaned):
+        return False
+    return all(is_ranking_host_url(url) for url in cleaned)
+
+
 def looks_like_store_pitch(text: str) -> bool:
     return bool(STORE_PITCH_RE.search(text))
 
@@ -719,6 +780,12 @@ def looks_like_thread(text: str) -> bool:
         return True
     leftover = _THREAD_TECH_RE.sub(" ", cleaned)
     return bool(THREAD_WORD_RE.search(leftover))
+
+
+def looks_like_ranking_dump(text: str) -> bool:
+    """True for HN front, a star counter, or a vanity chart. Not an artifact."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(RANKING_DUMP_RE.search(cleaned))
 
 
 def looks_like_hashtag_wall(text: str) -> bool:
@@ -852,7 +919,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a tag wall, a summon, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -875,6 +942,10 @@ def unquotable_reason(
         return "thread"
     if extra and looks_like_thread(extra):
         return "thread"
+    if any(looks_like_ranking_dump(text) for text in operator_texts):
+        return "ranking_not_an_artifact"
+    if extra and looks_like_ranking_dump(extra):
+        return "ranking_not_an_artifact"
     if any(looks_like_hashtag_wall(text) for text in operator_texts):
         return "hashtag_wall"
     if extra and looks_like_hashtag_wall(extra):
@@ -939,6 +1010,8 @@ __all__ = [
     "MIN_SOCIAL_FACTS",
     "NEWSLETTER_STORY_KINDS",
     "QUOTE_MARKS",
+    "RANKING_DUMP_RE",
+    "RANKING_HOSTS",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
     "STORE_HOSTS",
@@ -958,6 +1031,7 @@ __all__ = [
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_merge_log_texts",
+    "is_ranking_host_url",
     "is_ship_artifact_url",
     "is_social_arena",
     "is_store_host_url",
@@ -966,9 +1040,11 @@ __all__ = [
     "looks_like_commit_noise",
     "looks_like_dunk",
     "looks_like_contest",
+    "looks_like_ranking_dump",
     "looks_like_thread",
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
+    "ranking_urls_only",
     "looks_like_invented_opinion",
     "looks_like_person_mention",
     "metric_tokens",
