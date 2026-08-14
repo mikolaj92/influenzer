@@ -397,6 +397,25 @@ ENGAGEMENT_BAIT_RE = re.compile(
     r"[\u2193\u2b07\U0001F447\U0001F53D]"
     r")"
 )
+# A contest is not an angle. Giveaway / raffle / RT to win /
+# nagroda za follow is silence. This is not a product.
+CONTEST_RE = re.compile(
+    r"(?i)(?:"
+    r"\bgive[- ]?aways?\b|"
+    r"\braffles?\b|"
+    r"\bsweepstakes?\b|"
+    r"\bcontests?\b|"
+    r"\bkonkurs(?:y|ie|u|ów)?\b|"
+    r"\blosowa[nń](?:ie|ia|iu)\b|"
+    r"\b(?:rt|retweet|repost|follow|star)\s+to\s+win\b|"
+    r"\bwin\s+(?:if\s+you\s+)?(?:rt|retweet|repost|follow|star)\b|"
+    r"\bprize\s+(?:for|if\s+you)\s+(?:a\s+)?(?:follow|rt|retweet|like|star)\b|"
+    r"\bnagrod[aąęy]\s+za\s+(?:follow|obserw|rt|retweet|lajk|gwiazdk)|"
+    r"\benter\s+to\s+win\b|"
+    r"\bwygraj\b|"
+    r"\bdo\s+wygrania\b"
+    r")"
+)
 # A wall of hashtags is not a costume. More than one-two tags, or a
 # trailing tag tail, is silence. Court and agora are not an SEO catalog.
 HASHTAG_RE = re.compile(r"(?<![A-Za-z0-9/])#([A-Za-z][A-Za-z0-9_]{1,39})\b")
@@ -659,6 +678,12 @@ def looks_like_engagement_bait(text: str) -> bool:
     return bool(ENGAGEMENT_BAIT_RE.search(text))
 
 
+def looks_like_contest(text: str) -> bool:
+    """True for a giveaway, raffle, RT-to-win, or prize-for-follow. Not a product."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(CONTEST_RE.search(cleaned))
+
+
 def looks_like_hashtag_wall(text: str) -> bool:
     """True when copy dumps tags or ends on a tag-only tail. One inline tag can stay."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -790,7 +815,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a tag wall, a summon, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a tag wall, a summon, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -805,6 +830,10 @@ def unquotable_reason(
         return "engagement_bait"
     if extra and looks_like_engagement_bait(extra):
         return "engagement_bait"
+    if any(looks_like_contest(text) for text in operator_texts):
+        return "contest"
+    if extra and looks_like_contest(extra):
+        return "contest"
     if any(looks_like_hashtag_wall(text) for text in operator_texts):
         return "hashtag_wall"
     if extra and looks_like_hashtag_wall(extra):
@@ -852,6 +881,7 @@ __all__ = [
     "COMMIT_NOISE_RE",
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
+    "CONTEST_RE",
     "ENGAGEMENT_BAIT_RE",
     "HASHTAG_RE",
     "HN_STORY_KINDS",
@@ -892,6 +922,7 @@ __all__ = [
     "is_video_host_url",
     "looks_like_commit_noise",
     "looks_like_dunk",
+    "looks_like_contest",
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
     "looks_like_invented_opinion",

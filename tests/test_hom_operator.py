@@ -30,6 +30,7 @@ from influenzer.playbook import (
     is_store_host_url,
     is_video_host_url,
     invented_metric_reason,
+    looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
     looks_like_emoji_title,
@@ -384,6 +385,44 @@ class PlaybookCopyTests(unittest.TestCase):
             )
         )
 
+    def test_contest_is_giveaway_raffle_or_prize_for_follow(self) -> None:
+        contests = (
+            "giveaway of the local tick",
+            "Give-away: one license",
+            "raffle for a seat",
+            "sweepstake next week",
+            "contest: follow to win",
+            "konkurs na follow",
+            "losowanie licencji",
+            "RT to win a license",
+            "retweet to win",
+            "follow to win a seat",
+            "win if you follow",
+            "prize for a follow",
+            "nagroda za follow",
+            "enter to win",
+            "wygraj licencję",
+            "do wygrania: licencja",
+        )
+        for text in contests:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_contest(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "contest",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "follow the README to run the demo",
+            "star the repo after you try it",
+            "Unlike Loki, this scores briefs locally",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_contest(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
     def test_hashtag_wall_is_a_tag_dump_not_one_inline_tag(self) -> None:
         walls = (
             "#buildinpublic #saas #ai",
@@ -723,6 +762,27 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, "engagement_bait")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_contest_is_killed(self) -> None:
+        contests = (
+            "giveaway of the local tick",
+            "raffle for a seat",
+            "RT to win a license",
+            "nagroda za follow",
+        )
+        for text in contests:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "contest")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
