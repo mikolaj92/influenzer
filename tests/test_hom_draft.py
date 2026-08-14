@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from influenzer.hom import Brief, Fact, Score, apply_brief, brief_to_mapping, compose_draft, score_brief
 from influenzer.hom_draft import dress_brief, dress_payload, main as draft_main
-from influenzer.playbook import ARENAS, ArenaId, StoryKind, Verdict
+from influenzer.playbook import ARENAS, ArenaId, StoryKind, Verdict, invented_metric_reason
 
 from tests.test_hom_operator import FEEDBACK_COMMENT, SHIP_PR, SHIP_REPO
 
@@ -186,6 +186,52 @@ class HomDraftCostumeTests(unittest.TestCase):
         dumped = json.dumps(payload)
         self.assertNotIn("this is great", dumped)
         self.assertNotIn("Show HN:", dumped)
+
+    def test_dress_does_not_invent_10x_or_1m_users_or_benchmarks(self) -> None:
+        brief = _ship_brief()
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        body = decision.draft.body.casefold()
+        self.assertNotIn("10x", body)
+        self.assertNotIn("1m users", body)
+        self.assertNotIn("benchmark", body)
+        triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
+        self.assertIsNone(invented_metric_reason(triples, extra=decision.draft.body))
+
+    def test_invented_metric_in_body_is_undressable_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief()
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        dressed = dress_brief(brief, fake)
+        assert dressed is not None
+        invented = dressed.body + "\n10x faster, 1M users, benchmark included"
+        triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
+        self.assertEqual(invented_metric_reason(triples, extra=invented), "invented_metric")
+        from influenzer.playbook import unquotable_reason
+
+        self.assertEqual(unquotable_reason(triples, extra=invented), "invented_metric")
+
+    def test_number_from_brief_stays_in_hn_body(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick is 10x faster than the queue", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("10x", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
+        self.assertIsNone(invented_metric_reason(triples, extra=decision.draft.body))
 
     def test_users_love_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(

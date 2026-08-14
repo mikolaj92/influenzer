@@ -315,6 +315,17 @@ INVENTED_OPINION_RE = re.compile(
     r"(?i)\b(?:users|user|customers|customer|people|everyone|they)\s+love\b|"
     r"\bloved\s+by\s+(?:users|customers|everyone|people)\b"
 )
+# A number in the costume must already be a fact. Dress does not add
+# "10x", "1M users", or benchmarks. No number in facts → no number in body.
+METRIC_TOKEN_RE = re.compile(
+    r"(?i)(?<![A-Za-z0-9])"
+    r"(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
+    r"(?:[kmbx×%])?"
+    r"(?:\s+users)?"
+    r"(?![A-Za-z0-9])"
+)
+BENCHMARK_WORD_RE = re.compile(r"(?i)\bbenchmarks?\b")
+_URL_IN_TEXT_RE = re.compile(r"https?://\S+", re.I)
 
 # Social drafts need more than a single thin signal unless a ship artifact is attached.
 MIN_SOCIAL_FACTS = 2
@@ -523,6 +534,40 @@ def looks_like_invented_opinion(text: str) -> bool:
     return bool(INVENTED_OPINION_RE.search(text))
 
 
+def metric_tokens(text: str) -> frozenset[str]:
+    """Claim numbers a costume may repeat: 10x, 1M users, 50%, 100k."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    found: set[str] = set()
+    for match in METRIC_TOKEN_RE.finditer(cleaned):
+        raw = match.group(0).replace(",", "").replace("×", "x")
+        token = " ".join(raw.split()).casefold()
+        if not token:
+            continue
+        found.add(token)
+        if token.endswith(" users"):
+            found.add(token[: -len(" users")])
+    if BENCHMARK_WORD_RE.search(cleaned):
+        found.add("benchmark")
+    return frozenset(found)
+
+
+def invented_metric_reason(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+    extra: str = "",
+) -> str | None:
+    """Silence when the costume grows a number the brief did not state."""
+    if not extra or not extra.strip():
+        return None
+    allowed: set[str] = set()
+    for _kind, text, url in facts:
+        allowed.update(metric_tokens(text))
+        if url:
+            allowed.update(metric_tokens(url))
+    if any(token not in allowed for token in metric_tokens(extra)):
+        return "invented_metric"
+    return None
+
+
 def quoted_spans(text: str) -> tuple[str, ...]:
     """Quoted excerpts only. No excerpt — no quotation marks."""
     found: list[str] = []
@@ -584,7 +629,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote or 'users love' is not a sourced excerpt."""
+    """Silence reason when a quote, 'users love', or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -598,6 +643,10 @@ def unquotable_reason(
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if quote_without_sourced_excerpt(blob, excerpts):
         return "quote_without_excerpt"
+    if extra:
+        metric = invented_metric_reason(packed, extra)
+        if metric:
+            return metric
     return None
 
 
@@ -632,6 +681,7 @@ __all__ = [
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
     "LISTICLE_TITLE_RE",
+    "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
@@ -658,9 +708,11 @@ __all__ = [
     "is_ship_artifact_url",
     "is_social_arena",
     "is_store_host_url",
+    "invented_metric_reason",
     "is_video_host_url",
     "looks_like_commit_noise",
     "looks_like_invented_opinion",
+    "metric_tokens",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
