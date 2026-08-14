@@ -29,10 +29,12 @@ from influenzer.playbook import (
     is_blog_host_url,
     is_store_host_url,
     is_video_host_url,
+    invented_metric_reason,
     looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    metric_tokens,
     quote_without_sourced_excerpt,
     unquotable_reason,
 )
@@ -227,6 +229,46 @@ class PlaybookCopyTests(unittest.TestCase):
                 )
             )
         )
+
+    def test_number_in_costume_must_already_be_in_brief(self) -> None:
+        self.assertIn("10x", metric_tokens("we are 10x faster"))
+        self.assertIn("10x", metric_tokens("we are 10× faster"))
+        self.assertIn("1m users", metric_tokens("1M users on day one"))
+        self.assertIn("1m", metric_tokens("1M users on day one"))
+        self.assertIn("benchmark", metric_tokens("our benchmark beats the queue"))
+        self.assertFalse(metric_tokens("Local tick scores briefs and emits a draft"))
+        facts = (("signal", "Local tick scores briefs and emits a draft", SHIP_PR),)
+        self.assertEqual(
+            invented_metric_reason(facts, extra="Show HN: 10x faster local tick"),
+            "invented_metric",
+        )
+        self.assertEqual(
+            unquotable_reason(facts, extra="Show HN: 10x faster local tick"),
+            "invented_metric",
+        )
+        self.assertEqual(
+            unquotable_reason(facts, extra="1M users already use the local tick"),
+            "invented_metric",
+        )
+        self.assertEqual(
+            unquotable_reason(facts, extra="benchmark: local tick beats the queue"),
+            "invented_metric",
+        )
+        self.assertIsNone(
+            unquotable_reason(
+                (("signal", "Local tick is 10x faster than the queue", SHIP_PR),),
+                extra="Show HN: Local tick is 10x faster than the queue",
+            )
+        )
+        self.assertFalse(metric_tokens(SHIP_PR))
+        self.assertIsNone(
+            invented_metric_reason(
+                facts,
+                extra=f"Show HN: Local tick scores briefs\n\n{SHIP_PR}",
+            )
+        )
+        self.assertIsNone(invented_metric_reason(facts))
+        self.assertIsNone(unquotable_reason(facts))
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -462,6 +504,19 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.reason, "invented_opinion")
         self.assertIsNone(score.arena)
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_number_from_brief_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick is 10x faster than the queue", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        assert decision.draft is not None
+        self.assertIn("10x", decision.draft.body)
 
     def test_quote_from_feedback_excerpt_with_url_can_still_draft(self) -> None:
         excerpt = "the Windows install fails with a traceback"

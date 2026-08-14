@@ -1,32 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=120 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=118 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #120 — Krzykliwy CAPS w tytule = cisza na HN/GitHub
+Issue: #118 — Liczba w kącie musi być w briefie
 
 ## Goal
 
-Krzykliwy CAPS w tytule = cisza na HN/GitHub. Seminarium nie wrzeszczy. Jedno-dwa słowa akronimu wolno; CAŁY TYTUŁ WIELKIMI nie.
+Liczba w kącie musi być w briefie. Dress nie dopisuje „10x”, „1M users”, benchmarków. Brak liczby w faktach = brak liczby w body. Zmyślona metryka = cisza.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_shouty_title`; whole title uppercase fails closed; 1–2 letter-words allowed
-- `influenzer/hom.py` — score HN/GitHub shouty titles as `shouty_title` kill
-- `influenzer/hom_draft.py` — refuse to dress a shouty title even if a score already says draft
-- `tests/test_hom_operator.py` / `tests/test_hom_draft.py` — detector + score + dress coverage
+- `influenzer/playbook.py` — fail-closed metric tokens; number in body must already be a fact
+- `tests/test_hom_operator.py` — invented 10x / 1M users / benchmark = silence
+- `tests/test_hom_draft.py` — dress does not add metrics; sourced number may stay
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q --tb=short`
+- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
 
 ## Non-goals
 
-- Title length (#70) or emoji (#115)
-- Auto-rewriting shouty titles into sentence case
-- Applying the gate to X / LinkedIn / other borrowed-attention costumes
+- Do not kill a brief merely because a fact already contains a number
+- Do not invent dress-time metrics such as 10x, 1M users, or benchmarks
 
 ## Notes
 
-- Same fail-closed shape as listicle / store / blog / film: detector in playbook, kill in score, undressable in dresser.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
