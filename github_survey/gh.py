@@ -1,12 +1,19 @@
-"""Injectable ``gh`` subprocess. Missing binary, auth, bad JSON, or non-UTF8 is silence, not a crash."""
+"""Injectable ``gh`` subprocess. Missing binary, auth, bad JSON, or non-UTF8 is silence, not a crash.
+
+The child cwd is an empty temporary directory, never HOME and never the host
+checkout. A cwd outside that empty temp is silence, not a spawn.
+"""
 
 from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 GH_TIMEOUT_S = 20.0
@@ -45,13 +52,99 @@ def decode_gh_bytes(blob: bytes | str | None) -> str:
         return ""
 
 
-def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
+def _resolved(path: Path) -> Path | None:
     try:
+        return path.resolve()
+    except OSError:
+        return None
+
+
+def _empty_dir(path: Path) -> bool:
+    try:
+        if not path.is_dir():
+            return False
+        next(path.iterdir())
+    except StopIteration:
+        return True
+    except OSError:
+        return False
+    return False
+
+
+def _under_system_temp(path: Path) -> bool:
+    resolved = _resolved(path)
+    tmp = _resolved(Path(tempfile.gettempdir()))
+    if resolved is None or tmp is None:
+        return False
+    try:
+        resolved.relative_to(tmp)
+    except ValueError:
+        return False
+    return True
+
+
+def _forbidden_host_path(path: Path) -> bool:
+    resolved = _resolved(path)
+    if resolved is None:
+        return True
+    home = _resolved(Path.home())
+    host = _resolved(Path.cwd())
+    if home is not None and resolved == home:
+        return True
+    if host is not None and resolved == host:
+        return True
+    return False
+
+
+def _inside_host_checkout(path: Path) -> bool:
+    resolved = _resolved(path)
+    host = _resolved(Path.cwd())
+    if resolved is None or host is None:
+        return False
+    try:
+        resolved.relative_to(host)
+    except ValueError:
+        return False
+    return True
+
+
+def isolated_gh_cwd(path: Path) -> bool:
+    """True only for an empty temporary directory that is not HOME or host cwd."""
+    resolved = _resolved(path)
+    if resolved is None:
+        return False
+    return (
+        _under_system_temp(resolved)
+        and _empty_dir(resolved)
+        and not _forbidden_host_path(resolved)
+        and not _inside_host_checkout(resolved)
+    )
+
+
+def _remove_gh_cwd(cwd: str | None) -> None:
+    if cwd is None:
+        return
+    path = Path(cwd)
+    resolved = _resolved(path)
+    if resolved is None or not resolved.name.startswith("influenzer-gh-"):
+        return
+    if not _under_system_temp(resolved) or _forbidden_host_path(resolved) or _inside_host_checkout(resolved):
+        return
+    shutil.rmtree(cwd, ignore_errors=True)
+
+
+def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
+    cwd: str | None = None
+    try:
+        cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
+        if not isolated_gh_cwd(Path(cwd)):
+            return GhCall(returncode=0, stdout="", stderr="")
         completed = subprocess.run(
             ["gh", *argv],
             capture_output=True,
             timeout=timeout,
             check=False,
+            cwd=cwd,
         )
     except FileNotFoundError:
         return GhCall(returncode=127, stdout="", stderr="gh not found", missing=True)
@@ -61,6 +154,8 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         return GhCall(returncode=124, stdout="", stderr="gh timeout")
     except UnicodeDecodeError:
         return GhCall(returncode=0, stdout="", stderr="")
+    finally:
+        _remove_gh_cwd(cwd)
     return GhCall(
         returncode=int(completed.returncode),
         stdout=decode_gh_bytes(completed.stdout),

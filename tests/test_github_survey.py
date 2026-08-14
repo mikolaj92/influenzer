@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from github_survey import GhCall, classify_gh_argv, run_gh, survey_public_repo
-from github_survey.gh import decode_gh_bytes, loads_json, required_json
+from github_survey.gh import decode_gh_bytes, isolated_gh_cwd, loads_json, required_json
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -149,3 +151,54 @@ class RunGhTests(unittest.TestCase):
         self.assertIsNone(loads_json(b"\xff"))
         self.assertIsNone(loads_json("not-json"))
         self.assertEqual(loads_json(b'{"ok": true}'), {"ok": True})
+
+    def test_run_gh_uses_empty_temp_cwd_not_home_or_checkout(self) -> None:
+        seen: list[str] = []
+        host = Path.cwd().resolve()
+        home = Path.home().resolve()
+
+        def fake_run(*args, **kwargs):
+            cwd = Path(kwargs["cwd"]).resolve()
+            seen.append(str(cwd))
+            self.assertTrue(cwd.is_dir())
+            self.assertEqual(list(cwd.iterdir()), [])
+            self.assertNotEqual(cwd, host)
+            self.assertNotEqual(cwd, home)
+            self.assertTrue(isolated_gh_cwd(cwd))
+            return subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=b"{}", stderr=b"")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "{}")
+        self.assertEqual(len(seen), 1)
+        self.assertFalse(Path(seen[0]).exists())
+
+    def test_cwd_outside_empty_temp_is_silence(self) -> None:
+        self.assertFalse(isolated_gh_cwd(Path.home()))
+        self.assertFalse(isolated_gh_cwd(Path.cwd()))
+        with tempfile.TemporaryDirectory() as tmp:
+            filled = Path(tmp) / "checkout"
+            filled.mkdir()
+            (filled / "secret.txt").write_text("host file", encoding="utf-8")
+            self.assertFalse(isolated_gh_cwd(filled))
+            empty = Path(tmp) / "empty"
+            empty.mkdir()
+            self.assertTrue(isolated_gh_cwd(empty))
+        inside_checkout = Path.cwd() / "influenzer-gh-not-isolated"
+        inside_checkout.mkdir()
+        try:
+            self.assertFalse(isolated_gh_cwd(inside_checkout))
+        finally:
+            inside_checkout.rmdir()
+
+        def fake_run(*args, **kwargs):
+            raise AssertionError("gh must not spawn when cwd is not isolated")
+
+        with patch("tempfile.mkdtemp", return_value=str(Path.home())), patch(
+            "subprocess.run", side_effect=fake_run
+        ):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "")
+        self.assertEqual(call.stderr, "")
