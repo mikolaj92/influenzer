@@ -29,8 +29,11 @@ from influenzer.playbook import (
     is_blog_host_url,
     is_store_host_url,
     is_video_host_url,
+    looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_store_pitch,
+    quote_without_sourced_excerpt,
+    unquotable_reason,
 )
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
@@ -41,6 +44,7 @@ SHIP_PR = "https://github.com/mikolaj92/influenzer/pull/12"
 SHIP_ISSUE = "https://github.com/mikolaj92/influenzer/issues/4"
 SHIP_RELEASE = "https://github.com/mikolaj92/influenzer/releases/tag/v0.1.0"
 SHIP_REPO = "https://github.com/mikolaj92/influenzer"
+FEEDBACK_COMMENT = "https://github.com/mikolaj92/influenzer/issues/4#issuecomment-101"
 
 
 def _project(repo: StateRepository, project_id: str = "app-1") -> None:
@@ -162,6 +166,45 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_blog_host_url("https://example.com/medium"))
         self.assertFalse(is_blog_host_url("https://notmedium.com/we-shipped"))
         self.assertFalse(is_blog_host_url("https://medium.com.evil.com/we-shipped"))
+
+    def test_quote_needs_feedback_excerpt_with_url_not_users_love(self) -> None:
+        self.assertTrue(looks_like_invented_opinion("users love the local tick"))
+        self.assertTrue(looks_like_invented_opinion("Customers love this operator"))
+        self.assertTrue(looks_like_invented_opinion("loved by users on day one"))
+        self.assertFalse(looks_like_invented_opinion("Local tick scores briefs and emits a draft"))
+        self.assertTrue(quote_without_sourced_excerpt('A stranger said "this is great"', ()))
+        self.assertTrue(
+            quote_without_sourced_excerpt(
+                'A stranger said "this is great"',
+                ("something else entirely",),
+            )
+        )
+        self.assertFalse(
+            quote_without_sourced_excerpt(
+                'A stranger said "the Windows install fails"',
+                ("@bob: the Windows install fails with a traceback",),
+            )
+        )
+        self.assertEqual(
+            unquotable_reason((("signal", 'users said "this is great"', SHIP_PR),)),
+            "quote_without_excerpt",
+        )
+        self.assertEqual(
+            unquotable_reason((("excerpt", '"great tool"', None),)),
+            "quote_without_excerpt",
+        )
+        self.assertEqual(
+            unquotable_reason((("signal", "users love the local tick", SHIP_PR),)),
+            "invented_opinion",
+        )
+        self.assertIsNone(
+            unquotable_reason(
+                (
+                    ("issue_comment", "@bob: the Windows install fails", FEEDBACK_COMMENT),
+                    ("signal", 'A stranger said "the Windows install fails"', None),
+                )
+            )
+        )
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -371,6 +414,48 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "press_release_tone")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_quote_without_excerpt_url_is_killed(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(text='users said "this is great"', artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "quote_without_excerpt")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_users_love_without_excerpt_is_killed(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(text="users love the local tick", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "invented_opinion")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_quote_from_feedback_excerpt_with_url_can_still_draft(self) -> None:
+        excerpt = "the Windows install fails with a traceback"
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="issue_comment", text=f"@bob: {excerpt}", artifact_url=FEEDBACK_COMMENT),
+                Fact(text=f'A stranger said "{excerpt}"', artifact_url=SHIP_PR),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertIn(excerpt, decision.draft.body)
+        self.assertIn(SHIP_PR, decision.draft.body)
 
     def test_youtube_without_package_is_killed(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.YOUTUBE)
