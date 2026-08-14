@@ -43,6 +43,7 @@ from influenzer.playbook import (
     is_merge_log_texts,
     is_store_host_url,
     is_video_host_url,
+    looks_like_listicle_title,
     looks_like_merged_pr_fact,
     looks_like_press_release,
     looks_like_store_pitch,
@@ -225,6 +226,8 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     if title_src.lower().startswith("show hn:"):
         title_src = title_src.split(":", 1)[1].strip()
     if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
+        return None
+    if looks_like_listicle_title(title_src):
         return None
     url = _proof_url(bits)
     if not url or is_video_host_url(url) or is_store_host_url(url) or is_blog_host_url(url):

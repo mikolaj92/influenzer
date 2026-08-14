@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show.",
+            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no listicle.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -269,6 +269,11 @@ STORE_HOSTS: frozenset[str] = frozenset(
 )
 STORE_PITCH_RE = re.compile(
     r"(?i)\b(?:download the app|app store|google play|play store|testflight)\b"
+)
+# A magazine title is not a Show HN. "N ways", "you won't believe",
+# or a trailing bang is silence on seminar. Curiosity, not a listicle.
+LISTICLE_TITLE_RE = re.compile(
+    r"(?i)(?:\b(?:\d+|n)\s+ways\b|you\s+(?:won'?t|will\s+not)\s+believe)"
 )
 # An article is not click-and-run. Medium / Substack / dev.to / hashnode as
 # the only URL is silence on seminar. A blog next to a repo can stay as evidence.
@@ -445,6 +450,18 @@ def looks_like_store_pitch(text: str) -> bool:
     return bool(STORE_PITCH_RE.search(text))
 
 
+def looks_like_listicle_title(text: str) -> bool:
+    """True for a listicle / clickbait / trailing-bang title. Not a Show HN."""
+    title = text.strip()
+    if title.lower().startswith("show hn:"):
+        title = title.split(":", 1)[1].strip()
+    if not title:
+        return False
+    if title.endswith("!"):
+        return True
+    return bool(LISTICLE_TITLE_RE.search(title))
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -500,6 +517,7 @@ __all__ = [
     "CANON_URL",
     "COMMIT_NOISE_RE",
     "HN_STORY_KINDS",
+    "LISTICLE_TITLE_RE",
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
@@ -524,6 +542,7 @@ __all__ = [
     "is_store_host_url",
     "is_video_host_url",
     "looks_like_commit_noise",
+    "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
     "looks_like_store_pitch",

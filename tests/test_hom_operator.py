@@ -29,6 +29,7 @@ from influenzer.playbook import (
     is_blog_host_url,
     is_store_host_url,
     is_video_host_url,
+    looks_like_listicle_title,
     looks_like_store_pitch,
 )
 from influenzer.scheduler import tick
@@ -125,6 +126,22 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertTrue(looks_like_store_pitch("download the app on TestFlight"))
         self.assertTrue(looks_like_store_pitch("Get it on the App Store"))
         self.assertFalse(looks_like_store_pitch("a stranger can click and run the demo"))
+
+    def test_listicle_title_is_n_ways_you_wont_believe_or_trailing_bang(self) -> None:
+        bait = (
+            "7 ways to score briefs",
+            "N ways a stranger can try it",
+            "you won't believe this local tick",
+            "you will not believe this local tick",
+            "Show HN: you wont believe this local tick",
+            "Local tick scores briefs!",
+        )
+        for title in bait:
+            with self.subTest(title=title):
+                self.assertTrue(looks_like_listicle_title(title))
+        self.assertFalse(looks_like_listicle_title("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_listicle_title("this is a great way to run ticks"))
+        self.assertFalse(looks_like_listicle_title("Wow! Local tick scores briefs"))
 
     def test_blog_host_is_medium_substack_devto_hashnode_not_a_repo(self) -> None:
         blogs = (
@@ -556,6 +573,44 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "hn_not_a_blog")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_listicle_or_clickbait_title_is_not_show_hn(self) -> None:
+        bait = (
+            "7 ways to score briefs",
+            "N ways a stranger can try it",
+            "you won't believe this local tick",
+            "Local tick scores briefs!",
+        )
+        for title in bait:
+            with self.subTest(title=title):
+                brief = self._brief(
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text=title, artifact_url=SHIP_REPO),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_a_listicle")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_curiosity_title_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertFalse(decision.draft.body.splitlines()[0].endswith("!"))
+        self.assertNotIn("ways", decision.draft.body.splitlines()[0].lower())
 
     def test_blog_next_to_repo_can_still_be_show_hn(self) -> None:
         brief = self._brief(
