@@ -441,6 +441,47 @@ class HomDraftCostumeTests(unittest.TestCase):
                 self.assertIsNone(payload["body"])
                 self.assertNotIn("Show HN:", json.dumps(payload))
 
+    def test_shouty_title_is_undressable_on_hn_and_github_even_when_score_says_draft(self) -> None:
+        title = "LOCAL TICK SCORES BRIEFS AND EMITS A DRAFT"
+        for arena in (ArenaId.HN, ArenaId.GITHUB):
+            with self.subTest(arena=arena.value):
+                brief = _ship_brief(
+                    preferred_arena=arena,
+                    facts=(
+                        Fact(text=title, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=arena,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[arena].wave,
+                    canon_url=ARENAS[arena].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": arena.value,
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[arena].wave),
+                            "canon_url": ARENAS[arena].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("Show HN:", dumped)
+                self.assertNotIn(title, dumped)
+
     def test_hn_without_tryable_url_is_undressable_not_a_label_dump(self) -> None:
         brief = _ship_brief(
             facts=(Fact(text="a working demo exists on my laptop"), Fact(text="strangers can run it locally")),

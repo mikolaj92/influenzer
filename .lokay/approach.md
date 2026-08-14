@@ -1,35 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=119 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=120 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #119 — Cytat tylko z feedbacku z URL-em
+Issue: #120 — Krzykliwy CAPS w tytule = cisza na HN/GitHub
 
 ## Goal
 
-Cytat tylko z feedbacku z URL-em. Żadnego „users love” / zmyślonej opinii. Nie ma excerptu — nie ma cudzysłowu.
+Krzykliwy CAPS w tytule = cisza na HN/GitHub. Seminarium nie wrzeszczy. Jedno-dwa słowa akronimu wolno; CAŁY TYTUŁ WIELKIMI nie.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `unquotable_reason`: quote marks need an excerpt/comment + https URL; `users love` is invented opinion
-- `influenzer/hom.py` — score-time kill (`quote_without_excerpt` / `invented_opinion`)
-- `influenzer/hom_draft.py` — dress-time refuse so a leaked DRAFT still cannot invent a quote
-- `tests/test_hom_operator.py` — helper + score cases
-- `tests/test_hom_draft.py` — undressable even when score says draft
+- `influenzer/playbook.py` — `looks_like_shouty_title`; whole title uppercase fails closed; 1–2 letter-words allowed
+- `influenzer/hom.py` — score HN/GitHub shouty titles as `shouty_title` kill
+- `influenzer/hom_draft.py` — refuse to dress a shouty title even if a score already says draft
+- `tests/test_hom_operator.py` / `tests/test_hom_draft.py` — detector + score + dress coverage
 
 ## Test plan
 
-- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py tests/test_hom_pass.py tests/test_hom_feedback.py tests/test_hom_outbox.py -q`
+- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q --tb=short`
 
 ## Non-goals
 
-- Neighbor #118 (a number from the brief)
-- Neighbor #99 (excerpt, not the whole thread)
-- Changing github_feedback collection / admit
+- Title length (#70) or emoji (#115)
+- Auto-rewriting shouty titles into sentence case
+- Applying the gate to X / LinkedIn / other borrowed-attention costumes
 
 ## Notes
 
+- Same fail-closed shape as listicle / store / blog / film: detector in playbook, kill in score, undressable in dresser.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Fail-closed: quote without excerpt+URL = silence; invented opinion = silence.
-- A sourced `issue_comment` / `pull_comment` / `excerpt` with an https URL may be quoted.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.

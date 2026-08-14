@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip.",
             "Sit on the repo during the spike (issues, Discussions).",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no listicle.",
+            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no listicle, no shouty CAPS.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -475,6 +475,22 @@ def looks_like_listicle_title(text: str) -> bool:
     return bool(LISTICLE_TITLE_RE.search(title))
 
 
+def looks_like_shouty_title(text: str) -> bool:
+    """True when the whole title is uppercase. One or two acronym words are allowed."""
+    title = text.strip()
+    if title.lower().startswith("show hn:"):
+        title = title.split(":", 1)[1].strip()
+    if not title:
+        return False
+    words = [word for word in title.split() if any(ch.isalpha() for ch in word)]
+    if len(words) <= 2:
+        return False
+    letters = [ch for ch in title if ch.isalpha()]
+    if not letters:
+        return False
+    return all(ch.isupper() for ch in letters)
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -648,6 +664,7 @@ __all__ = [
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
+    "looks_like_shouty_title",
     "looks_like_store_pitch",
     "looks_like_waitlist",
     "parse_arena",
