@@ -387,6 +387,16 @@ INVENTED_OPINION_RE = re.compile(
     r"(?i)\b(?:users|user|customers|customer|people|everyone|they)\s+love\b|"
     r"\bloved\s+by\s+(?:users|customers|everyone|people)\b"
 )
+# Asking for a gesture is silence. A question from feedback is fine.
+# Agree? / like if / comment one word / ↓ are bait, not an angle.
+ENGAGEMENT_BAIT_RE = re.compile(
+    r"(?i)(?:"
+    r"\bagree\s*\?|"
+    r"\b(?:like|upvote|rt|retweet)\s+if\b|"
+    r"\bcomment\s+(?:just\s+)?(?:one|a)\s+word\b|"
+    r"[\u2193\u2b07\U0001F447\U0001F53D]"
+    r")"
+)
 # A number in the costume must already be a fact. Dress does not add
 # "10x", "1M users", or benchmarks. No number in facts → no number in body.
 METRIC_TOKEN_RE = re.compile(
@@ -630,6 +640,11 @@ def looks_like_invented_opinion(text: str) -> bool:
     return bool(INVENTED_OPINION_RE.search(text))
 
 
+def looks_like_engagement_bait(text: str) -> bool:
+    """True when copy asks for a gesture. A feedback question is not bait."""
+    return bool(ENGAGEMENT_BAIT_RE.search(text))
+
+
 def metric_tokens(text: str) -> frozenset[str]:
     """Claim numbers a costume may repeat: 10x, 1M users, 50%, 100k."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -725,7 +740,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -736,6 +751,10 @@ def unquotable_reason(
     if extra and looks_like_invented_opinion(extra):
         if not any(looks_like_invented_opinion(item) for item in excerpts):
             return "invented_opinion"
+    if any(looks_like_engagement_bait(text) for text in operator_texts):
+        return "engagement_bait"
+    if extra and looks_like_engagement_bait(extra):
+        return "engagement_bait"
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if quote_without_sourced_excerpt(blob, excerpts):
         return "quote_without_excerpt"
@@ -775,6 +794,7 @@ __all__ = [
     "COMMIT_NOISE_RE",
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
+    "ENGAGEMENT_BAIT_RE",
     "HN_STORY_KINDS",
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
@@ -811,6 +831,7 @@ __all__ = [
     "is_video_host_url",
     "looks_like_commit_noise",
     "looks_like_dunk",
+    "looks_like_engagement_bait",
     "looks_like_invented_opinion",
     "metric_tokens",
     "looks_like_listicle_title",

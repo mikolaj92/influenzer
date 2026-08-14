@@ -31,6 +31,7 @@ from influenzer.playbook import (
     is_video_host_url,
     invented_metric_reason,
     looks_like_dunk,
+    looks_like_engagement_bait,
     looks_like_emoji_title,
     looks_like_invented_opinion,
     looks_like_listicle_title,
@@ -336,6 +337,50 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertIsNone(invented_metric_reason(facts))
         self.assertIsNone(unquotable_reason(facts))
 
+    def test_engagement_bait_is_a_gesture_ask_not_a_feedback_question(self) -> None:
+        bait = (
+            "Agree?",
+            "agree ?",
+            "like if this helped",
+            "Like if you want Windows support",
+            "upvote if you found this useful",
+            "rt if this saved you an hour",
+            "comment one word",
+            "comment just one word",
+            "comment a word below",
+            "Local tick scores briefs \u2193",
+            "tap the arrow \u2b07",
+            "more below \U0001F447",
+        )
+        for text in bait:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_engagement_bait(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "engagement_bait",
+                )
+        questions = (
+            "How do I install this when uv is missing?",
+            "The Windows install fails with a traceback",
+            "Does the local tick score a thin brief?",
+            "Do you agree this is a bug?",
+            "I like this local tick",
+            "Leave a comment if the install fails",
+            "Local tick scores briefs and emits a draft",
+        )
+        for text in questions:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_engagement_bait(text))
+        excerpt = "How do I install this when uv is missing?"
+        self.assertIsNone(
+            unquotable_reason(
+                (
+                    ("issue_comment", f"@bob: {excerpt}", FEEDBACK_COMMENT),
+                    ("signal", f'A stranger said "{excerpt}"', SHIP_PR),
+                )
+            )
+        )
+
 
 class ScoreBriefTests(unittest.TestCase):
     def _brief(self, **overrides: object) -> Brief:
@@ -586,6 +631,27 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_engagement_bait_is_killed(self) -> None:
+        bait = (
+            "Agree?",
+            "like if this helped",
+            "comment one word",
+            "Local tick scores briefs \u2193",
+        )
+        for text in bait:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "engagement_bait")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_naming_a_predecessor_or_offering_help_can_still_draft(self) -> None:
         allowed = (
             "Unlike Loki, this scores briefs locally",
@@ -673,6 +739,23 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.score.verdict, Verdict.DRAFT)
         assert decision.draft is not None
         self.assertIn("10x", decision.draft.body)
+
+    def test_feedback_question_can_still_draft(self) -> None:
+        excerpt = "How do I install this when uv is missing?"
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="issue_comment", text=f"@bob: {excerpt}", artifact_url=FEEDBACK_COMMENT),
+                Fact(text=f'A stranger asked "{excerpt}"', artifact_url=SHIP_PR),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertIn(excerpt, decision.draft.body)
+        self.assertNotIn("Agree?", decision.draft.body)
+        self.assertNotIn("like if", decision.draft.body.casefold())
 
     def test_quote_from_feedback_excerpt_with_url_can_still_draft(self) -> None:
         excerpt = "the Windows install fails with a traceback"
