@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show.",
+            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -256,6 +256,19 @@ VIDEO_HOSTS: frozenset[str] = frozenset(
         "vimeo.com",
         "loom.com",
     }
+)
+# A store is not click-and-run. App Store / Play / TestFlight as the only URL
+# is silence on seminar. A store next to a repo can stay as evidence.
+STORE_HOSTS: frozenset[str] = frozenset(
+    {
+        "apps.apple.com",
+        "itunes.apple.com",
+        "play.google.com",
+        "testflight.apple.com",
+    }
+)
+STORE_PITCH_RE = re.compile(
+    r"(?i)\b(?:download the app|app store|google play|play store|testflight)\b"
 )
 
 WAITLIST_RE = re.compile(
@@ -383,17 +396,37 @@ def is_ship_artifact_url(url: str | None) -> bool:
     return bool(SHIP_ARTIFACT_RE.fullmatch(url.strip()))
 
 
-def is_video_host_url(url: str | None) -> bool:
-    """True for a YouTube/Vimeo/Loom URL. A film is not a tryable demo."""
+def _http_host(url: str | None) -> str | None:
     if not url:
-        return False
+        return None
     parsed = urlparse(url.strip())
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return False
+        return None
     host = (parsed.hostname or "").lower()
     if host.startswith("www."):
         host = host[4:]
-    return any(host == name or host.endswith("." + name) for name in VIDEO_HOSTS)
+    return host or None
+
+
+def _host_in(url: str | None, names: frozenset[str]) -> bool:
+    host = _http_host(url)
+    if not host:
+        return False
+    return any(host == name or host.endswith("." + name) for name in names)
+
+
+def is_video_host_url(url: str | None) -> bool:
+    """True for a YouTube/Vimeo/Loom URL. A film is not a tryable demo."""
+    return _host_in(url, VIDEO_HOSTS)
+
+
+def is_store_host_url(url: str | None) -> bool:
+    """True for an App Store / Play / TestFlight URL. A store is not a tryable demo."""
+    return _host_in(url, STORE_HOSTS)
+
+
+def looks_like_store_pitch(text: str) -> bool:
+    return bool(STORE_PITCH_RE.search(text))
 
 
 def looks_like_commit_noise(text: str) -> bool:
@@ -456,6 +489,8 @@ __all__ = [
     "NEWSLETTER_STORY_KINDS",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
+    "STORE_HOSTS",
+    "STORE_PITCH_RE",
     "VIDEO_HOSTS",
     "StoryKind",
     "Verdict",
@@ -468,10 +503,12 @@ __all__ = [
     "is_merge_log_texts",
     "is_ship_artifact_url",
     "is_social_arena",
+    "is_store_host_url",
     "is_video_host_url",
     "looks_like_commit_noise",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
+    "looks_like_store_pitch",
     "looks_like_waitlist",
     "parse_arena",
 ]
