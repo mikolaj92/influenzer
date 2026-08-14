@@ -1,21 +1,23 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=127 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=111 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #127 — Open source tylko gdy w repo jest LICENSE
+Issue: #111 — Zły JSON albo nie-UTF8 z gh to cisza, nie wyjątek
 
 ## Goal
 
-„Open source” w kącie tylko gdy w repo jest LICENSE. Bez pliku licencji nie mówimy że to OSS. Albo cisza, albo body bez tego słowa. Uczciwość, nie naklejka.
+Zły JSON albo nie-UTF8 z gh to cisza, nie wyjątek. Pętla żyje. Decode/parse fail-closed.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `github_survey/gh.py` — decode `gh` stdout/stderr as UTF-8; bad JSON / non-UTF8 is empty look
+- `influenzer/brief_scan.py`, `influenzer/scan_due.py`, `influenzer/hom_feedback.py` — decode/parse exceptions stay silence so the loop lives
+- `tests/test_github_survey.py`, `tests/test_github_feedback.py`, `tests/test_scan_due.py`, `tests/test_hom_watch.py`
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python -m pytest tests/test_github_survey.py tests/test_github_feedback.py tests/test_scan_due.py tests/test_hom_watch.py tests/test_scan_path.py tests/test_tick_loop.py -q`
 
 ## Non-goals
 

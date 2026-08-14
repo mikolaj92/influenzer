@@ -10,6 +10,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
+from github_survey import GhCall
+
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main as cli_main
 from influenzer.cli import setup_parser
@@ -20,7 +22,7 @@ from influenzer.hom_watch import interval_tick, set_watch, show_watch
 from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
-from influenzer.tick import main as tick_main
+from influenzer.tick import guarded_tick, loop_ticks, main as tick_main
 from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, ship_script
 
 ALWAYS_ON = HostPower(has_battery=False, source="test")
@@ -171,6 +173,34 @@ class HomWatchTests(unittest.TestCase):
         self.assertIsNone(self.repo.get_brief("app-1", "scan-v0-1-0"))
         self.assertFalse(out.get("published", False))
         self.assertFalse(out["operator"]["published"])
+
+    def test_bad_gh_bytes_are_empty_look_and_loop_lives(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        out, fake = self._tick({"repo": GhCall(0, "not-json")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertTrue(fake.calls)
+
+        n = {"i": 0}
+
+        def tick_once() -> dict:
+            n["i"] += 1
+            if n["i"] == 1:
+                raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")
+            return {"status": "ok", "n": n["i"], "mutated": False, "published": False}
+
+        results = loop_ticks(
+            guarded_tick(tick_once, supervise=True),
+            interval=1,
+            max_ticks=2,
+            sleep=lambda _n: None,
+        )
+        self.assertEqual(results[0]["status"], "failed")
+        self.assertFalse(results[0]["mutated"])
+        self.assertEqual(results[1]["n"], 2)
 
     def test_once_without_flag_does_not_scan(self) -> None:
         set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)

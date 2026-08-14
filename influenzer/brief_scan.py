@@ -9,6 +9,7 @@ Does not implement `gh` — that is github_survey's job.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from github_pack import pack_survey
@@ -34,7 +35,10 @@ def scan_github(
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
-    packed = pack_survey(survey_public_repo(slug, gh=gh, now=now))
+    try:
+        packed = pack_survey(survey_public_repo(slug, gh=gh, now=now))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     return admit_pack(repo, packed, project_id=project_id, now=now or utc_now())
 
 

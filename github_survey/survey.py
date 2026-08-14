@@ -146,7 +146,9 @@ def survey_public_repo(
     clock = parse_now(now)
     try:
         survey, reason = collect_survey(slug, gh=runner, now=clock)
-    except (OSError, TypeError, ValueError, json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _silence("empty_survey", repo=slug)
+    except (OSError, TypeError, ValueError):
         return _silence("scan_failed", repo=slug)
     if reason:
         return _silence(reason, repo=slug)

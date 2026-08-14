@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from github_survey import GhCall
+
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main as cli_main
 from influenzer.config import Config, write_config
@@ -117,6 +119,38 @@ class ScanDueTests(unittest.TestCase):
         self.assertEqual(fake2.calls, [])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
         self.assertFalse(second["published"])
+
+    def test_bad_json_from_gh_is_empty_look_not_exception(self) -> None:
+        out, fake = self._due({"repo": GhCall(0, "not-json")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertTrue(fake.calls)
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertIsNotNone(last_scan_at(self.repo, "app-1", REPO))
+
+    def test_non_utf8_from_gh_is_empty_look_not_exception(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")
+
+        with (
+            patch("subprocess.run", side_effect=AssertionError("scan-due must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("scan-due must not fetch")),
+        ):
+            out = scan_github_if_due(
+                self.repo,
+                project_id="app-1",
+                repo_slug=REPO,
+                gh=boom,
+                now=NOW,
+            )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertIsNotNone(last_scan_at(self.repo, "app-1", REPO))
 
     def test_github_scan_brief_fallback_is_not_due_without_gh(self) -> None:
         self.repo.save_brief(

@@ -142,7 +142,10 @@ def collect_and_admit(
         return host_silence(blocked, project_id=pid, repo_slug=slug)
     if repo.list_operator_drafts(pid):
         return host_silence("open_draft", project_id=pid, repo_slug=slug)
-    packed = collect_feedback(slug, gh=gh, now=now)
+    try:
+        packed = collect_feedback(slug, gh=gh, now=now)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return host_silence("empty_feedback", project_id=pid, repo_slug=slug)
     return admit_feedback(repo, packed, project_id=pid, now=now or utc_now())
 
 
