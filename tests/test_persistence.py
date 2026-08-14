@@ -6,7 +6,15 @@ from pathlib import Path
 from influenzer.domain import AttemptStatus, ContentStatus, Project
 from influenzer.domain import ContentRevision, PlatformAccount, AccountStatus
 from influenzer.domain import PublishPlan, PlanStatus, PublicationAttempt
-from influenzer.storage import ArtifactCorruptionError, StateRepository
+from influenzer.hom import Brief, Fact
+from influenzer.playbook import StoryKind
+from influenzer.storage import (
+    ArtifactCorruptionError,
+    StateRepository,
+    UnboundSqlError,
+    reject_unbound_sql,
+    sql_has_inbound_literal,
+)
 
 
 class PersistenceTests(unittest.TestCase):
@@ -136,6 +144,73 @@ class PersistenceTests(unittest.TestCase):
             artifact.write_bytes(b"tampered")
             with self.assertRaises(ArtifactCorruptionError):
                 repo.artifacts.verify(meta["digest"])
+
+    def test_spliced_inbound_sql_is_silence(self) -> None:
+        slug = "owner/name'; DROP TABLE projects;--"
+        excerpt = "How do I install this?'; DELETE FROM briefs;--"
+        gh_json = '{"repo":"owner/name","facts":[{"text":"boom"}]}'
+        self.assertTrue(sql_has_inbound_literal(f"SELECT * FROM hom_watch WHERE repo_slug='{slug}'"))
+        self.assertTrue(sql_has_inbound_literal(f"SELECT * FROM briefs WHERE facts_json='{excerpt}'"))
+        self.assertTrue(sql_has_inbound_literal(f"INSERT INTO domain_events(payload_json) VALUES ('{gh_json}')"))
+        self.assertFalse(sql_has_inbound_literal("SELECT * FROM hom_watch WHERE repo_slug=?"))
+        self.assertFalse(
+            sql_has_inbound_literal(
+                "SELECT * FROM operator_drafts WHERE coalesce(gate_verdict, '') != ?"
+            )
+        )
+        with self.assertRaises(UnboundSqlError):
+            reject_unbound_sql(f"SELECT * FROM projects WHERE slug='{slug}'")
+
+    def test_inbound_slug_excerpt_and_gh_json_are_bound(self) -> None:
+        slug = "owner/name'; DROP TABLE projects;--"
+        excerpt = "How do I install this?'; DELETE FROM briefs;--"
+        gh_json = '{"repo":"owner/name","body":"boom"}'
+        with tempfile.TemporaryDirectory() as tmp, StateRepository(Path(tmp) / "state.db") as repo:
+            repo.save_project(self.project("p", "project"))
+            repo.set_hom_watch("p", slug, created_at="2026-01-01T00:00:00Z")
+            repo.save_brief(
+                Brief.create(
+                    project_id="p",
+                    brief_id="fb-bound",
+                    facts=(Fact(text=excerpt, artifact_url="https://github.com/owner/name/issues/1#issuecomment-1"),),
+                    story_kind=StoryKind.HARD_ISSUE,
+                    source="github-feedback",
+                )
+            )
+            repo.record_github_scan("p", slug, scanned_at="2026-01-01T00:00:00Z")
+            repo.append_receipt(
+                project_id="p",
+                receipt_id="gh-json",
+                status="scanned",
+                payload={"repo": slug, "excerpt": excerpt, "raw": gh_json},
+                created_at="2026-01-01T00:00:00Z",
+            )
+            watch = repo.get_hom_watch()
+            assert watch is not None
+            self.assertEqual(watch["repo"], slug)
+            stored = repo.get_brief("p", "fb-bound")
+            assert stored is not None
+            self.assertEqual(stored.facts[0].text, excerpt)
+            events = repo.events("p")
+            self.assertTrue(any(row["event_type"] == "github.scanned" for row in events))
+            receipt = repo.conn.execute(
+                "SELECT payload_json FROM receipts WHERE receipt_id=?",
+                ("gh-json",),
+            ).fetchone()
+            self.assertIn(slug, receipt["payload_json"])
+            self.assertIn(excerpt, receipt["payload_json"])
+            tables = {
+                row[0]
+                for row in repo.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            self.assertIn("projects", tables)
+            self.assertIn("briefs", tables)
+            with self.assertRaises(UnboundSqlError):
+                repo.conn.execute(f"SELECT * FROM hom_watch WHERE repo_slug='{slug}'")
+            with self.assertRaises(UnboundSqlError):
+                repo.conn.execute(f"SELECT * FROM briefs WHERE facts_json LIKE '%{excerpt}%'")
+            with self.assertRaises(UnboundSqlError):
+                repo.conn.execute(f"SELECT * FROM receipts WHERE payload_json='{gh_json}'")
 
 
 if __name__ == "__main__":
