@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
@@ -31,6 +32,71 @@ class ArtifactCorruptionError(StorageError):
 
 class CrossProjectError(StorageError):
     """A relationship attempts to cross a project boundary."""
+
+
+class UnboundSqlError(StorageError):
+    """SQL was assembled from inbound text instead of bind parameters."""
+
+
+_SQL_DML = re.compile(r"\b(SELECT|INSERT|UPDATE|DELETE)\b", re.IGNORECASE)
+_SQL_MUTATION = re.compile(r"\b(DROP|ALTER|ATTACH|DETACH)\b", re.IGNORECASE)
+_SQL_COMMENT = re.compile(r"(--|/\*)")
+_SQL_STACKED = re.compile(
+    r";\s*(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|PRAGMA|CREATE)\b",
+    re.IGNORECASE,
+)
+_SQL_QUOTED = re.compile(r"'([^']*)'")
+_STATIC_SQL_LITERALS = frozenset({"", "now", "hold", "pending", "processed", "schema_version"})
+
+
+def _quoted_literal_is_inbound(literal: str) -> bool:
+    """True for a quoted value that looks like a slug, excerpt, or JSON payload."""
+    if literal in _STATIC_SQL_LITERALS:
+        return False
+    if "/" in literal or any(ch in literal for ch in "{}[]"):
+        return True
+    if any(ch.isspace() for ch in literal):
+        return True
+    return len(literal) > 80
+
+
+def sql_has_inbound_literal(sql: str) -> bool:
+    """True when inbound text was spliced into a DML string instead of bound."""
+    if not isinstance(sql, str) or not _SQL_DML.search(sql):
+        return False
+    if _SQL_MUTATION.search(sql) or _SQL_COMMENT.search(sql) or _SQL_STACKED.search(sql):
+        return True
+    if "{" in sql or "[" in sql:
+        return True
+    return any(_quoted_literal_is_inbound(literal) for literal in _SQL_QUOTED.findall(sql))
+
+
+def reject_unbound_sql(sql: Any) -> None:
+    """Fail closed when a DML string looks spliced instead of bound."""
+    if sql_has_inbound_literal(sql if isinstance(sql, str) else ""):
+        raise UnboundSqlError("sql must use bind parameters")
+
+
+class _BindOnlyConnection:
+    """sqlite3 connection that refuses inbound text spliced into SQL."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def execute(self, sql: str, parameters: Any = ()) -> sqlite3.Cursor:
+        reject_unbound_sql(sql)
+        return self._conn.execute(sql, parameters)
+
+    def executemany(self, sql: str, seq_of_parameters: Any) -> sqlite3.Cursor:
+        reject_unbound_sql(sql)
+        return self._conn.executemany(sql, seq_of_parameters)
+
+    def executescript(self, sql: str) -> sqlite3.Cursor:
+        reject_unbound_sql(sql)
+        return self._conn.executescript(sql)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._conn, name)
 
 
 def _json(value: Any) -> str:
@@ -79,12 +145,13 @@ class StateRepository:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.artifacts = ArtifactStore(artifact_root or self.db_path.parent / "artifacts")
-        self.conn = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
-        self.conn.row_factory = sqlite3.Row
+        raw = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
+        raw.row_factory = sqlite3.Row
+        self.conn = _BindOnlyConnection(raw)
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA busy_timeout = 30000")
         self.conn.execute("PRAGMA journal_mode = WAL")
-        migrate(self.conn)
+        migrate(raw)
 
     def close(self) -> None:
         self.conn.close()
@@ -586,15 +653,26 @@ class StateRepository:
         include_held: bool = False,
     ) -> list[Draft]:
         """Open drafts by default. Held (gate veto) rows stay in the table."""
-        held_sql = "" if include_held else " AND coalesce(gate_verdict, '') != 'hold'"
-        if project_id is None:
+        if include_held and project_id is None:
             rows = self.conn.execute(
-                f"SELECT * FROM operator_drafts WHERE 1=1{held_sql} ORDER BY created_at, draft_id"
+                "SELECT * FROM operator_drafts ORDER BY created_at, draft_id"
+            )
+        elif include_held:
+            rows = self.conn.execute(
+                "SELECT * FROM operator_drafts WHERE project_id=? ORDER BY created_at, draft_id",
+                (project_id,),
+            )
+        elif project_id is None:
+            rows = self.conn.execute(
+                "SELECT * FROM operator_drafts WHERE coalesce(gate_verdict, '') != ? "
+                "ORDER BY created_at, draft_id",
+                ("hold",),
             )
         else:
             rows = self.conn.execute(
-                f"SELECT * FROM operator_drafts WHERE project_id=?{held_sql} ORDER BY created_at, draft_id",
-                (project_id,),
+                "SELECT * FROM operator_drafts WHERE project_id=? AND coalesce(gate_verdict, '') != ? "
+                "ORDER BY created_at, draft_id",
+                (project_id, "hold"),
             )
         return [self._draft_from_row(row) for row in rows]
 
@@ -804,4 +882,15 @@ class StateRepository:
 # The shorter name is convenient for callers while retaining an explicit alias.
 SQLiteRepository = StateRepository
 
-__all__ = ["ArtifactCorruptionError", "ArtifactStore", "CrossProjectError", "MigrationError", "SQLiteRepository", "StateRepository", "StorageError"]
+__all__ = [
+    "ArtifactCorruptionError",
+    "ArtifactStore",
+    "CrossProjectError",
+    "MigrationError",
+    "SQLiteRepository",
+    "StateRepository",
+    "StorageError",
+    "UnboundSqlError",
+    "reject_unbound_sql",
+    "sql_has_inbound_literal",
+]
