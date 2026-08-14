@@ -1,33 +1,37 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=116 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=115 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #116 — Nie kopiemy w innych
+Issue: #115 — Show HN i one-liner GitHuba bez emoji
 
 ## Goal
 
-Nie kopiemy w innych. Draft który wyśmiewa cudzy projekt = cisza. Wolno nazwać poprzednika i powiedzieć czym się różnimy albo że warto mu pomóc. Nie wolno dunka.
+Show HN and the GitHub README one-liner stay without emoji. Seminar and
+workshop are not a fair. Emoji in the title is silence on those arenas.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — fail-closed dunk detector (`looks_like_dunk`)
-- `influenzer/hom.py` — score kill `dunking`
-- `influenzer/hom_draft.py` — dress-time silence even if score leaks draft
-- `tests/test_hom_operator.py` — detector + score cases
-- `tests/test_hom_draft.py` — undress even when score says draft
+- `influenzer/playbook.py` — `looks_like_emoji_title` plus wave copy
+- `influenzer/hom.py` — fail-closed score kill on HN / GitHub
+- `influenzer/hom_draft.py` — undressable even if a score says draft
+- `tests/test_hom_operator.py` — detector + score silence
+- `tests/test_hom_draft.py` — dress-path silence
 
 ## Test plan
 
-- `uv run --extra dev python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py`
+- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py`
+- `python -m pytest tests/test_hom_pass.py tests/test_hom_outbox.py tests/test_hom_verdict.py tests/test_policy.py`
 
 ## Non-goals
 
-- #43 (nie reklamujemy gorszego klona): existence / worse-clone, not tone
-- No LLM classifier; keep the same regex/table style as press-release and superlative
+- Length limits (neighbor of #70). This issue is the sign, not the length.
+- Costume language (#69).
+- Emoji elsewhere in the body / first comment / backstory.
+- Other arenas (X, LinkedIn, Reddit, …).
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Naming a predecessor plus a difference, or offering help, must still draft.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Same shape as #120 shouty CAPS: score kill + dress refuse.
+- ASCII, C++, and the workshop arrow `→` stay wearable.
+- Collector boundary: no collection job.
