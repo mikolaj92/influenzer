@@ -36,11 +36,13 @@ from influenzer.playbook import (
     looks_like_hashtag_wall,
     looks_like_invented_opinion,
     looks_like_listicle_title,
+    looks_like_person_mention,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
     metric_tokens,
     quote_without_sourced_excerpt,
+    strip_person_mentions,
     unquotable_reason,
 )
 from influenzer.scheduler import tick
@@ -406,6 +408,52 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_hashtag_wall(text))
+
+    def test_person_mention_is_a_summon_not_a_url_or_email(self) -> None:
+        summons = (
+            "@alice try this local tick",
+            "cc @bob on the Windows install",
+            "thanks @pg",
+            "(@cara) the timeout looks like success",
+        )
+        for text in summons:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_person_mention(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "person_mention",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "hello@example.com is the support inbox",
+            f"read the writeup at https://medium.com/@someone/we-shipped-a-thing-abc123",
+            "Merged PR #190: Treat GitHub repo root as a ship artifact",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_person_mention(text))
+        self.assertEqual(
+            strip_person_mentions("@bob: the Windows install fails"),
+            "the Windows install fails",
+        )
+        self.assertEqual(
+            strip_person_mentions("cc @alice on this"),
+            "cc on this",
+        )
+        self.assertIn(
+            "https://medium.com/@someone/we-shipped-a-thing-abc123",
+            strip_person_mentions(
+                "read https://medium.com/@someone/we-shipped-a-thing-abc123"
+            ),
+        )
+        self.assertIsNone(
+            unquotable_reason(
+                (
+                    ("issue_comment", "@bob: the Windows install fails", FEEDBACK_COMMENT),
+                    ("signal", 'A stranger said "the Windows install fails"', SHIP_PR),
+                )
+            )
+        )
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -815,6 +863,7 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.score.arena, ArenaId.HN)
         assert decision.draft is not None
         self.assertIn(excerpt, decision.draft.body)
+        self.assertNotIn("@bob", decision.draft.body)
         self.assertNotIn("Agree?", decision.draft.body)
         self.assertNotIn("like if", decision.draft.body.casefold())
 
@@ -833,6 +882,20 @@ class ScoreBriefTests(unittest.TestCase):
         assert decision.draft is not None
         self.assertIn(excerpt, decision.draft.body)
         self.assertIn(SHIP_PR, decision.draft.body)
+        self.assertNotIn("@bob", decision.draft.body)
+
+    def test_operator_mention_is_killed(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(text="@alice try this local tick", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "person_mention")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
 
     def test_youtube_without_package_is_killed(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.YOUTUBE)

@@ -404,6 +404,13 @@ _HASHTAG_TAIL_RE = re.compile(
     r"(?:^|\s)(?:#[A-Za-z][A-Za-z0-9_]{1,39}[\s,.;:!?]*)+$"
 )
 MAX_HASHTAGS = 2
+# @login in a draft is a summon. Strip or silence. URLs and emails are not pings.
+MENTION_RE = re.compile(
+    r"(?<![A-Za-z0-9/])@([A-Za-z0-9][A-Za-z0-9_-]{0,38})\b"
+)
+_STRIP_MENTION_RE = re.compile(
+    r"(?<![A-Za-z0-9/])@([A-Za-z0-9][A-Za-z0-9_-]{0,38})\b\s*[:\-\u2013\u2014,.!?]*\s*"
+)
 # A number in the costume must already be a fact. Dress does not add
 # "10x", "1M users", or benchmarks. No number in facts → no number in body.
 METRIC_TOKEN_RE = re.compile(
@@ -667,6 +674,27 @@ def looks_like_hashtag_wall(text: str) -> bool:
     return False
 
 
+def looks_like_person_mention(text: str) -> bool:
+    """True when copy has @login outside a URL. A draft does not summon people."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(MENTION_RE.search(cleaned))
+
+
+def strip_person_mentions(text: str) -> str:
+    """Drop @login summons. URLs stay. Empty after strip is silence."""
+    parts: list[str] = []
+    last = 0
+    for match in _URL_IN_TEXT_RE.finditer(text):
+        parts.append(_STRIP_MENTION_RE.sub("", text[last:match.start()]))
+        parts.append(match.group(0))
+        last = match.end()
+    parts.append(_STRIP_MENTION_RE.sub("", text[last:]))
+    cleaned = "".join(parts)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" *\n *", "\n", cleaned)
+    return cleaned.strip()
+
+
 def metric_tokens(text: str) -> frozenset[str]:
     """Claim numbers a costume may repeat: 10x, 1M users, 50%, 100k."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -762,7 +790,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a tag wall, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a tag wall, a summon, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -781,6 +809,10 @@ def unquotable_reason(
         return "hashtag_wall"
     if extra and looks_like_hashtag_wall(extra):
         return "hashtag_wall"
+    if any(looks_like_person_mention(text) for text in operator_texts):
+        return "person_mention"
+    if extra and looks_like_person_mention(extra):
+        return "person_mention"
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if quote_without_sourced_excerpt(blob, excerpts):
         return "quote_without_excerpt"
@@ -824,6 +856,7 @@ __all__ = [
     "HASHTAG_RE",
     "HN_STORY_KINDS",
     "MAX_HASHTAGS",
+    "MENTION_RE",
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
     "LISTICLE_TITLE_RE",
@@ -862,6 +895,7 @@ __all__ = [
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
     "looks_like_invented_opinion",
+    "looks_like_person_mention",
     "metric_tokens",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
@@ -874,5 +908,6 @@ __all__ = [
     "parse_arena",
     "quote_without_sourced_excerpt",
     "quoted_spans",
+    "strip_person_mentions",
     "unquotable_reason",
 ]
