@@ -468,6 +468,34 @@ METRIC_TOKEN_RE = re.compile(
 )
 BENCHMARK_WORD_RE = re.compile(r"(?i)\bbenchmarks?\b")
 _URL_IN_TEXT_RE = re.compile(r"https?://\S+", re.I)
+# A reply under someone else's post is silence unless that parent is
+# already about our watch/ship. A parent URL alone is not proof.
+# This is not dunk and not echo — it is stealing a wave.
+PARENT_FACT_KINDS: frozenset[str] = frozenset(
+    {"parent", "reply", "parent_post", "in_reply_to"}
+)
+_GITHUB_REPO_RE = re.compile(
+    r"https://github\.com/"
+    r"(?!(?:gist|orgs|settings|users)/)"
+    r"([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)",
+    re.I,
+)
+_REPLY_CUE_RE = re.compile(
+    r"(?i)(?:"
+    r"\breply(?:ing)?\s+(?:to|under|on)\b|"
+    r"\bin\s+reply\s+to\b|"
+    r"\bcomment(?:ing)?\s+(?:on|under)\s+(?:this\s+)?(?:post|tweet)\b|"
+    r"\bodpowied[zź]\s+pod\b|"
+    r"\bodpowiadamy\s+pod\b|"
+    r"\bpod\s+(?:tym\s+)?postem\b"
+    r")"
+)
+_X_STATUS_RE = re.compile(r"/[^/]+/status/\d+", re.I)
+_HN_ITEM_RE = re.compile(r"^/item/?$", re.I)
+_REDDIT_COMMENT_RE = re.compile(r"/comments/", re.I)
+_LINKEDIN_POST_RE = re.compile(r"/(?:posts|feed/update)/", re.I)
+_BSKY_POST_RE = re.compile(r"/profile/[^/]+/post/", re.I)
+_MASTODON_STATUS_RE = re.compile(r"/@[^/]+/\d+")
 
 # Social drafts need more than a single thin signal unless a ship artifact is attached.
 MIN_SOCIAL_FACTS = 2
@@ -740,6 +768,90 @@ def looks_like_person_mention(text: str) -> bool:
     """True when copy has @login outside a URL. A draft does not summon people."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
     return bool(MENTION_RE.search(cleaned))
+
+
+def is_social_parent_url(url: str | None) -> bool:
+    """True for an X / HN / Reddit / LinkedIn / Bluesky / Mastodon post URL.
+
+    A parent status URL is not a ship artifact and is not proof the post is ours.
+    """
+    if not url or is_ship_artifact_url(url):
+        return False
+    host = _http_host(url)
+    if not host:
+        return False
+    parsed = urlparse(url.strip())
+    path = parsed.path or ""
+    if host in {"x.com", "twitter.com"} or host.endswith(".x.com") or host.endswith(".twitter.com"):
+        return bool(_X_STATUS_RE.search(path))
+    if host == "news.ycombinator.com":
+        return bool(_HN_ITEM_RE.search(path))
+    if host == "reddit.com" or host.endswith(".reddit.com"):
+        return bool(_REDDIT_COMMENT_RE.search(path))
+    if host == "linkedin.com" or host.endswith(".linkedin.com"):
+        return bool(_LINKEDIN_POST_RE.search(path))
+    if host == "bsky.app" or host.endswith(".bsky.app"):
+        return bool(_BSKY_POST_RE.search(path))
+    return bool(_MASTODON_STATUS_RE.search(path))
+
+
+def github_repo_slugs(text: str) -> frozenset[str]:
+    """owner/name slugs mentioned as github.com URLs. Trailing .git is dropped."""
+    found: set[str] = set()
+    for match in _GITHUB_REPO_RE.finditer(text):
+        owner, name = match.group(1), match.group(2)
+        if name.lower().endswith(".git"):
+            name = name[:-4]
+        if owner and name:
+            found.add(f"{owner}/{name}".casefold())
+    return frozenset(found)
+
+
+def _our_ship_slugs(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> frozenset[str]:
+    slugs: set[str] = set()
+    for _kind, text, url in facts:
+        if url and is_ship_artifact_url(url):
+            slugs.update(github_repo_slugs(url))
+        for match in _GITHUB_REPO_RE.finditer(text or ""):
+            candidate = match.group(0).rstrip(").,;")
+            if is_ship_artifact_url(candidate):
+                slugs.update(github_repo_slugs(candidate))
+    return frozenset(slugs)
+
+
+def _parent_fact_triples(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> tuple[tuple[str, str, str | None], ...]:
+    found: list[tuple[str, str, str | None]] = []
+    for kind, text, url in facts:
+        kind_l = kind.strip().lower()
+        if kind_l in PARENT_FACT_KINDS or is_social_parent_url(url) or _REPLY_CUE_RE.search(text or ""):
+            found.append((kind, text, url))
+    return tuple(found)
+
+
+def _parent_is_our_ship(text: str, url: str | None, our_slugs: frozenset[str]) -> bool:
+    if not our_slugs:
+        return False
+    hay = "\n".join(part for part in (text, url or "") if part)
+    return bool(github_repo_slugs(hay) & our_slugs)
+
+
+def looks_like_foreign_wave(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+    extra: str = "",
+) -> bool:
+    """True when a reply's parent is not our watch/ship. A parent URL is not enough."""
+    packed: list[tuple[str, str, str | None]] = list(facts)
+    if extra and extra.strip():
+        packed.append(("signal", extra, None))
+    parents = _parent_fact_triples(packed)
+    if not parents:
+        return False
+    our_slugs = _our_ship_slugs(packed)
+    return any(not _parent_is_our_ship(text, url, our_slugs) for _kind, text, url in parents)
 
 
 def strip_person_mentions(text: str) -> str:

@@ -1,33 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=136 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=133 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #136 — Wątek 1/n nie jest kątem
+Issue: #133 — Nie wpinamy produktu w cudzą falę
 
 ## Goal
 
-Wątek 1/n nie jest kątem. Numeracja, „thread”, storm = cisza. Jeden post, nie serial.
+Nie wpinamy produktu w cudzą falę. Reply pod postem, który nie jest o naszym watchu/shipie = cisza. Sam parent URL nie wystarczy. To nie dunk i nie echo — to kradzież fali.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — detect 1/n / thread / storm; exempt OS thread-safe / pthread / 24/7
-- `influenzer/hom.py` — kill briefs whose facts are a serial
-- `influenzer/hom_draft.py` — refuse to dress a leaked serial even if score says draft
-- `tests/test_hom_operator.py` — detector + score kill
-- `tests/test_hom_draft.py` — undressable even when score says draft
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py tests/test_hom_verdict.py tests/test_hom_pass.py tests/test_policy.py tests/test_hom_feedback.py`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Does not change one-story-at-a-time admit (`#44`) or camp-the-HN-thread (`#50`).
-- Does not invent a thread publisher. One post, or silence.
+- (none stated)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
