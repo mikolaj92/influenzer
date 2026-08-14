@@ -640,6 +640,23 @@ NEGATED_SOURCE_AVAILABLE_RE = re.compile(
     r"|\bto\s+nie\s+(?:jest\s+)?(?:busl|sspl|commons\s+clause|fair[\s-]?code|source-available)\b"
     r")"
 )
+# A LICENSE file is the only honest proof for an OSS sticker.
+# "MIT License" in a sentence is not a file. Drop the word, or stay silent.
+LICENSE_FILE_NAME_RE = re.compile(r"(?i)^licen[cs]e(?:\.(?:md|txt|rst))?$")
+LICENSE_FILE_RE = re.compile(
+    r"(?:"
+    r"(?<![A-Za-z])LICEN[CS]E(?:\.(?:md|txt|rst))?(?![A-Za-z])"
+    r"|(?i:\blicen[cs]e\.(?:md|txt|rst)\b)"
+    r"|(?i:\blicen[cs]e\s+file\b)"
+    r"|(?i:\bplik(?:u)?\s+licen[cs]e\b)"
+    r")"
+)
+_LICENSE_FAMILY_BEFORE_RE = re.compile(
+    r"(?i)(?:mit|apache(?:-?\d+(?:\.\d+)?)?|bsd|gpl|lgpl|agpl|isc|mpl|"
+    r"mozilla(?:\s+public)?|business\s+source|server[\s-]+side\s+public|"
+    r"public|proprietary|commercial|dual|open[\s-]?source|"
+    r"source[\s-]?available)\s+$"
+)
 QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
 _QUOTED_SPAN_RE = re.compile(
     r'"([^"]{1,240})"|\u201c([^\u201d]{1,240})\u201d|\u201e([^\u201d]{1,240})\u201d|\u00ab([^\u00bb]{1,240})\u00bb'
@@ -1226,6 +1243,69 @@ def looks_like_source_available_as_oss(text: str) -> bool:
     return looks_like_open_source_claim(text)
 
 
+def _url_points_at_license_file(url: str) -> bool:
+    path = urlparse(url.strip()).path or ""
+    name = path.rstrip("/").rsplit("/", 1)[-1]
+    return bool(name and LICENSE_FILE_NAME_RE.fullmatch(name))
+
+
+def looks_like_license_file(text: str) -> bool:
+    """True when the text names a LICENSE file, not a license family."""
+    if not text or not text.strip():
+        return False
+    if LICENSE_FILE_NAME_RE.fullmatch(text.strip()):
+        return True
+    if any(_url_points_at_license_file(match.group(0)) for match in _URL_IN_TEXT_RE.finditer(text)):
+        return True
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    for match in LICENSE_FILE_RE.finditer(cleaned):
+        if _LICENSE_FAMILY_BEFORE_RE.search(cleaned[: match.start()]):
+            continue
+        return True
+    return False
+
+
+def looks_like_open_source_without_license(text: str) -> bool:
+    """OSS sticker without a LICENSE file. Drop the word, or stay silent."""
+    if not looks_like_open_source_claim(text):
+        return False
+    return not looks_like_license_file(text)
+
+
+def _strip_open_source_chunk(chunk: str) -> str:
+    """Drop a positive OSS sticker. Honest denial stays."""
+    kept: list[str] = []
+
+    def _hold(match: re.Match[str]) -> str:
+        kept.append(match.group(0))
+        return f"\x00{len(kept) - 1}\x00"
+
+    protected = NEGATED_OPEN_SOURCE_RE.sub(_hold, chunk)
+    stripped = OPEN_SOURCE_CLAIM_RE.sub(" ", protected)
+    for index, phrase in enumerate(kept):
+        stripped = stripped.replace(f"\x00{index}\x00", phrase)
+    return stripped
+
+
+def strip_open_source_claim(text: str) -> str:
+    """Drop an OSS sticker. Honest denial and URLs stay. Empty after strip is silence."""
+    if not text or not looks_like_open_source_claim(text):
+        return text
+    parts: list[str] = []
+    last = 0
+    for match in _URL_IN_TEXT_RE.finditer(text):
+        parts.append(_strip_open_source_chunk(text[last:match.start()]))
+        parts.append(match.group(0))
+        last = match.end()
+    parts.append(_strip_open_source_chunk(text[last:]))
+    cleaned = "".join(parts)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" *\n *", "\n", cleaned)
+    cleaned = re.sub(r" +([,.;:])", r"\1", cleaned)
+    cleaned = re.sub(r"[ \t]*[\u2014\u2013-][ \t]*(?=\n|$)", "", cleaned)
+    return cleaned.strip(" \t,;:\u2014\u2013-")
+
+
 def strip_person_mentions(text: str) -> str:
     """Drop @login summons. URLs stay. Empty after strip is silence."""
     parts: list[str] = []
@@ -1447,6 +1527,8 @@ __all__ = [
     "MENTION_RE",
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
+    "LICENSE_FILE_NAME_RE",
+    "LICENSE_FILE_RE",
     "LISTICLE_TITLE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
@@ -1503,7 +1585,9 @@ __all__ = [
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
     "looks_like_hire_fundraise",
+    "looks_like_license_file",
     "looks_like_open_source_claim",
+    "looks_like_open_source_without_license",
     "looks_like_source_available_as_oss",
     "looks_like_source_available_license",
     "ranking_urls_only",
@@ -1525,6 +1609,7 @@ __all__ = [
     "parse_arena",
     "quote_without_sourced_excerpt",
     "quoted_spans",
+    "strip_open_source_claim",
     "strip_person_mentions",
     "unquotable_reason",
 ]
