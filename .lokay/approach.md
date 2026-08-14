@@ -1,39 +1,34 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=126 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=108 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #126 — Artefakt za logowaniem nie jest tryable
+Issue: #108 — cwd dziecka gh to pusta tymczasowa, nie HOME
 
 ## Goal
 
-A login-gated artifact is not tryable. Copy that says the demo is behind a
-login / sign-in / 401/403 is silence on Show HN and ship claims. This is a
-gate, not a 404 corpse. A stranger must be able to run it without logging in.
+cwd dziecka gh to pusta tymczasowa, nie HOME i nie checkout z plikami hosta. Proces nie widzi lokalnych plików hosta przez przypadek.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `LOGIN_GATE_RE` + `looks_like_login_gate`
-- `influenzer/hom.py` — fail-closed score (`login_gate_not_tryable`)
-- `influenzer/hom_draft.py` — undressable even if a score leaks draft
-- `tests/test_hom_operator.py` / `tests/test_hom_draft.py`
+- `github_survey/gh.py` — `run_gh` is the only `gh` spawn; it inherited the host cwd
+- `tests/test_github_survey.py` — assert empty temp cwd, reject HOME/checkout, fail closed
+
+`github_survey` must not import Influenzer. Isolation lives next to `run_gh`.
 
 ## Test plan
 
-- Heuristic: login wall / HEAD-GET 401/403 / za logowaniem match; login form
-  as a product feature and 404 do not
-- Ship claim or social arena + login gate → KILL `login_gate_not_tryable`
-- Same copy without ship/social → CHANGELOG_ONLY
-- Dress refuses a leaked draft score; product copy still dresses
+- `uv run python -m pytest tests/test_github_survey.py -q`
 
 ## Non-goals
 
-- Live HEAD/GET of artifact URLs (HOM stays rule-only; no provider calls)
-- 404/410 dead-link (#92) and waitlist (#46) — neighbors, not this gate
-- github_pack survey packing (login walls do not arrive as GH release names)
+- Adapter subprocess cwd (`influenzer/adapters/subprocess_harness.py`)
+- Env allowlist (#107)
+- Letting `github_survey` import `influenzer.security`
 
 ## Notes
 
-- Same shape as waitlist/roadmap: playbook detector, score kill/changelog,
-  dress fail-closed.
-- Collector boundary: no unbounded collection.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Fail-closed: cwd outside an empty system temp, or equal to HOME / host cwd, is silence (no spawn).
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
