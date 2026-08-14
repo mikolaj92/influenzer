@@ -545,6 +545,39 @@ WORLD_COMMENTARY_RE = re.compile(
     r"|\bpresidential\s+election\b"
     r")"
 )
+# A hire / round / offsite is not a product angle. We say what we build,
+# not that we are hiring, raising, or flying the team somewhere.
+# A job-application form or a funding README stays; a tablica ogłoszeń does not.
+HIRE_FUNDRAISE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwe(?:'re| are)\s+hiring\b"
+    r"|\bhiring\s+(?:for|a|an|our)\b"
+    r"|\bhiring\s+(?:engineers?|designers?|founders?|interns?|pms?)\b"
+    r"|\bjoin\s+(?:our|the)\s+(?:team|company)\b"
+    r"|\bopen\s+(?:role|roles|position|positions)\b"
+    r"|\bjob\s+board\b"
+    r"|\bcareers?\s+page\b"
+    r"|\bnow\s+hiring\b"
+    r"|\bfundrais(?:e|ing)\b"
+    r"|\braising\s+(?:a\s+)?(?:seed|pre[- ]?seed|series\s+[a-d]|round)\b"
+    r"|\bclosed\s+(?:our\s+)?(?:seed|pre[- ]?seed|series\s+[a-d]|round)\b"
+    r"|\b(?:seed|pre[- ]?seed|series\s+[a-d])\s+round\b"
+    r"|\bfunding\s+round\b"
+    r"|\bannounc(?:e|ing|ed)\s+(?:our\s+)?(?:seed|pre[- ]?seed|series\s+[a-d]|round|fundraise)\b"
+    r"|\boffsite\b"
+    r"|\bteam\s+offsite\b"
+    r"|\bcompany\s+offsite\b"
+    r"|\brekrutacj"
+    r"|\bszuka(?:my|m)\s+(?:osoby|ludzi|inżynier|engineer|founders?)"
+    r"|\botwart[aey]\s+stanowisk"
+    r"|\btablic[aąe]\s+ogłoszeń"
+    r"|\brund[aeyę]\s+(?:seed|pre[- ]?seed|seria\s+[a-d]|finansow)"
+    r"|\bzbi[oó]rka\s+(?:na\s+)?rund"
+    r"|\bpozysk(?:aliśmy|ujemy)\s+(?:rund|finansow|seed)"
+    r"|\boffsite\s+(?:zespołu|firmy|team)"
+    r"|\bwyjazd\s+(?:zespołu|firmowy|integracyjn)"
+    r")"
+)
 QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
 _QUOTED_SPAN_RE = re.compile(
     r'"([^"]{1,240})"|\u201c([^\u201d]{1,240})\u201d|\u201e([^\u201d]{1,240})\u201d|\u00ab([^\u00bb]{1,240})\u00bb'
@@ -1091,6 +1124,14 @@ def looks_like_world_commentary(text: str) -> bool:
     return bool(WORLD_COMMENTARY_RE.search(cleaned))
 
 
+def looks_like_hire_fundraise(text: str) -> bool:
+    """True for hire / a funding round / an offsite. Not a product. CMO is not a job board."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(HIRE_FUNDRAISE_RE.search(cleaned))
+
+
 def strip_person_mentions(text: str) -> str:
     """Drop @login summons. URLs stay. Empty after strip is silence."""
     parts: list[str] = []
@@ -1200,7 +1241,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -1218,6 +1259,11 @@ def unquotable_reason(
             return "world_commentary"
     if extra and (looks_like_world_commentary(extra) or is_news_host_url(extra)):
         return "world_commentary"
+    for _kind, text, _url in packed:
+        if looks_like_hire_fundraise(text):
+            return "hire_fundraise"
+    if extra and looks_like_hire_fundraise(extra):
+        return "hire_fundraise"
     if looks_like_foreign_wave(packed):
         return "foreign_wave"
     if extra and looks_like_foreign_wave((*packed, ("signal", extra, None))):
@@ -1295,6 +1341,7 @@ __all__ = [
     "THREAD_WORD_RE",
     "ENGAGEMENT_BAIT_RE",
     "HASHTAG_RE",
+    "HIRE_FUNDRAISE_RE",
     "HN_STORY_KINDS",
     "MAX_HASHTAGS",
     "MENTION_RE",
@@ -1353,6 +1400,7 @@ __all__ = [
     "looks_like_thread",
     "looks_like_engagement_bait",
     "looks_like_hashtag_wall",
+    "looks_like_hire_fundraise",
     "ranking_urls_only",
     "looks_like_invented_opinion",
     "looks_like_person_mention",
