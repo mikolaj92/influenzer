@@ -10,7 +10,8 @@ Does not publish. Does not enable live social. Does not call gh
 Does not run pass every interval. Does not open runtime.db.
 Does not embed a Fala host. Watch set is host CLI only.
 Does not comment, label, close, or push. Look is GitHub GET only.
-Reply and code are not this path.
+Does not git clone. Does not make a worktree. Mini is not a checkout cache.
+Survey/feedback only through gh api. Reply and code are not this path.
 """
 
 from __future__ import annotations
