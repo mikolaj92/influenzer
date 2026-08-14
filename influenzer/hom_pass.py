@@ -14,6 +14,8 @@ Does not merge scan_due, tick, and outbox into one file.
 Does not open runtime.db. Does not embed a Fala host.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Reply and code are not this path.
+Does not clone. Does not launch the project from a watch.
+Tryable is a README+URL heuristic. Code in look (theirs or ours) is untrusted.
 """
 
 from __future__ import annotations

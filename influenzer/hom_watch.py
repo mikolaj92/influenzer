@@ -11,6 +11,8 @@ Does not run pass every interval. Does not open runtime.db.
 Does not embed a Fala host. Watch set is host CLI only.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Reply and code are not this path.
+Does not clone. Does not launch the project from a watch.
+Tryable is a README+URL heuristic. Code in look (theirs or ours) is untrusted.
 """
 
 from __future__ import annotations
@@ -90,7 +92,10 @@ def interval_tick(
     gh: Any = None,
     now: str | None = None,
 ) -> dict[str, Any]:
-    """Score pending briefs. If allow_hom_pass and a due watch, run hom_pass once."""
+    """Score pending briefs. If allow_hom_pass and a due watch, run hom_pass once.
+
+    Look does not clone or launch that project. Tryable stays README+URL.
+    """
     clock = now or utc_now()
     if allow_hom_pass:
         watch = get_watch(repo)

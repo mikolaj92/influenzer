@@ -7,6 +7,8 @@ Does not score. Does not publish. Does not enable live social.
 Does not implement `gh` — that is github_survey's job.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Reply and code are not this path.
+Does not clone. Does not launch the project from a watch.
+Tryable is a README+URL heuristic. Code in look (theirs or ours) is untrusted.
 """
 
 from __future__ import annotations
@@ -23,15 +25,70 @@ from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_
 from influenzer.domain import utc_now
 from influenzer.storage import StateRepository
 
+# Clone / run / install of the watched tree. Look never spawns these.
+# Tryable stays a README+URL heuristic, not proof we launched anything.
+_PROJECT_LAUNCH_HEADS = frozenset(
+    {
+        "bash",
+        "brew",
+        "bun",
+        "cargo",
+        "cmake",
+        "compose",
+        "docker",
+        "fish",
+        "git",
+        "go",
+        "hatch",
+        "make",
+        "mise",
+        "npm",
+        "npx",
+        "pdm",
+        "pip",
+        "pip3",
+        "pipx",
+        "pnpm",
+        "podman",
+        "poetry",
+        "python",
+        "python3",
+        "rtx",
+        "sh",
+        "uv",
+        "yarn",
+        "zsh",
+    }
+)
+
+
+def is_project_launch_argv(argv: Sequence[str]) -> bool:
+    """True when argv would clone or run a project. Look refuses that."""
+    if not argv or any(not isinstance(item, str) for item in argv):
+        return False
+    tokens = [item.strip() for item in argv if isinstance(item, str) and item.strip()]
+    if not tokens:
+        return False
+    if any(token.lower() == "clone" for token in tokens):
+        return True
+    head = tokens[0].rsplit("/", 1)[-1].lower()
+    if head.endswith(".exe"):
+        head = head[:-4]
+    return head in _PROJECT_LAUNCH_HEADS
+
 
 def look_only_gh(gh: GhRunner | None) -> GhRunner | None:
-    """Look may only GET. comment/label/close/push is silence, not a spawn."""
+    """Look may only GET. comment/label/close/push/clone/run is silence, not a spawn."""
     if gh is None:
         return None
 
     def _read_only(argv: Sequence[str]) -> GhCall:
+        if is_project_launch_argv(argv):
+            return GhCall(returncode=0, stdout="", stderr="")
         child = gh_argv(argv)
         if child is None or not allowlisted_gh_argv(child):
+            return GhCall(returncode=0, stdout="", stderr="")
+        if is_project_launch_argv(child):
             return GhCall(returncode=0, stdout="", stderr="")
         return gh(argv)
 
@@ -60,4 +117,4 @@ def scan_github(
     return admit_pack(repo, packed, project_id=project_id, now=now or utc_now())
 
 
-__all__ = ["SOURCE", "look_only_gh", "scan_github"]
+__all__ = ["SOURCE", "is_project_launch_argv", "look_only_gh", "scan_github"]

@@ -11,6 +11,8 @@ Does not enable Ads. Does not run every tick interval. Does not open runtime.db.
 Does not embed a Fala host.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Reply and code are not this path.
+Does not clone. Does not launch the project from a watch.
+Tryable is a README+URL heuristic. Code in look (theirs or ours) is untrusted.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from github_feedback import collect_feedback
 from github_survey import GhRunner, invalid_repo_reason
 
 from influenzer.brief_admit import already_told, open_story_reason
+from influenzer.brief_scan import look_only_gh
 from influenzer.config import load_config
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
@@ -145,7 +148,7 @@ def collect_and_admit(
     if repo.list_operator_drafts(pid):
         return host_silence("open_draft", project_id=pid, repo_slug=slug)
     try:
-        packed = collect_feedback(slug, gh=gh, now=now)
+        packed = collect_feedback(slug, gh=look_only_gh(gh), now=now)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return host_silence("empty_feedback", project_id=pid, repo_slug=slug)
     return admit_feedback(repo, packed, project_id=pid, now=now or utc_now())

@@ -5,6 +5,8 @@ the same ship artifact is not retold.
 
 Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
+Does not clone. Does not launch the project from a watch.
+Tryable is a README+URL heuristic. Code in look (theirs or ours) is untrusted.
 """
 
 from __future__ import annotations

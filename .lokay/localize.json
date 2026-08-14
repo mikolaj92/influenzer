@@ -1,5 +1,9 @@
 {
   "paths": [
+    "README.md",
+    "github_feedback/README.md",
+    "github_pack/README.md",
+    "github_survey/README.md",
     "influenzer",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
@@ -35,20 +39,12 @@
     "influenzer/policy.py",
     "influenzer/scan_due.py",
     "influenzer/scheduler.py",
-    "influenzer/security.py",
-    "influenzer/storage.py",
-    "influenzer/tick.py",
-    "comment/label/close/push",
-    "issues/PR/repo"
+    "influenzer/security.py"
   ],
   "source": "deterministic",
-  "seed_paths": [
-    "comment/label/close/push",
-    "issues/PR/repo"
-  ],
+  "seed_paths": [],
   "matched_tokens": [
-    "comment",
-    "issues",
+    "README",
     "influenzer"
   ],
   "notes": [
@@ -56,7 +52,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__104-look-nic-nie-zapisuje-na-githubie-63b82ec4",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__103-look-nie-odpala-projektu-z-watcha-fb3778ac",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

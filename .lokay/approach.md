@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=104 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=103 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #104 — Look nic nie zapisuje na GitHubie
+Issue: #103 — Look nie odpala projektu z watcha
 
 ## Goal
 
-Look nic nie zapisuje na GitHubie. Zero comment/label/close/push. Tylko odczyt. Odpowiedź i kod to nie ta ścieżka.
+Look nie odpala projektu z watcha. Tryable to heurystyka README+URL. Cudzy i nasz kod w looku jest nieufny.
 
 ## Files likely touched
 
