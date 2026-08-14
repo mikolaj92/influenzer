@@ -39,6 +39,7 @@ from influenzer.playbook import (
     looks_like_press_release,
     looks_like_store_pitch,
     looks_like_waitlist,
+    unquotable_reason,
 )
 
 _SECRET_KEYS = frozenset(
@@ -337,6 +338,10 @@ def _is_merge_log_brief(brief: Brief) -> bool:
     return is_merge_log_texts(_wearable_fact_texts(brief))
 
 
+def _fact_triples(brief: Brief) -> tuple[tuple[str, str, str | None], ...]:
+    return tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
+
+
 def _choose_arena(brief: Brief) -> ArenaId:
     """One primary arena. GitHub is the website; HN only when there is a clickable demo."""
     if brief.preferred_arena is not None:
@@ -391,6 +396,9 @@ def score_brief(brief: Brief) -> Score:
     if not brief.facts:
         return _kill(brief, "empty_brief")
     blob = _facts_blob(brief)
+    unsourced = unquotable_reason(_fact_triples(brief))
+    if unsourced:
+        return _kill(brief, unsourced)
     if brief.story_kind is StoryKind.PATCH:
         return _changelog(brief, "patch_changelog_only")
     if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):

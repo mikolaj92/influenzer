@@ -302,6 +302,19 @@ MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
+# A quotation mark is not a testimonial. No excerpt with a URL → no quotes.
+# "users love" without a sourced excerpt is invented opinion → silence.
+FEEDBACK_EXCERPT_KINDS: frozenset[str] = frozenset(
+    {"excerpt", "issue_comment", "pull_comment"}
+)
+QUOTE_MARKS = frozenset('"\u201c\u201d\u201e\u00ab\u00bb')
+_QUOTED_SPAN_RE = re.compile(
+    r'"([^"]{1,240})"|\u201c([^\u201d]{1,240})\u201d|\u201e([^\u201d]{1,240})\u201d|\u00ab([^\u00bb]{1,240})\u00bb'
+)
+INVENTED_OPINION_RE = re.compile(
+    r"(?i)\b(?:users|user|customers|customer|people|everyone|they)\s+love\b|"
+    r"\bloved\s+by\s+(?:users|customers|everyone|people)\b"
+)
 
 # Social drafts need more than a single thin signal unless a ship artifact is attached.
 MIN_SOCIAL_FACTS = 2
@@ -489,6 +502,89 @@ def looks_like_press_release(text: str) -> bool:
     return bool(PRESS_RELEASE_RE.search(text))
 
 
+def looks_like_invented_opinion(text: str) -> bool:
+    """True for unsourced praise such as 'users love'. Not a quote."""
+    return bool(INVENTED_OPINION_RE.search(text))
+
+
+def quoted_spans(text: str) -> tuple[str, ...]:
+    """Quoted excerpts only. No excerpt — no quotation marks."""
+    found: list[str] = []
+    for match in _QUOTED_SPAN_RE.finditer(text):
+        span = next((group for group in match.groups() if group), "")
+        cleaned = span.strip()
+        if cleaned:
+            found.append(cleaned)
+    return tuple(found)
+
+
+def has_quote_mark(text: str) -> bool:
+    return any(mark in text for mark in QUOTE_MARKS)
+
+
+def is_feedback_excerpt_fact(kind: str, artifact_url: str | None) -> bool:
+    """A quote needs an excerpt-shaped fact with a clickable source URL."""
+    if kind.strip().lower() not in FEEDBACK_EXCERPT_KINDS:
+        return False
+    url = (artifact_url or "").strip()
+    return url.startswith("https://")
+
+
+def feedback_excerpt_texts(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> tuple[str, ...]:
+    """Texts that may legally be quoted: excerpt/comment + https URL."""
+    found: list[str] = []
+    for kind, text, url in facts:
+        if not is_feedback_excerpt_fact(kind, url):
+            continue
+        cleaned = text.strip()
+        if cleaned:
+            found.append(cleaned)
+    return tuple(found)
+
+
+def quote_without_sourced_excerpt(
+    text: str,
+    excerpt_texts: tuple[str, ...] | list[str],
+) -> bool:
+    """True when a quotation mark appears without a matching excerpt+URL."""
+    if not has_quote_mark(text):
+        return False
+    spans = quoted_spans(text)
+    if not spans:
+        return True
+    haystacks = [item.casefold() for item in excerpt_texts if item and item.strip()]
+    if not haystacks:
+        return True
+    for span in spans:
+        needle = span.casefold()
+        if not any(needle in hay for hay in haystacks):
+            return True
+    return False
+
+
+def unquotable_reason(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+    extra: str = "",
+) -> str | None:
+    """Silence reason when a quote or 'users love' is not a sourced excerpt."""
+    packed = tuple(facts)
+    excerpts = feedback_excerpt_texts(packed)
+    operator_texts = [
+        text for kind, text, url in packed if not is_feedback_excerpt_fact(kind, url)
+    ]
+    if any(looks_like_invented_opinion(text) for text in operator_texts):
+        return "invented_opinion"
+    if extra and looks_like_invented_opinion(extra):
+        if not any(looks_like_invented_opinion(item) for item in excerpts):
+            return "invented_opinion"
+    blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
+    if quote_without_sourced_excerpt(blob, excerpts):
+        return "quote_without_excerpt"
+    return None
+
+
 def has_named_subreddit(text: str) -> bool:
     return bool(SUBREDDIT_RE.search(text))
 
@@ -517,11 +613,14 @@ __all__ = [
     "CANON_URL",
     "COMMIT_NOISE_RE",
     "HN_STORY_KINDS",
+    "FEEDBACK_EXCERPT_KINDS",
+    "INVENTED_OPINION_RE",
     "LISTICLE_TITLE_RE",
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
     "NEWSLETTER_STORY_KINDS",
+    "QUOTE_MARKS",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
     "STORE_HOSTS",
@@ -532,20 +631,27 @@ __all__ = [
     "WORKSHOP_STORY_KINDS",
     "arena_gate",
     "arena_play",
+    "feedback_excerpt_texts",
     "has_cinema_package",
     "has_fair_hook",
     "has_named_subreddit",
+    "has_quote_mark",
     "is_blog_host_url",
+    "is_feedback_excerpt_fact",
     "is_merge_log_texts",
     "is_ship_artifact_url",
     "is_social_arena",
     "is_store_host_url",
     "is_video_host_url",
     "looks_like_commit_noise",
+    "looks_like_invented_opinion",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
     "looks_like_store_pitch",
     "looks_like_waitlist",
     "parse_arena",
+    "quote_without_sourced_excerpt",
+    "quoted_spans",
+    "unquotable_reason",
 ]

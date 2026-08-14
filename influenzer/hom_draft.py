@@ -48,6 +48,7 @@ from influenzer.playbook import (
     looks_like_press_release,
     looks_like_store_pitch,
     looks_like_waitlist,
+    unquotable_reason,
 )
 
 # Bodies must look like the arena, not operator metadata.
@@ -394,11 +395,14 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     bits = _copy_bits(brief)
     if bits is None or _undressable_blob(bits):
         return None
+    triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
+    if unquotable_reason(triples):
+        return None
     dresser = _DRESSERS.get(score.arena)
     if dresser is None:
         return None
     body = dresser(bits, score)
-    if body is None:
+    if body is None or unquotable_reason(triples, extra=body):
         return None
     play = arena_play(score.arena)
     clock = now or utc_now()
