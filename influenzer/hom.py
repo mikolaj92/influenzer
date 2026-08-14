@@ -36,6 +36,7 @@ from influenzer.playbook import (
     is_video_host_url,
     looks_like_commit_noise,
     looks_like_dunk,
+    looks_like_engagement_bait,
     looks_like_emoji_title,
     looks_like_listicle_title,
     looks_like_press_release,
@@ -428,6 +429,8 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "superlative_without_proof")
     if looks_like_dunk(blob):
         return _kill(brief, "dunking")
+    if looks_like_engagement_bait(blob):
+        return _kill(brief, "engagement_bait")
     if brief.story_kind is StoryKind.EXPLORATION:
         if is_social_arena(brief.preferred_arena):
             return _kill(brief, "exploration_not_a_post")

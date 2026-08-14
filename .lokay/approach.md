@@ -1,37 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=115 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=114 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #115 — Show HN i one-liner GitHuba bez emoji
+Issue: #114 — Bait na klik to nie kąt
 
 ## Goal
 
-Show HN and the GitHub README one-liner stay without emoji. Seminar and
-workshop are not a fair. Emoji in the title is silence on those arenas.
+Bait na klik to nie kąt. „Agree?”, „like if”, „comment one word”, strzałka w dół = cisza. Pytanie z feedbacku jest ok; prośba o gest nie.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_emoji_title` plus wave copy
-- `influenzer/hom.py` — fail-closed score kill on HN / GitHub
-- `influenzer/hom_draft.py` — undressable even if a score says draft
-- `tests/test_hom_operator.py` — detector + score silence
-- `tests/test_hom_draft.py` — dress-path silence
+- `influenzer/playbook.py` — `looks_like_engagement_bait` + `ENGAGEMENT_BAIT_RE`
+- `influenzer/hom.py` — score kill `engagement_bait`
+- `influenzer/hom_draft.py` — dress fail-closed even if score says draft
+- `tests/test_hom_operator.py` — detector + score tests
+- `tests/test_hom_draft.py` — dress silence vs feedback question
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py`
-- `python -m pytest tests/test_hom_pass.py tests/test_hom_outbox.py tests/test_hom_verdict.py tests/test_policy.py`
+- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q --tb=short`
 
 ## Non-goals
 
-- Length limits (neighbor of #70). This issue is the sign, not the length.
-- Costume language (#69).
-- Emoji elsewhere in the body / first comment / backstory.
-- Other arenas (X, LinkedIn, Reddit, …).
+- Do not treat a sourced feedback question as bait.
+- Do not invent a new costume or arena.
 
 ## Notes
 
-- Same shape as #120 shouty CAPS: score kill + dress refuse.
-- ASCII, C++, and the workshop arrow `→` stay wearable.
-- Collector boundary: no collection job.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
