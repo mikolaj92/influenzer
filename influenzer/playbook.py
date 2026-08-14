@@ -78,7 +78,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Two jobs: comment earns the click; profile converts the follow.",
             "Max P(reply), then reply to replies. Quote beats Repost when small.",
             "Under 1k mostly replies; author diversity; first hour is the clock.",
-            "Do not flood originals into an empty feed.",
+            "Do not flood originals into an empty feed. Not a hashtag catalog.",
         ),
         canon_path="x.md",
     ),
@@ -91,7 +91,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Seed ICP: early 2+ line add (not echo) on people buyers already watch.",
             "Dwell: win the ~210-char fold; body must be finishable.",
             "First 60–90 min: reply with new substance (re-entry).",
-            "Zero-click: insight in the post. No pitch in line one.",
+            "Zero-click: insight in the post. No pitch in line one, no hashtag wall.",
         ),
         canon_path="linkedin.md",
     ),
@@ -397,6 +397,13 @@ ENGAGEMENT_BAIT_RE = re.compile(
     r"[\u2193\u2b07\U0001F447\U0001F53D]"
     r")"
 )
+# A wall of hashtags is not a costume. More than one-two tags, or a
+# trailing tag tail, is silence. Court and agora are not an SEO catalog.
+HASHTAG_RE = re.compile(r"(?<![A-Za-z0-9/])#([A-Za-z][A-Za-z0-9_]{1,39})\b")
+_HASHTAG_TAIL_RE = re.compile(
+    r"(?:^|\s)(?:#[A-Za-z][A-Za-z0-9_]{1,39}[\s,.;:!?]*)+$"
+)
+MAX_HASHTAGS = 2
 # A number in the costume must already be a fact. Dress does not add
 # "10x", "1M users", or benchmarks. No number in facts → no number in body.
 METRIC_TOKEN_RE = re.compile(
@@ -645,6 +652,21 @@ def looks_like_engagement_bait(text: str) -> bool:
     return bool(ENGAGEMENT_BAIT_RE.search(text))
 
 
+def looks_like_hashtag_wall(text: str) -> bool:
+    """True when copy dumps tags or ends on a tag-only tail. One inline tag can stay."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    tags = HASHTAG_RE.findall(cleaned)
+    if len(tags) > MAX_HASHTAGS:
+        return True
+    if not tags:
+        return False
+    for line in cleaned.splitlines():
+        stripped = line.strip()
+        if stripped and _HASHTAG_TAIL_RE.fullmatch(stripped):
+            return True
+    return False
+
+
 def metric_tokens(text: str) -> frozenset[str]:
     """Claim numbers a costume may repeat: 10x, 1M users, 50%, 100k."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -740,7 +762,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a tag wall, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -755,6 +777,10 @@ def unquotable_reason(
         return "engagement_bait"
     if extra and looks_like_engagement_bait(extra):
         return "engagement_bait"
+    if any(looks_like_hashtag_wall(text) for text in operator_texts):
+        return "hashtag_wall"
+    if extra and looks_like_hashtag_wall(extra):
+        return "hashtag_wall"
     blob = "\n".join((*operator_texts, extra) if extra else operator_texts)
     if quote_without_sourced_excerpt(blob, excerpts):
         return "quote_without_excerpt"
@@ -795,7 +821,9 @@ __all__ = [
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "ENGAGEMENT_BAIT_RE",
+    "HASHTAG_RE",
     "HN_STORY_KINDS",
+    "MAX_HASHTAGS",
     "FEEDBACK_EXCERPT_KINDS",
     "INVENTED_OPINION_RE",
     "LISTICLE_TITLE_RE",
@@ -832,6 +860,7 @@ __all__ = [
     "looks_like_commit_noise",
     "looks_like_dunk",
     "looks_like_engagement_bait",
+    "looks_like_hashtag_wall",
     "looks_like_invented_opinion",
     "metric_tokens",
     "looks_like_listicle_title",

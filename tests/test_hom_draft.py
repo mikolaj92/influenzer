@@ -374,6 +374,64 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertNotIn("Agree?", decision.draft.body)
 
+    def test_hashtag_wall_is_undressable_even_when_score_says_draft(self) -> None:
+        walls = (
+            "#buildinpublic #saas #ai",
+            "Local tick scores briefs #buildinpublic #saas #indiehackers",
+            "Local tick scores briefs\n#buildinpublic #saas",
+        )
+        for text in walls:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                for arena in (ArenaId.HN, ArenaId.X, ArenaId.LINKEDIN):
+                    fake = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(dress_brief(brief, fake))
+                    payload = dress_payload(
+                        {
+                            "brief": brief_to_mapping(brief),
+                            "score": {
+                                "brief_id": brief.brief_id,
+                                "verdict": "draft",
+                                "reason": "one_angle",
+                                "arena": arena.value,
+                                "angle": "what shipped and why a stranger should try it",
+                                "wave_checklist": list(ARENAS[arena].wave),
+                                "canon_url": ARENAS[arena].canon_url,
+                            },
+                        }
+                    )
+                    self.assertEqual(payload["status"], "noop")
+                    self.assertIsNone(payload["body"])
+                    dumped = json.dumps(payload)
+                    self.assertNotIn("#saas", dumped)
+                    self.assertNotIn("Show HN:", dumped)
+
+    def test_one_inline_hashtag_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs #buildinpublic", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("#buildinpublic", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+
     def test_users_love_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(
             facts=(

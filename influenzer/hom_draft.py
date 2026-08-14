@@ -46,6 +46,7 @@ from influenzer.playbook import (
     looks_like_dunk,
     looks_like_engagement_bait,
     looks_like_emoji_title,
+    looks_like_hashtag_wall,
     looks_like_listicle_title,
     looks_like_merged_pr_fact,
     looks_like_press_release,
@@ -411,6 +412,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or _superlative_without_proof(brief, bits)
         or looks_like_dunk(bits.blob)
         or looks_like_engagement_bait(bits.blob)
+        or looks_like_hashtag_wall(bits.blob)
     ):
         return None
     triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
@@ -425,6 +427,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or unquotable_reason(triples, extra=body)
         or looks_like_dunk(body)
         or looks_like_engagement_bait(body)
+        or looks_like_hashtag_wall(body)
     ):
         return None
     play = arena_play(score.arena)
