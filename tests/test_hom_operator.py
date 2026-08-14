@@ -30,6 +30,7 @@ from influenzer.playbook import (
     is_store_host_url,
     is_video_host_url,
     invented_metric_reason,
+    looks_like_dunk,
     looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_shouty_title,
@@ -206,6 +207,33 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertTrue(looks_like_superlative(text))
         self.assertFalse(looks_like_superlative("Local tick scores briefs and emits a draft"))
         self.assertFalse(looks_like_superlative("first local tick on this machine"))
+
+    def test_dunk_is_mockery_not_naming_a_predecessor(self) -> None:
+        dunks = (
+            "Loki sucks, use this local tick instead",
+            "their project is trash",
+            "that clone is a joke",
+            "dunking on Loki with a local tick",
+            "laughing at their project",
+            "roast their repo",
+            "that trash of a project",
+        )
+        for text in dunks:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dunk(text))
+        allowed = (
+            "Unlike Loki, this scores briefs locally",
+            "Loki is the predecessor; the difference is a local tick",
+            "Loki is worth helping with a local tick",
+            "Compared to Loki we keep the draft local",
+            "Local tick scores briefs and emits a draft",
+            "the project is dead until the install works",
+            "HN is dead until the first hour",
+            "the install is dead until the demo works",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_dunk(text))
 
     def test_quote_needs_feedback_excerpt_with_url_not_users_love(self) -> None:
         self.assertTrue(looks_like_invented_opinion("users love the local tick"))
@@ -515,6 +543,48 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "superlative_without_proof")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_dunking_another_project_is_killed(self) -> None:
+        dunks = (
+            "Loki sucks, use this local tick instead",
+            "their project is trash",
+            "dunking on Loki with a local tick",
+        )
+        for text in dunks:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "dunking")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_naming_a_predecessor_or_offering_help_can_still_draft(self) -> None:
+        allowed = (
+            "Unlike Loki, this scores briefs locally",
+            "Loki is the predecessor; the difference is a local tick",
+            "Loki is worth helping with a local tick",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                decision = apply_brief(brief)
+                self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+                self.assertEqual(decision.score.arena, ArenaId.HN)
+                assert decision.draft is not None
+                self.assertTrue(decision.draft.body.startswith("Show HN:"))
+                self.assertIn("Loki", decision.draft.body)
 
     def test_superlative_with_tryable_artifact_can_still_draft(self) -> None:
         brief = self._brief(

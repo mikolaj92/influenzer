@@ -1,33 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=117 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=116 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #117 — Superlatyw bez dowodu milczy
+Issue: #116 — Nie kopiemy w innych
 
 ## Goal
 
-Superlatyw bez dowodu milczy. „Revolutionary”, „world’s first”, „AI-powered” bez tryable artefaktu = cisza. To gimmick, nie historia. Dowód albo nic.
+Nie kopiemy w innych. Draft który wyśmiewa cudzy projekt = cisza. Wolno nazwać poprzednika i powiedzieć czym się różnimy albo że warto mu pomóc. Nie wolno dunka.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — detect revolutionary / world's first / AI-powered
-- `influenzer/hom.py` — kill a superlative without a tryable ship artifact
-- `influenzer/hom_draft.py` — stay silent even if a forged score says draft
-- `tests/test_hom_operator.py` / `tests/test_hom_draft.py`
+- `influenzer/playbook.py` — fail-closed dunk detector (`looks_like_dunk`)
+- `influenzer/hom.py` — score kill `dunking`
+- `influenzer/hom_draft.py` — dress-time silence even if score leaks draft
+- `tests/test_hom_operator.py` — detector + score cases
+- `tests/test_hom_draft.py` — undress even when score says draft
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
+- `uv run --extra dev python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py`
 
 ## Non-goals
 
-- Do not relax press-release tone (#29). Revolutionary with proof still dies on social as PR tone.
-- Do not invent a new publish path. Score/dress only.
+- #43 (nie reklamujemy gorszego klona): existence / worse-clone, not tone
+- No LLM classifier; keep the same regex/table style as press-release and superlative
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Naming a predecessor plus a difference, or offering help, must still draft.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.

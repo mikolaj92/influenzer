@@ -43,6 +43,7 @@ from influenzer.playbook import (
     is_merge_log_texts,
     is_store_host_url,
     is_video_host_url,
+    looks_like_dunk,
     looks_like_listicle_title,
     looks_like_merged_pr_fact,
     looks_like_press_release,
@@ -402,7 +403,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     if score.arena is ArenaId.DISCORD:
         return None
     bits = _copy_bits(brief)
-    if bits is None or _undressable_blob(bits) or _superlative_without_proof(brief, bits):
+    if bits is None or _undressable_blob(bits) or _superlative_without_proof(brief, bits) or looks_like_dunk(bits.blob):
         return None
     triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
     if unquotable_reason(triples):
@@ -411,7 +412,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     if dresser is None:
         return None
     body = dresser(bits, score)
-    if body is None or unquotable_reason(triples, extra=body):
+    if body is None or unquotable_reason(triples, extra=body) or looks_like_dunk(body):
         return None
     play = arena_play(score.arena)
     clock = now or utc_now()
