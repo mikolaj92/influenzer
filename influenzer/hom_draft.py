@@ -48,6 +48,7 @@ from influenzer.playbook import (
     looks_like_press_release,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    looks_like_superlative,
     looks_like_waitlist,
     unquotable_reason,
 )
@@ -182,6 +183,13 @@ def _proof_url(bits: CopyBits) -> str | None:
 
 def _undressable_blob(bits: CopyBits) -> bool:
     return looks_like_waitlist(bits.blob) or looks_like_press_release(bits.blob)
+
+
+def _superlative_without_proof(brief: Brief, bits: CopyBits) -> bool:
+    """A slogan without a tryable GitHub artifact is silence. Proof or nothing."""
+    if not looks_like_superlative(bits.blob):
+        return False
+    return not (brief.tryable and any(is_ship_artifact(url) for url in brief_artifacts(brief)))
 
 
 def _merge_log_bits(bits: CopyBits) -> bool:
@@ -394,7 +402,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     if score.arena is ArenaId.DISCORD:
         return None
     bits = _copy_bits(brief)
-    if bits is None or _undressable_blob(bits):
+    if bits is None or _undressable_blob(bits) or _superlative_without_proof(brief, bits):
         return None
     triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
     if unquotable_reason(triples):

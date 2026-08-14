@@ -34,6 +34,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    looks_like_superlative,
     metric_tokens,
     quote_without_sourced_excerpt,
     unquotable_reason,
@@ -190,6 +191,21 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_blog_host_url("https://example.com/medium"))
         self.assertFalse(is_blog_host_url("https://notmedium.com/we-shipped"))
         self.assertFalse(is_blog_host_url("https://medium.com.evil.com/we-shipped"))
+
+    def test_superlative_is_revolutionary_worlds_first_or_ai_powered(self) -> None:
+        slogans = (
+            "revolutionary local tick",
+            "the world's first local tick",
+            "the worlds first local tick",
+            "a world-first operator tick",
+            "an AI-powered local tick",
+            "an AI powered local tick",
+        )
+        for text in slogans:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_superlative(text))
+        self.assertFalse(looks_like_superlative("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_superlative("first local tick on this machine"))
 
     def test_quote_needs_feedback_excerpt_with_url_not_users_love(self) -> None:
         self.assertTrue(looks_like_invented_opinion("users love the local tick"))
@@ -466,6 +482,54 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_superlative_without_tryable_artifact_is_killed(self) -> None:
+        slogans = (
+            "revolutionary local tick",
+            "the world's first local tick",
+            "an AI-powered local tick",
+        )
+        for text in slogans:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=False,
+                    facts=(Fact(text=text),),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "superlative_without_proof")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_superlative_with_artifact_but_not_tryable_is_killed(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(
+                Fact(text="an AI-powered local tick", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "superlative_without_proof")
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_superlative_with_tryable_artifact_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="an AI-powered local tick", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_PR, decision.draft.body)
 
     def test_press_release_tone_on_hn_is_killed(self) -> None:
         brief = self._brief(
