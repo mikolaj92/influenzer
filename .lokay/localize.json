@@ -1,8 +1,7 @@
 {
   "paths": [
-    "github_feedback/feedback.py",
     "influenzer",
-    "influenzer/hom_feedback.py",
+    "influenzer/adapters/subprocess_harness.py",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -12,7 +11,6 @@
     "influenzer/adapters/http_fake.py",
     "influenzer/adapters/platforms.py",
     "influenzer/adapters/registry.py",
-    "influenzer/adapters/subprocess_harness.py",
     "influenzer/brief_admit.py",
     "influenzer/brief_scan.py",
     "influenzer/campaigns.py",
@@ -26,6 +24,7 @@
     "influenzer/fala_result.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
+    "influenzer/hom_feedback.py",
     "influenzer/hom_outbox.py",
     "influenzer/hom_pass.py",
     "influenzer/hom_verdict.py",
@@ -39,12 +38,13 @@
     "influenzer/security.py",
     "influenzer/storage.py",
     "influenzer/tick.py",
-    "influenzer/tick_all.py"
+    "influenzer/tick_all.py",
+    "influenzer/adapters"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "feedback",
+    "proces",
     "influenzer"
   ],
   "notes": [
@@ -52,7 +52,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__110-sql-tylko-przez-bind-zero-sklejania-stri-e7ab0631",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__109-state.db-i-config-s-0600-katalog-0700-c8756c1f",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

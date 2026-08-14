@@ -182,11 +182,89 @@ def redact(value: str, secrets: Sequence[str] = ()) -> str:
     return output
 
 
+DIR_MODE = 0o700
+FILE_MODE = 0o600
+
+
+class WorkspacePermissionError(SecurityError):
+    """Workspace directory or file is looser than 0700 / 0600."""
+
+
+def file_mode(path: Path) -> int:
+    return path.stat().st_mode & 0o777
+
+
+def mode_is_looser(mode: int, allowed: int) -> bool:
+    """True when any bit outside the allowed mask is set (group/other, extra owner)."""
+    return bool(mode & ~allowed)
+
+
+def require_mode(path: Path, allowed: int) -> None:
+    """Fail closed when an existing path is world/group-readable or otherwise looser."""
+    if not path.exists():
+        return
+    mode = file_mode(path)
+    if mode_is_looser(mode, allowed):
+        raise WorkspacePermissionError(
+            f"{path} mode {mode:04o} is looser than {allowed:04o}"
+        )
+
+
+def mkdir_private(path: Path, *, parents: bool = False) -> Path:
+    """Create a 0700 directory, or refuse an existing one that is looser."""
+    if path.exists():
+        if not path.is_dir():
+            raise WorkspacePermissionError(f"{path} is not a directory")
+        require_mode(path, DIR_MODE)
+        return path
+    if parents:
+        missing: list[Path] = []
+        current = path
+        while not current.exists():
+            missing.append(current)
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+        for directory in reversed(missing):
+            directory.mkdir(mode=DIR_MODE, exist_ok=True)
+            os.chmod(directory, DIR_MODE)
+        require_mode(path, DIR_MODE)
+        return path
+    path.mkdir(mode=DIR_MODE, exist_ok=True)
+    os.chmod(path, DIR_MODE)
+    require_mode(path, DIR_MODE)
+    return path
+
+
+def chmod_private_file(path: Path) -> Path:
+    """Force a newly written file to 0600."""
+    os.chmod(path, FILE_MODE)
+    require_mode(path, FILE_MODE)
+    return path
+
+
+def require_private_file(path: Path) -> Path:
+    """Refuse to open an existing file looser than 0600."""
+    require_mode(path, FILE_MODE)
+    return path
+
+
+def require_workspace(home: Path, *, config_path: Path | None = None, state_db: Path | None = None) -> None:
+    """Home 0700, config and state.db 0600. Missing paths are allowed."""
+    if home.exists():
+        require_mode(home, DIR_MODE)
+    if config_path is not None and config_path.exists():
+        require_mode(config_path, FILE_MODE)
+    if state_db is not None and state_db.exists():
+        require_mode(state_db, FILE_MODE)
+
+
 @contextlib.contextmanager
 def isolated_home() -> Iterator[Path]:
     """Yield a mode-0700 temporary HOME and remove it on every exit path."""
     path = Path(tempfile.mkdtemp(prefix="influenzer-home-"))
-    path.chmod(0o700)
+    path.chmod(DIR_MODE)
     try:
         yield path
     finally:
@@ -385,9 +463,12 @@ safe_fetch = fetch_url
 validate_url = validate_fetch_url
 
 __all__ = [
-    "CredentialError", "CredentialProvider", "EnvCredentialProvider", "FetchError",
-    "FetchResponse", "KeychainCredentialProvider", "SecurityError", "build_child_env",
-    "child_environment", "fetch_url", "isolated_home", "manifest_for_child", "parse_credential_ref",
-    "redact", "resolve_credential", "resolve_public_addresses", "safe_fetch", "validate_content_length",
-    "validate_content_type", "validate_fetch_url", "validate_redirect_url", "validate_url",
+    "CredentialError", "CredentialProvider", "DIR_MODE", "EnvCredentialProvider", "FILE_MODE",
+    "FetchError", "FetchResponse", "KeychainCredentialProvider", "SecurityError",
+    "WorkspacePermissionError", "build_child_env", "child_environment", "chmod_private_file",
+    "fetch_url", "file_mode", "isolated_home", "manifest_for_child", "mkdir_private",
+    "mode_is_looser", "parse_credential_ref", "redact", "require_mode", "require_private_file",
+    "require_workspace", "resolve_credential", "resolve_public_addresses", "safe_fetch",
+    "validate_content_length", "validate_content_type", "validate_fetch_url",
+    "validate_redirect_url", "validate_url",
 ]
