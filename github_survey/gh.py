@@ -2,22 +2,42 @@
 
 The child cwd is an empty temporary directory, never HOME and never the host
 checkout. A cwd outside that empty temp is silence, not a spawn.
+
+The child env is an allowlist, never the host world. A key outside that
+allowlist does not reach the process. An env that is not isolated is
+silence, not a spawn.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 GH_TIMEOUT_S = 20.0
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_GH_ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "TMPDIR",
+        "TZ",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_HOST",
+        "GH_ENTERPRISE_TOKEN",
+        "GH_CONFIG_DIR",
+    }
+)
 REPO_JSON_FIELDS = "nameWithOwner,isPrivate,url,description,homepageUrl"
 PR_JSON_FIELDS = "number,title,url,mergedAt,body"
 RELEASE_JSON_FIELDS = "tagName,name,isDraft,isPrerelease,publishedAt"
@@ -121,6 +141,44 @@ def isolated_gh_cwd(path: Path) -> bool:
     )
 
 
+def isolated_gh_env(env: object) -> bool:
+    """True only for an allowlisted env. The host world is silence."""
+    if not isinstance(env, Mapping) or not env:
+        return False
+    path = env.get("PATH") if hasattr(env, "get") else None
+    if not isinstance(path, str) or not path or "\x00" in path:
+        return False
+    for key, value in env.items():
+        if not isinstance(key, str) or key not in _GH_ENV_ALLOWLIST:
+            return False
+        if not isinstance(value, str) or value == "" or "\x00" in value:
+            return False
+    return True
+
+
+def gh_env(source: Mapping[str, str] | None = None) -> dict[str, str] | None:
+    """Copy only the allowlisted keys. The host world is not a child env."""
+    environ = os.environ if source is None else source
+    if not isinstance(environ, Mapping):
+        return None
+    getter = getattr(environ, "get", None)
+    if not callable(getter):
+        return None
+    child: dict[str, str] = {}
+    for key in _GH_ENV_ALLOWLIST:
+        value = getter(key)
+        if value is None:
+            continue
+        if not isinstance(value, str) or "\x00" in value:
+            return None
+        if value == "":
+            continue
+        child[key] = value
+    if not isolated_gh_env(child):
+        return None
+    return child
+
+
 def _remove_gh_cwd(cwd: str | None) -> None:
     if cwd is None:
         return
@@ -136,6 +194,9 @@ def _remove_gh_cwd(cwd: str | None) -> None:
 def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
     cwd: str | None = None
     try:
+        child_env = gh_env()
+        if child_env is None or not isolated_gh_env(child_env):
+            return GhCall(returncode=0, stdout="", stderr="")
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
@@ -145,6 +206,7 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
             timeout=timeout,
             check=False,
             cwd=cwd,
+            env=child_env,
         )
     except FileNotFoundError:
         return GhCall(returncode=127, stdout="", stderr="gh not found", missing=True)
