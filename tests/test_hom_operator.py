@@ -19,7 +19,7 @@ from influenzer.hom import (
     is_ship_artifact,
     score_brief,
 )
-from influenzer.playbook import ARENAS, CANON_URL, SOCIAL_ARENAS, ArenaId, StoryKind, Verdict
+from influenzer.playbook import ARENAS, CANON_URL, SOCIAL_ARENAS, ArenaId, StoryKind, Verdict, is_video_host_url
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from influenzer.tick_all import main as tick_all_main
@@ -76,6 +76,24 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_ship_artifact("https://github.com/mikolaj92"))
         self.assertFalse(is_ship_artifact("https://github.com/orgs/github"))
         self.assertFalse(is_ship_artifact("https://github.com/settings/profile"))
+
+    def test_video_host_is_youtube_vimeo_loom_not_a_repo(self) -> None:
+        films = (
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://youtube-nocookie.com/embed/dQw4w9WgXcQ",
+            "http://vimeo.com/123456789",
+            "https://player.vimeo.com/video/123456789",
+            "https://www.loom.com/share/abc123",
+        )
+        for url in films:
+            with self.subTest(url=url):
+                self.assertTrue(is_video_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+        self.assertFalse(is_video_host_url(SHIP_REPO))
+        self.assertFalse(is_video_host_url("https://example.com/watch?v=dQw4w9WgXcQ"))
+        self.assertFalse(is_video_host_url("https://notyoutube.com/watch?v=dQw4w9WgXcQ"))
+        self.assertFalse(is_video_host_url("https://youtube.com.evil.com/watch"))
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -356,6 +374,49 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "hn_not_tryable")
+
+    def test_youtube_vimeo_or_loom_as_only_url_is_not_show_hn(self) -> None:
+        films = (
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://vimeo.com/123456789",
+            "https://www.loom.com/share/abc123",
+        )
+        for url in films:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="watch the walkthrough", artifact_url=url),
+                        Fact(text="strangers can click the film today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_an_episode")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_film_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="walkthrough film as evidence",
+                    artifact_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("youtube.com", decision.draft.body)
 
     def test_hard_issue_defaults_to_github_workshop_not_social(self) -> None:
         brief = self._brief(

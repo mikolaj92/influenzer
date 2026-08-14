@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from urllib.parse import urlparse
 
 
 CANON_URL = "https://github.com/mikolaj92/influenzer-playbook"
@@ -245,6 +246,17 @@ SHIP_ARTIFACT_RE = re.compile(
     r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
     r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))?)?$"
 )
+# A film is not click-and-run. YouTube/Vimeo/Loom as the only URL is silence
+# on seminar. A film next to a repo can stay as evidence. Cinema is separate.
+VIDEO_HOSTS: frozenset[str] = frozenset(
+    {
+        "youtube.com",
+        "youtu.be",
+        "youtube-nocookie.com",
+        "vimeo.com",
+        "loom.com",
+    }
+)
 
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
@@ -371,6 +383,19 @@ def is_ship_artifact_url(url: str | None) -> bool:
     return bool(SHIP_ARTIFACT_RE.fullmatch(url.strip()))
 
 
+def is_video_host_url(url: str | None) -> bool:
+    """True for a YouTube/Vimeo/Loom URL. A film is not a tryable demo."""
+    if not url:
+        return False
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return any(host == name or host.endswith("." + name) for name in VIDEO_HOSTS)
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -431,6 +456,7 @@ __all__ = [
     "NEWSLETTER_STORY_KINDS",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
+    "VIDEO_HOSTS",
     "StoryKind",
     "Verdict",
     "WORKSHOP_STORY_KINDS",
@@ -442,6 +468,7 @@ __all__ = [
     "is_merge_log_texts",
     "is_ship_artifact_url",
     "is_social_arena",
+    "is_video_host_url",
     "looks_like_commit_noise",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
