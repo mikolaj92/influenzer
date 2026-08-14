@@ -30,6 +30,7 @@ from influenzer.playbook import (
     has_named_subreddit,
     is_blog_host_url,
     is_merge_log_texts,
+    is_news_host_url,
     is_ranking_host_url,
     is_ship_artifact_url,
     is_social_arena,
@@ -47,6 +48,8 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_private_conversation,
     looks_like_press_release,
+    looks_like_world_commentary,
+    news_urls_only,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
@@ -294,6 +297,7 @@ def _has_clickable_url(brief: Brief) -> bool:
             and not is_store_host_url(url)
             and not is_blog_host_url(url)
             and not is_ranking_host_url(url)
+            and not is_news_host_url(url)
         ):
             return True
     return False
@@ -332,6 +336,11 @@ def _blog_only_urls(brief: Brief) -> bool:
 def _ranking_only_urls(brief: Brief) -> bool:
     """True when every artifact URL is HN / star-history / shields and none is a repo."""
     return ranking_urls_only(brief_artifacts(brief))
+
+
+def _news_only_urls(brief: Brief) -> bool:
+    """True when every artifact URL is a newspaper / wire and none is a repo."""
+    return news_urls_only(brief_artifacts(brief))
 
 
 def _enough_social_substance(brief: Brief) -> bool:
@@ -391,6 +400,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "hn_not_a_blog"
     if arena is ArenaId.HN and _ranking_only_urls(brief):
         return Verdict.KILL, "ranking_not_an_artifact"
+    if arena is ArenaId.HN and _news_only_urls(brief):
+        return Verdict.KILL, "world_commentary"
     title = next(iter(_wearable_fact_texts(brief)), "")
     if arena is ArenaId.HN and looks_like_listicle_title(title):
         return Verdict.KILL, "hn_not_a_listicle"
@@ -459,6 +470,8 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "hashtag_wall")
     if looks_like_private_conversation(blob):
         return _kill(brief, "private_conversation")
+    if looks_like_world_commentary(blob) or _news_only_urls(brief):
+        return _kill(brief, "world_commentary")
     if brief.story_kind is StoryKind.EXPLORATION:
         if is_social_arena(brief.preferred_arena):
             return _kill(brief, "exploration_not_a_post")

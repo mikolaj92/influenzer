@@ -41,6 +41,7 @@ from influenzer.playbook import (
     has_named_subreddit,
     is_blog_host_url,
     is_merge_log_texts,
+    is_news_host_url,
     is_ranking_host_url,
     is_store_host_url,
     is_video_host_url,
@@ -57,6 +58,7 @@ from influenzer.playbook import (
     looks_like_person_mention,
     looks_like_press_release,
     looks_like_private_conversation,
+    looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_superlative,
@@ -133,6 +135,7 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
             and not is_store_host_url(url)
             and not is_blog_host_url(url)
             and not is_ranking_host_url(url)
+            and not is_news_host_url(url)
             and url not in found
         ):
             found.append(url)
@@ -198,7 +201,11 @@ def _proof_url(bits: CopyBits) -> str | None:
 
 
 def _undressable_blob(bits: CopyBits) -> bool:
-    return looks_like_waitlist(bits.blob) or looks_like_press_release(bits.blob)
+    return (
+        looks_like_waitlist(bits.blob)
+        or looks_like_press_release(bits.blob)
+        or looks_like_world_commentary(bits.blob)
+    )
 
 
 def _superlative_without_proof(brief: Brief, bits: CopyBits) -> bool:
@@ -264,6 +271,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
         or is_store_host_url(url)
         or is_blog_host_url(url)
         or is_ranking_host_url(url)
+        or is_news_host_url(url)
     ):
         return None
     if looks_like_store_pitch("\n".join((bits.one_liner, *bits.rest))):
@@ -439,6 +447,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
         or looks_like_private_conversation(bits.blob)
+        or looks_like_world_commentary(bits.blob)
     ):
         return None
     if unquotable_reason(triples):
@@ -459,6 +468,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
         or looks_like_private_conversation(body)
+        or looks_like_world_commentary(body)
     ):
         return None
     play = arena_play(score.arena)
