@@ -5,19 +5,37 @@ not `import influenzer.scan`.
 
 Does not score. Does not publish. Does not enable live social.
 Does not implement `gh` — that is github_survey's job.
+Does not comment, label, close, or push. Look is GitHub GET only.
+Reply and code are not this path.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 from github_pack import pack_survey
-from github_survey import GhRunner, invalid_repo_reason, survey_public_repo
+from github_survey import GhCall, GhRunner, invalid_repo_reason, survey_public_repo
+from github_survey.gh import allowlisted_gh_argv, gh_argv
 
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
 from influenzer.domain import utc_now
 from influenzer.storage import StateRepository
+
+
+def look_only_gh(gh: GhRunner | None) -> GhRunner | None:
+    """Look may only GET. comment/label/close/push is silence, not a spawn."""
+    if gh is None:
+        return None
+
+    def _read_only(argv: Sequence[str]) -> GhCall:
+        child = gh_argv(argv)
+        if child is None or not allowlisted_gh_argv(child):
+            return GhCall(returncode=0, stdout="", stderr="")
+        return gh(argv)
+
+    return _read_only
 
 
 def scan_github(
@@ -36,10 +54,10 @@ def scan_github(
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     try:
-        packed = pack_survey(survey_public_repo(slug, gh=gh, now=now))
+        packed = pack_survey(survey_public_repo(slug, gh=look_only_gh(gh), now=now))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     return admit_pack(repo, packed, project_id=project_id, now=now or utc_now())
 
 
-__all__ = ["SOURCE", "scan_github"]
+__all__ = ["SOURCE", "look_only_gh", "scan_github"]

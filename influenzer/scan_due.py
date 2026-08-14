@@ -10,6 +10,8 @@ Does not know Heimdall. Does not know my-auth. Does not implement github_pack
 shape. Does not call gh (github_survey owns gh). Does not copy survey, pack,
 or admit. Does not grow github_survey. Does not run every tick interval.
 Does not open runtime.db. Does not embed a Fala host.
+Does not comment, label, close, or push. Look is GitHub GET only.
+Reply and code are not this path.
 """
 
 from __future__ import annotations

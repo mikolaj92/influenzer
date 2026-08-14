@@ -12,6 +12,8 @@ Does not publish. Does not enable live social. Does not call gh
 Does not invoke hold or pass. Does not run every tick interval.
 Does not merge scan_due, tick, and outbox into one file.
 Does not open runtime.db. Does not embed a Fala host.
+Does not comment, label, close, or push. Look is GitHub GET only.
+Reply and code are not this path.
 """
 
 from __future__ import annotations

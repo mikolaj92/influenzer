@@ -1,34 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=105 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=104 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #105 — GhRunner: pozytywna allowlista, tylko odczyt
+Issue: #104 — Look nic nie zapisuje na GitHubie
 
 ## Goal
 
-GhRunner has a positive allowlist: read-only catalog (`repo view`, `pr list`,
-`release list`, GET `api`). Any other argv is silence, not a comment, label,
-close, or push. The catalog is the latch in the runner, like the effector
-catalog — compose does not decide what may spawn.
+Look nic nie zapisuje na GitHubie. Zero comment/label/close/push. Tylko odczyt. Odpowiedź i kod to nie ta ścieżka.
 
 ## Files likely touched
 
-- `github_survey/gh.py` — allowlist + `run_gh` latch
-- `tests/test_github_survey.py` — read catalog vs write argv
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python -m unittest tests.test_github_survey tests.test_github_feedback`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Env allowlist (#107), cwd isolation (#108), argv-vs-shell (#106)
-- Teaching survey/feedback new GitHub endpoints
-- Writing comments, labels, closes, or pushes
+- (none stated)
 
 ## Notes
 
-- Localize seed `comment/label/close/push` was token noise. GhRunner lives in
-  `github_survey/gh.py`; that is the latch, same as #106–#108.
-- Collector boundary: no unbounded collection in this patch.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
