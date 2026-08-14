@@ -1,37 +1,34 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=106 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=107 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #106 — gh leci listą argv, nigdy przez shell
+Issue: #107 — Dziecko gh dostaje allowlistę env, nie cały świat
 
 ## Goal
 
-gh leci listą argv, nigdy przez shell. Slug watcha walidowany zanim trafi do procesu. Żadnej interpolacji stringa z bazy.
+The gh child process gets a positive env allowlist, never the host world.
+Host secrets do not inherit. Only what gh must have (PATH/HOME/locale/tmp
+plus GH_TOKEN/GITHUB_TOKEN). An env outside that allowlist is silence,
+not a spawn.
 
 ## Files likely touched
 
-- `github_survey/gh.py` — `run_gh` is the only `gh` spawn; lock argv list + `shell=False`, refuse a shell string or a bad slug before spawn
-- `influenzer/hom_watch.py` — a poisoned watch slug from the database is silence, not a process
-- `tests/test_github_survey.py` — argv list, never shell; bad slug is silence
-- `tests/test_hom_watch.py` — poisoned `hom_watch.repo_slug` does not reach gh
-
-`github_survey` must not import Influenzer. Isolation lives next to `run_gh`.
+- `github_survey/gh.py` — same latch as #106 (argv) and #108 (cwd)
+- `tests/test_github_survey.py`
 
 ## Test plan
 
-- `uv run python -m pytest tests/test_github_survey.py tests/test_hom_watch.py -q`
+- `python -m pytest tests/test_github_survey.py -q`
 
 ## Non-goals
 
-- Adapter subprocess argv (`influenzer/adapters/subprocess_harness.py`)
-- GET allowlist in GhRunner (#105)
-- Child env allowlist (#107) and cwd isolation (#108)
-- Letting `github_survey` import `influenzer`
+- Do not import influenzer from github_survey
+- Do not change adapter/subprocess child env (#107 is the gh child)
+- Do not start a collector
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Fail-closed: gh only as an argv list; a bad watch slug is silence and does not reach the process; a string from the database does not compose a command.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Sibling latches: #105 GET allowlist, #106 argv not shell, #108 empty temp cwd.
+- Fail-closed: extra env keys → no spawn (look = silence).

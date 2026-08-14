@@ -6,21 +6,28 @@ checkout. A cwd outside that empty temp is silence, not a spawn.
 gh is always an argv list, never a shell string. A watch slug is validated
 before it reaches the process. A string from the database does not compose
 a command.
+
+The child environment is a positive allowlist, never the host world. Host
+secrets do not inherit. An env outside that allowlist is silence, not a spawn.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 GH_TIMEOUT_S = 20.0
+GH_CHILD_ENV = frozenset(
+    {"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TZ", "GH_TOKEN", "GITHUB_TOKEN"}
+)
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 REPO_JSON_FIELDS = "nameWithOwner,isPrivate,url,description,homepageUrl"
 PR_JSON_FIELDS = "number,title,url,mergedAt,body"
@@ -164,6 +171,19 @@ def isolated_gh_argv(argv: object) -> bool:
     return True
 
 
+def gh_child_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Copy only the keys gh needs. Host secrets stay in the parent."""
+    source = os.environ if environ is None else environ
+    return {key: value for key, value in source.items() if key in GH_CHILD_ENV}
+
+
+def isolated_gh_env(environ: Mapping[str, str] | None) -> bool:
+    """True only for an allowlisted env. Extra keys are silence, not a spawn."""
+    if not isinstance(environ, Mapping):
+        return False
+    return all(isinstance(key, str) and key in GH_CHILD_ENV for key in environ)
+
+
 def _remove_gh_cwd(cwd: str | None) -> None:
     if cwd is None:
         return
@@ -182,6 +202,9 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         child_argv = gh_argv(argv)
         if child_argv is None or not isolated_gh_argv(child_argv):
             return GhCall(returncode=0, stdout="", stderr="")
+        child_env = gh_child_env()
+        if not isolated_gh_env(child_env):
+            return GhCall(returncode=0, stdout="", stderr="")
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
@@ -191,6 +214,7 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
             timeout=timeout,
             check=False,
             cwd=cwd,
+            env=child_env,
             shell=False,
         )
     except FileNotFoundError:
