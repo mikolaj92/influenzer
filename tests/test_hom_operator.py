@@ -19,7 +19,7 @@ from influenzer.hom import (
     is_ship_artifact,
     score_brief,
 )
-from influenzer.playbook import ARENAS, CANON_URL, SOCIAL_ARENAS, ArenaId, StoryKind, Verdict
+from influenzer.playbook import ARENAS, CANON_URL, SOCIAL_ARENAS, ArenaId, StoryKind, Verdict, is_launch_board_url
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from influenzer.tick_all import main as tick_all_main
@@ -76,6 +76,24 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_ship_artifact("https://github.com/mikolaj92"))
         self.assertFalse(is_ship_artifact("https://github.com/orgs/github"))
         self.assertFalse(is_ship_artifact("https://github.com/settings/profile"))
+
+    def test_launch_board_is_product_hunt_betalist_not_a_repo(self) -> None:
+        boards = (
+            "https://www.producthunt.com/posts/influenzer",
+            "https://producthunt.com/products/influenzer",
+            "https://www.betalist.com/startups/influenzer",
+            "https://betalist.com/startups/influenzer",
+            "https://example.com/launch-on-ph",
+            "launch on PH tomorrow",
+        )
+        for url in boards:
+            with self.subTest(url=url):
+                self.assertTrue(is_launch_board_url(url))
+                self.assertFalse(is_ship_artifact(url))
+        self.assertFalse(is_launch_board_url(SHIP_REPO))
+        self.assertFalse(is_launch_board_url("https://example.com/product"))
+        self.assertFalse(is_launch_board_url("https://notproducthunt.com/posts/x"))
+        self.assertFalse(is_launch_board_url("https://producthunt.com.evil.com/posts/x"))
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -356,6 +374,49 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "hn_not_tryable")
+
+    def test_product_hunt_or_betalist_as_only_url_is_not_show_hn(self) -> None:
+        boards = (
+            "https://www.producthunt.com/posts/influenzer",
+            "https://producthunt.com/products/influenzer",
+            "https://www.betalist.com/startups/influenzer",
+            "https://example.com/pages/launch-on-ph",
+        )
+        for url in boards:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="we are live on the launch board", artifact_url=url),
+                        Fact(text="strangers can click the board today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_a_launch_board")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_launch_board_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="also filed on Product Hunt as evidence",
+                    artifact_url="https://www.producthunt.com/posts/influenzer",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("producthunt.com", decision.draft.body)
 
     def test_hard_issue_defaults_to_github_workshop_not_social(self) -> None:
         brief = self._brief(

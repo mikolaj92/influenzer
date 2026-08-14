@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
+from urllib.parse import urlparse
 
 
 CANON_URL = "https://github.com/mikolaj92/influenzer-playbook"
@@ -245,6 +246,15 @@ SHIP_ARTIFACT_RE = re.compile(
     r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
     r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))?)?$"
 )
+# A launch-board card is not the thing. Product Hunt / BetaList / "launch on PH"
+# as the only URL is silence on seminar. Link the demo, not the launch table.
+LAUNCH_BOARD_HOSTS: frozenset[str] = frozenset(
+    {
+        "producthunt.com",
+        "betalist.com",
+    }
+)
+LAUNCH_ON_PH_RE = re.compile(r"(?i)\blaunch[\s-]+on[\s-]+ph\b")
 
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
@@ -371,6 +381,24 @@ def is_ship_artifact_url(url: str | None) -> bool:
     return bool(SHIP_ARTIFACT_RE.fullmatch(url.strip()))
 
 
+def is_launch_board_url(url: str | None) -> bool:
+    """True for Product Hunt / BetaList / 'launch on PH'. A board is not the demo."""
+    if not url:
+        return False
+    text = url.strip()
+    if not text:
+        return False
+    if LAUNCH_ON_PH_RE.search(text):
+        return True
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return any(host == name or host.endswith("." + name) for name in LAUNCH_BOARD_HOSTS)
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -425,6 +453,8 @@ __all__ = [
     "CANON_URL",
     "COMMIT_NOISE_RE",
     "HN_STORY_KINDS",
+    "LAUNCH_BOARD_HOSTS",
+    "LAUNCH_ON_PH_RE",
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
@@ -439,6 +469,7 @@ __all__ = [
     "has_cinema_package",
     "has_fair_hook",
     "has_named_subreddit",
+    "is_launch_board_url",
     "is_merge_log_texts",
     "is_ship_artifact_url",
     "is_social_arena",

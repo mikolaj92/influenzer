@@ -28,6 +28,7 @@ from influenzer.playbook import (
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
+    is_launch_board_url,
     is_merge_log_texts,
     is_ship_artifact_url,
     is_social_arena,
@@ -264,11 +265,24 @@ def _facts_blob(brief: Brief) -> str:
 
 
 def _has_clickable_url(brief: Brief) -> bool:
+    """A tryable demo URL. A launch board is not the thing."""
     for fact in brief.facts:
         url = (fact.artifact_url or "").strip()
-        if is_ship_artifact(url) or url.startswith("https://"):
+        if is_ship_artifact(url):
+            return True
+        if url.startswith("https://") and not is_launch_board_url(url):
             return True
     return False
+
+
+def _launch_board_only_urls(brief: Brief) -> bool:
+    """True when every artifact URL is Product Hunt / BetaList and none is a repo."""
+    urls = [url.strip() for url in brief_artifacts(brief) if url and url.strip()]
+    if not urls:
+        return False
+    if any(is_ship_artifact(url) for url in urls):
+        return False
+    return all(is_launch_board_url(url) for url in urls)
 
 
 def _enough_social_substance(brief: Brief) -> bool:
@@ -315,6 +329,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return gate.mismatch_verdict, gate.reason
     if gate.require_tryable and not brief.tryable:
         return Verdict.KILL, gate.reason
+    if arena is ArenaId.HN and _launch_board_only_urls(brief):
+        return Verdict.KILL, "hn_not_a_launch_board"
     if gate.require_clickable_url and not _has_clickable_url(brief):
         return Verdict.KILL, gate.reason
     if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
