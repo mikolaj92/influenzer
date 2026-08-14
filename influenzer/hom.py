@@ -31,9 +31,11 @@ from influenzer.playbook import (
     is_merge_log_texts,
     is_ship_artifact_url,
     is_social_arena,
+    is_store_host_url,
     is_video_host_url,
     looks_like_commit_noise,
     looks_like_press_release,
+    looks_like_store_pitch,
     looks_like_waitlist,
 )
 
@@ -265,12 +267,12 @@ def _facts_blob(brief: Brief) -> str:
 
 
 def _has_clickable_url(brief: Brief) -> bool:
-    """A tryable demo URL. A film host is not click-and-run."""
+    """A tryable demo URL. A film or store host is not click-and-run."""
     for fact in brief.facts:
         url = (fact.artifact_url or "").strip()
         if is_ship_artifact(url):
             return True
-        if url.startswith("https://") and not is_video_host_url(url):
+        if url.startswith("https://") and not is_video_host_url(url) and not is_store_host_url(url):
             return True
     return False
 
@@ -283,6 +285,16 @@ def _film_only_urls(brief: Brief) -> bool:
     if any(is_ship_artifact(url) for url in urls):
         return False
     return all(is_video_host_url(url) for url in urls)
+
+
+def _store_only_urls(brief: Brief) -> bool:
+    """True when every artifact URL is App Store / Play / TestFlight and none is a repo."""
+    urls = [url.strip() for url in brief_artifacts(brief) if url and url.strip()]
+    if not urls:
+        return False
+    if any(is_ship_artifact(url) for url in urls):
+        return False
+    return all(is_store_host_url(url) for url in urls)
 
 
 def _enough_social_substance(brief: Brief) -> bool:
@@ -331,6 +343,9 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, gate.reason
     if arena is ArenaId.HN and _film_only_urls(brief):
         return Verdict.KILL, "hn_not_an_episode"
+    store_blob = "\n".join(fact.text for fact in brief.facts)
+    if arena is ArenaId.HN and (_store_only_urls(brief) or looks_like_store_pitch(store_blob)):
+        return Verdict.KILL, "hn_not_a_store"
     if gate.require_clickable_url and not _has_clickable_url(brief):
         return Verdict.KILL, gate.reason
     if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):

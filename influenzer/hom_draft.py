@@ -40,9 +40,11 @@ from influenzer.playbook import (
     has_fair_hook,
     has_named_subreddit,
     is_merge_log_texts,
+    is_store_host_url,
     is_video_host_url,
     looks_like_merged_pr_fact,
     looks_like_press_release,
+    looks_like_store_pitch,
     looks_like_waitlist,
 )
 
@@ -108,7 +110,12 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
             if url not in found:
                 found.append(url)
             continue
-        if url.startswith("https://") and not is_video_host_url(url) and url not in found:
+        if (
+            url.startswith("https://")
+            and not is_video_host_url(url)
+            and not is_store_host_url(url)
+            and url not in found
+        ):
             found.append(url)
     return tuple(found)
 
@@ -218,7 +225,9 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
         return None
     url = _proof_url(bits)
-    if not url or is_video_host_url(url):
+    if not url or is_video_host_url(url) or is_store_host_url(url):
+        return None
+    if looks_like_store_pitch("\n".join((bits.one_liner, *bits.rest))):
         return None
     parts = [_show_hn_title(bits.one_liner), url]
     backstory = _join_rest(bits)

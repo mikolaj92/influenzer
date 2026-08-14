@@ -19,7 +19,17 @@ from influenzer.hom import (
     is_ship_artifact,
     score_brief,
 )
-from influenzer.playbook import ARENAS, CANON_URL, SOCIAL_ARENAS, ArenaId, StoryKind, Verdict, is_video_host_url
+from influenzer.playbook import (
+    ARENAS,
+    CANON_URL,
+    SOCIAL_ARENAS,
+    ArenaId,
+    StoryKind,
+    Verdict,
+    is_store_host_url,
+    is_video_host_url,
+    looks_like_store_pitch,
+)
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from influenzer.tick_all import main as tick_all_main
@@ -94,6 +104,26 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_video_host_url("https://example.com/watch?v=dQw4w9WgXcQ"))
         self.assertFalse(is_video_host_url("https://notyoutube.com/watch?v=dQw4w9WgXcQ"))
         self.assertFalse(is_video_host_url("https://youtube.com.evil.com/watch"))
+
+    def test_store_host_is_app_store_play_testflight_not_a_repo(self) -> None:
+        stores = (
+            "https://apps.apple.com/app/id123456789",
+            "https://itunes.apple.com/us/app/id123456789",
+            "https://play.google.com/store/apps/details?id=com.example.app",
+            "https://testflight.apple.com/join/abc123",
+        )
+        for url in stores:
+            with self.subTest(url=url):
+                self.assertTrue(is_store_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+        self.assertFalse(is_store_host_url(SHIP_REPO))
+        self.assertFalse(is_store_host_url("https://example.com/app-store"))
+        self.assertFalse(is_store_host_url("https://notplay.google.com/store"))
+        self.assertFalse(is_store_host_url("https://apps.apple.com.evil.com/app"))
+        self.assertTrue(looks_like_store_pitch("download the app on TestFlight"))
+        self.assertTrue(looks_like_store_pitch("Get it on the App Store"))
+        self.assertFalse(looks_like_store_pitch("a stranger can click and run the demo"))
 
 
 class ScoreBriefTests(unittest.TestCase):
@@ -417,6 +447,68 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertIn(SHIP_REPO, decision.draft.body)
         self.assertNotIn("youtube.com", decision.draft.body)
+
+    def test_app_store_play_or_testflight_as_only_url_is_not_show_hn(self) -> None:
+        stores = (
+            "https://apps.apple.com/app/id123456789",
+            "https://itunes.apple.com/us/app/id123456789",
+            "https://play.google.com/store/apps/details?id=com.example.app",
+            "https://testflight.apple.com/join/abc123",
+        )
+        for url in stores:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="download the app", artifact_url=url),
+                        Fact(text="strangers can install it today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_a_store")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_download_the_app_pitch_is_not_show_hn(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(
+                    text="download the app from our homepage",
+                    artifact_url="https://example.com/demo",
+                ),
+                Fact(text="strangers can install it today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "hn_not_a_store")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_store_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="also listed on the store as evidence",
+                    artifact_url="https://apps.apple.com/app/id123456789",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("apps.apple.com", decision.draft.body)
 
     def test_hard_issue_defaults_to_github_workshop_not_social(self) -> None:
         brief = self._brief(
