@@ -33,6 +33,9 @@ from influenzer.playbook import (
     invented_metric_reason,
     looks_like_contest,
     looks_like_dunk,
+    looks_like_foreign_wave,
+    looks_like_reply,
+    is_parent_post_url,
     looks_like_engagement_bait,
     looks_like_ranking_dump,
     looks_like_thread,
@@ -292,6 +295,70 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_dunk(text))
+
+    def test_foreign_wave_is_reply_under_someone_elses_post(self) -> None:
+        parent = "https://x.com/other/status/123456789"
+        self.assertTrue(is_parent_post_url(parent))
+        self.assertFalse(is_parent_post_url(SHIP_PR))
+        self.assertFalse(is_parent_post_url("https://x.com/other"))
+        self.assertTrue(looks_like_reply("reply under a rising thread"))
+        self.assertTrue(looks_like_reply("in-reply-to a mid-KOL post"))
+        self.assertTrue(looks_like_reply("pod postem o launchu"))
+        self.assertFalse(looks_like_reply("thinking about posting a launch reply"))
+        self.assertFalse(looks_like_reply("Local tick scores briefs and emits a draft"))
+        self.assertTrue(
+            looks_like_foreign_wave(
+                (
+                    ("parent", "rising mid-KOL post", parent),
+                    ("signal", "Local tick scores briefs and emits a draft", SHIP_PR),
+                )
+            )
+        )
+        self.assertTrue(
+            looks_like_foreign_wave(
+                (
+                    ("signal", "reply under a rising thread", parent),
+                    ("signal", "strangers can click and run the demo today", SHIP_PR),
+                )
+            )
+        )
+        self.assertFalse(
+            looks_like_foreign_wave(
+                (
+                    ("parent", "Show HN about mikolaj92/influenzer", "https://news.ycombinator.com/item?id=1"),
+                    ("signal", "Local tick scores briefs and emits a draft", SHIP_PR),
+                )
+            )
+        )
+        self.assertFalse(
+            looks_like_foreign_wave(
+                (
+                    ("parent", "our ship thread", SHIP_PR),
+                    ("signal", "strangers can click and run the demo today", SHIP_PR),
+                )
+            )
+        )
+        self.assertTrue(
+            looks_like_foreign_wave(
+                (("parent", "a parent URL alone", "https://x.com/other/status/1"),)
+            )
+        )
+        self.assertTrue(
+            looks_like_foreign_wave((("parent", "a GitHub parent URL alone", SHIP_ISSUE),))
+        )
+        self.assertTrue(
+            looks_like_foreign_wave(
+                (
+                    ("parent", "someone else's repo", "https://github.com/other/tool"),
+                    ("signal", "Local tick scores briefs and emits a draft", SHIP_PR),
+                )
+            )
+        )
+        self.assertFalse(
+            looks_like_foreign_wave(
+                (("signal", "Local tick scores briefs and emits a draft", SHIP_PR),)
+            )
+        )
 
     def test_quote_needs_feedback_excerpt_with_url_not_users_love(self) -> None:
         self.assertTrue(looks_like_invented_opinion("users love the local tick"))
@@ -891,6 +958,57 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "superlative_without_proof")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_reply_under_someone_elses_post_is_killed(self) -> None:
+        parent = "https://x.com/other/status/123456789"
+        cases = (
+            (Fact(kind="parent", text="rising mid-KOL post", artifact_url=parent),),
+            (Fact(text="reply under a rising thread", artifact_url=parent),),
+            (Fact(text="pod postem o launchu", artifact_url=parent),),
+        )
+        for extra in cases:
+            with self.subTest(text=extra[0].text):
+                brief = self._brief(
+                    facts=(
+                        *extra,
+                        Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "foreign_wave")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_parent_url_alone_is_not_enough(self) -> None:
+        for url in ("https://x.com/other/status/1", SHIP_ISSUE):
+            with self.subTest(url=url):
+                brief = self._brief(
+                    facts=(Fact(kind="parent", text="a parent URL alone", artifact_url=url),)
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "foreign_wave")
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_reply_under_our_ship_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.X,
+            facts=(
+                Fact(
+                    kind="parent",
+                    text="Show HN about mikolaj92/influenzer",
+                    artifact_url="https://news.ycombinator.com/item?id=1",
+                ),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.X)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_dunking_another_project_is_killed(self) -> None:
         dunks = (

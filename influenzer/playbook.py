@@ -372,6 +372,27 @@ DUNK_NAMED_RE = re.compile(
     r"is\s+a\s+dumpster\s+fire|is\s+a\s+clown(?:\s+project)?|"
     r"is\s+a\s+toy(?:\s+project)?)\b"
 )
+# A reply under someone else's post. Kind names a parent; a social URL
+# is a thread to sit under, not a ship. This is wave theft, not dunk.
+PARENT_FACT_KINDS: frozenset[str] = frozenset(
+    {"parent", "parent_post", "in_reply_to", "reply_to"}
+)
+REPLY_SHAPE_RE = re.compile(
+    r"(?i)(?:"
+    r"\breply(?:ing)?\s+(?:under|to|on)\b|"
+    r"\bin[- ]reply[- ]to\b|"
+    r"\bcomment(?:ing)?\s+(?:under|on)\s+(?:this\s+)?(?:post|thread|tweet|item)\b|"
+    r"\bpod\s+postem\b|"
+    r"\bodpowied[zź]\s+pod\b"
+    r")"
+)
+_SHIP_URL_IN_TEXT_RE = re.compile(
+    r"https://github\.com/"
+    r"(?!(?:gist|orgs|settings|users)/)"
+    r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+    r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))?)",
+    re.I,
+)
 _DUNK_SUBJECT_STOP = frozenset(
     {
         "this",
@@ -801,6 +822,118 @@ def looks_like_dunk(text: str) -> bool:
     return False
 
 
+def is_parent_post_url(url: str | None) -> bool:
+    """True for a social parent post. A ship artifact is not a foreign wave."""
+    if not url or is_ship_artifact_url(url):
+        return False
+    host = _http_host(url)
+    if not host:
+        return False
+    parsed = urlparse(url.strip())
+    path = parsed.path or ""
+    query = parsed.query or ""
+    if host in {"x.com", "twitter.com"} or host.endswith(".twitter.com") or host.startswith("nitter."):
+        return bool(re.search(r"/status/\d+", path))
+    if host == "bsky.app":
+        return bool(re.search(r"/profile/[^/]+/post/[^/]+", path))
+    if host == "news.ycombinator.com":
+        return path.rstrip("/") == "/item" and "id=" in query
+    if host == "reddit.com" or host.endswith(".reddit.com"):
+        return "/comments/" in path
+    if host == "linkedin.com" or host.endswith(".linkedin.com"):
+        return "/posts/" in path or "/feed/update/" in path
+    return False
+
+
+def looks_like_reply(text: str) -> bool:
+    """True for reply-under / in-reply-to copy. The bare word 'reply' is not."""
+    if not text or not text.strip():
+        return False
+    return bool(REPLY_SHAPE_RE.search(text))
+
+
+def _github_repo_slug(url: str | None) -> str | None:
+    if not is_ship_artifact_url(url):
+        return None
+    parts = [item for item in urlparse(url.strip()).path.split("/") if item]
+    if len(parts) < 2:
+        return None
+    return f"{parts[0]}/{parts[1]}"
+
+
+def _ship_urls_and_slugs(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    urls: list[str] = []
+    slugs: list[str] = []
+    for kind, text, url in facts:
+        if _is_reply_fact(kind, text, url):
+            continue
+        candidates = [url] if url else []
+        if text:
+            candidates.extend(_SHIP_URL_IN_TEXT_RE.findall(text))
+        for candidate in candidates:
+            if not is_ship_artifact_url(candidate):
+                continue
+            cleaned = candidate.strip().rstrip("/")
+            if cleaned not in urls:
+                urls.append(cleaned)
+            slug = _github_repo_slug(cleaned)
+            if slug and slug not in slugs:
+                slugs.append(slug)
+    return tuple(urls), tuple(slugs)
+
+
+def _is_reply_fact(kind: str, text: str, _url: str | None) -> bool:
+    if kind.strip().lower() in PARENT_FACT_KINDS:
+        return True
+    return looks_like_reply(text)
+
+
+def _parent_about_our_ship(
+    _kind: str,
+    text: str,
+    url: str | None,
+    ship_urls: tuple[str, ...] | list[str],
+    ship_slugs: tuple[str, ...] | list[str],
+) -> bool:
+    """A social parent URL is not enough. The parent must be our watch/ship."""
+    if not ship_slugs:
+        return False
+    if is_ship_artifact_url(url):
+        slug = _github_repo_slug(url)
+        if slug and slug in ship_slugs:
+            return True
+        cleaned = url.strip().rstrip("/")
+        if any(cleaned == ship or cleaned.startswith(ship + "/") for ship in ship_urls):
+            return True
+        return False
+    blob = text or ""
+    folded = blob.casefold()
+    for ship in ship_urls:
+        if ship.casefold() in folded:
+            return True
+    for slug in ship_slugs:
+        if re.search(rf"\b{re.escape(slug)}\b", blob, flags=re.I):
+            return True
+    return False
+
+
+def looks_like_foreign_wave(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> bool:
+    """True when a reply sits under a post that is not our watch/ship."""
+    packed = tuple(facts)
+    replies = [item for item in packed if _is_reply_fact(*item)]
+    if not replies:
+        return False
+    ship_urls, ship_slugs = _ship_urls_and_slugs(packed)
+    return any(
+        not _parent_about_our_ship(kind, text, url, ship_urls, ship_slugs)
+        for kind, text, url in replies
+    )
+
+
 def looks_like_invented_opinion(text: str) -> bool:
     """True for unsourced praise such as 'users love'. Not a quote."""
     return bool(INVENTED_OPINION_RE.search(text))
@@ -997,6 +1130,10 @@ def unquotable_reason(
         looks_like_private_conversation(extra) or is_private_channel_url(extra)
     ):
         return "private_conversation"
+    if looks_like_foreign_wave(packed):
+        return "foreign_wave"
+    if extra and looks_like_foreign_wave((*packed, ("signal", extra, None))):
+        return "foreign_wave"
     if any(looks_like_invented_opinion(text) for text in operator_texts):
         return "invented_opinion"
     if extra and looks_like_invented_opinion(extra):
@@ -1115,6 +1252,11 @@ __all__ = [
     "is_video_host_url",
     "looks_like_commit_noise",
     "looks_like_dunk",
+    "looks_like_foreign_wave",
+    "looks_like_reply",
+    "is_parent_post_url",
+    "PARENT_FACT_KINDS",
+    "REPLY_SHAPE_RE",
     "looks_like_contest",
     "looks_like_ranking_dump",
     "looks_like_thread",

@@ -46,6 +46,7 @@ from influenzer.playbook import (
     is_video_host_url,
     looks_like_contest,
     looks_like_dunk,
+    looks_like_foreign_wave,
     looks_like_engagement_bait,
     looks_like_ranking_dump,
     looks_like_thread,
@@ -425,11 +426,13 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     if score.arena is ArenaId.DISCORD:
         return None
     bits = _copy_bits(brief)
+    triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
     if (
         bits is None
         or _undressable_blob(bits)
         or _superlative_without_proof(brief, bits)
         or looks_like_dunk(bits.blob)
+        or looks_like_foreign_wave(triples)
         or looks_like_engagement_bait(bits.blob)
         or looks_like_contest(bits.blob)
         or looks_like_thread(bits.blob)
@@ -438,7 +441,6 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_private_conversation(bits.blob)
     ):
         return None
-    triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
     if unquotable_reason(triples):
         return None
     dresser = _DRESSERS.get(score.arena)
@@ -449,6 +451,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         body is None
         or unquotable_reason(triples, extra=body)
         or looks_like_dunk(body)
+        or looks_like_foreign_wave((*triples, ("signal", body, None)))
         or looks_like_engagement_bait(body)
         or looks_like_contest(body)
         or looks_like_thread(body)

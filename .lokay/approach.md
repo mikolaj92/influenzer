@@ -1,38 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=132 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=133 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #132 — Prywatna rozmowa nie idzie w kąt
+Issue: #133 — Nie wpinamy produktu w cudzą falę
 
 ## Goal
 
-Prywatna rozmowa nie idzie w kąt. Zrzut Slacka, maila, DMa w body = cisza. Nawet „anonimizowane”. To nie excerpt z publicznego issue.
-
-Fail-closed:
-- Slack / mail / DM in body = silence, even after anonymization.
-- Excerpt only from a public GitHub issue/PR comment.
+Nie wpinamy produktu w cudzą falę. Reply pod postem, który nie jest o naszym watchu/shipie = cisza. Sam parent URL nie wystarczy. To nie dunk i nie echo — to kradzież fali.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — private-channel host set, dump detector, public-issue excerpt URL
-- `influenzer/hom.py` — score Slack/mail/DM dumps as kill
-- `influenzer/hom_draft.py` — refuse to dress a leaked private conversation
-- `tests/test_hom_operator.py` — detector + score kills
-- `tests/test_hom_draft.py` — undressable even when score says draft
+- `influenzer/playbook.py` — detect a reply under a foreign parent
+- `influenzer/hom.py` — score that shape as silence
+- `influenzer/hom_draft.py` — refuse to dress a leaked draft of the same shape
+- `tests/test_hom_operator.py`, `tests/test_hom_draft.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py tests/test_hom_feedback.py tests/test_github_feedback.py -q`
+- Reply under a post that is not our watch/ship is killed
+- A parent URL alone is not enough
+- A parent about our ship can still draft
+- Existing dunk / empty-feed / costume tests stay green
 
 ## Non-goals
 
-- Do not scrape Slack, mail, or DMs.
-- Do not treat a Slack/webmail URL as a legal excerpt source.
-- Do not kill product talk such as a Slack integration or a support inbox.
+- Live publish, X empty-feed gate (#27), reply-without-new-thought (#41)
 
 ## Notes
 
-- Neighbors: #47 (secret does not leave) and #119 (quote only from feedback with a URL). This issue is the channel, not the token.
-- A Slack / Gmail / Outlook host is not a public issue. Anonymized still counts.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
