@@ -27,12 +27,14 @@ from influenzer.playbook import (
     StoryKind,
     Verdict,
     is_blog_host_url,
+    is_ranking_host_url,
     is_store_host_url,
     is_video_host_url,
     invented_metric_reason,
     looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
+    looks_like_ranking_dump,
     looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
@@ -220,6 +222,33 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_blog_host_url("https://example.com/medium"))
         self.assertFalse(is_blog_host_url("https://notmedium.com/we-shipped"))
         self.assertFalse(is_blog_host_url("https://medium.com.evil.com/we-shipped"))
+
+    def test_ranking_host_is_hn_star_chart_or_badge_not_a_repo(self) -> None:
+        charts = (
+            "https://news.ycombinator.com/item?id=123",
+            "https://news.ycombinator.com/",
+            "https://hn.algolia.com/?q=influenzer",
+            "https://star-history.com/#mikolaj92/influenzer",
+            "https://star-history.t9t.io/#mikolaj92/influenzer",
+            "https://img.shields.io/github/stars/mikolaj92/influenzer",
+            "https://shields.io/github/stars/mikolaj92/influenzer",
+            "https://gitstar-ranking.com/mikolaj92/influenzer",
+            "https://github.com/mikolaj92/influenzer/stargazers",
+            "https://github.com/mikolaj92/influenzer/watchers",
+            "https://github.com/trending",
+        )
+        for url in charts:
+            with self.subTest(url=url):
+                self.assertTrue(is_ranking_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+                self.assertFalse(is_store_host_url(url))
+                self.assertFalse(is_blog_host_url(url))
+        self.assertFalse(is_ranking_host_url(SHIP_REPO))
+        self.assertFalse(is_ranking_host_url(SHIP_PR))
+        self.assertFalse(is_ranking_host_url("https://example.com/hn-front"))
+        self.assertFalse(is_ranking_host_url("https://notnews.ycombinator.com/item?id=1"))
+        self.assertFalse(is_ranking_host_url("https://news.ycombinator.com.evil.com/item?id=1"))
 
     def test_superlative_is_revolutionary_worlds_first_or_ai_powered(self) -> None:
         slogans = (
@@ -458,6 +487,43 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_thread(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_ranking_dump_is_hn_front_star_counter_or_vanity_chart(self) -> None:
+        dumps = (
+            "HN front for the local tick",
+            "hacker news front page",
+            "front page of HN",
+            "on the HN front",
+            "top on Hacker News",
+            "#1 on HN",
+            "star count in the README",
+            "star-counter in the corner",
+            "stars in the corner",
+            "licznik gwiazdek",
+            "gwiazdki w kącie",
+            "zrzut rankingu",
+            "ranking dump of the local tick",
+            "wykres próżności",
+            "vanity chart",
+            "stargazers this week",
+        )
+        for text in dumps:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_ranking_dump(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "ranking_not_an_artifact",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "star the repo after you try it",
+            "product dashboard for the local tick",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_ranking_dump(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_hashtag_wall_is_a_tag_dump_not_one_inline_tag(self) -> None:
@@ -844,6 +910,27 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_ranking_dump_is_killed(self) -> None:
+        dumps = (
+            "HN front for the local tick",
+            "stars in the corner",
+            "zrzut rankingu",
+            "vanity chart",
+        )
+        for text in dumps:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "ranking_not_an_artifact")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_hashtag_wall_is_killed(self) -> None:
         walls = (
             "#buildinpublic #saas #ai",
@@ -1216,6 +1303,49 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "hn_not_a_blog")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_hn_front_star_chart_or_badge_as_only_url_is_not_an_artifact(self) -> None:
+        charts = (
+            "https://news.ycombinator.com/item?id=123",
+            "https://star-history.com/#mikolaj92/influenzer",
+            "https://img.shields.io/github/stars/mikolaj92/influenzer",
+            "https://github.com/mikolaj92/influenzer/stargazers",
+        )
+        for url in charts:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="see the snapshot", artifact_url=url),
+                        Fact(text="strangers can click the page today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "ranking_not_an_artifact")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_ranking_chart_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="chart as evidence",
+                    artifact_url="https://star-history.com/#mikolaj92/influenzer",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("star-history.com", decision.draft.body)
 
     def test_listicle_or_clickbait_title_is_not_show_hn(self) -> None:
         bait = (

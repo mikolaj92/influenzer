@@ -30,6 +30,7 @@ from influenzer.playbook import (
     has_named_subreddit,
     is_blog_host_url,
     is_merge_log_texts,
+    is_ranking_host_url,
     is_ship_artifact_url,
     is_social_arena,
     is_store_host_url,
@@ -38,6 +39,7 @@ from influenzer.playbook import (
     looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
+    looks_like_ranking_dump,
     looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
@@ -47,6 +49,7 @@ from influenzer.playbook import (
     looks_like_store_pitch,
     looks_like_superlative,
     looks_like_waitlist,
+    ranking_urls_only,
     unquotable_reason,
 )
 
@@ -288,6 +291,7 @@ def _has_clickable_url(brief: Brief) -> bool:
             and not is_video_host_url(url)
             and not is_store_host_url(url)
             and not is_blog_host_url(url)
+            and not is_ranking_host_url(url)
         ):
             return True
     return False
@@ -321,6 +325,11 @@ def _blog_only_urls(brief: Brief) -> bool:
     if any(is_ship_artifact(url) for url in urls):
         return False
     return all(is_blog_host_url(url) for url in urls)
+
+
+def _ranking_only_urls(brief: Brief) -> bool:
+    """True when every artifact URL is HN / star-history / shields and none is a repo."""
+    return ranking_urls_only(brief_artifacts(brief))
 
 
 def _enough_social_substance(brief: Brief) -> bool:
@@ -378,6 +387,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "hn_not_a_store"
     if arena is ArenaId.HN and _blog_only_urls(brief):
         return Verdict.KILL, "hn_not_a_blog"
+    if arena is ArenaId.HN and _ranking_only_urls(brief):
+        return Verdict.KILL, "ranking_not_an_artifact"
     title = next(iter(_wearable_fact_texts(brief)), "")
     if arena is ArenaId.HN and looks_like_listicle_title(title):
         return Verdict.KILL, "hn_not_a_listicle"
@@ -438,6 +449,8 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "contest")
     if looks_like_thread(blob):
         return _kill(brief, "thread")
+    if looks_like_ranking_dump(blob):
+        return _kill(brief, "ranking_not_an_artifact")
     if looks_like_hashtag_wall(blob):
         return _kill(brief, "hashtag_wall")
     if brief.story_kind is StoryKind.EXPLORATION:

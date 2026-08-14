@@ -41,11 +41,13 @@ from influenzer.playbook import (
     has_named_subreddit,
     is_blog_host_url,
     is_merge_log_texts,
+    is_ranking_host_url,
     is_store_host_url,
     is_video_host_url,
     looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
+    looks_like_ranking_dump,
     looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
@@ -128,6 +130,7 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
             and not is_video_host_url(url)
             and not is_store_host_url(url)
             and not is_blog_host_url(url)
+            and not is_ranking_host_url(url)
             and url not in found
         ):
             found.append(url)
@@ -253,7 +256,13 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     if looks_like_listicle_title(title_src) or looks_like_shouty_title(title_src) or looks_like_emoji_title(title_src):
         return None
     url = _proof_url(bits)
-    if not url or is_video_host_url(url) or is_store_host_url(url) or is_blog_host_url(url):
+    if (
+        not url
+        or is_video_host_url(url)
+        or is_store_host_url(url)
+        or is_blog_host_url(url)
+        or is_ranking_host_url(url)
+    ):
         return None
     if looks_like_store_pitch("\n".join((bits.one_liner, *bits.rest))):
         return None
@@ -423,6 +432,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_engagement_bait(bits.blob)
         or looks_like_contest(bits.blob)
         or looks_like_thread(bits.blob)
+        or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
     ):
         return None
@@ -440,6 +450,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_engagement_bait(body)
         or looks_like_contest(body)
         or looks_like_thread(body)
+        or looks_like_ranking_dump(body)
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
     ):
