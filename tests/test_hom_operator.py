@@ -33,6 +33,7 @@ from influenzer.playbook import (
     looks_like_dunk,
     looks_like_engagement_bait,
     looks_like_emoji_title,
+    looks_like_hashtag_wall,
     looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_shouty_title,
@@ -381,6 +382,31 @@ class PlaybookCopyTests(unittest.TestCase):
             )
         )
 
+    def test_hashtag_wall_is_a_tag_dump_not_one_inline_tag(self) -> None:
+        walls = (
+            "#buildinpublic #saas #ai",
+            "Local tick scores briefs #buildinpublic #saas #indiehackers",
+            "Local tick scores briefs\n#buildinpublic #saas",
+            "#buildinpublic",
+        )
+        for text in walls:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_hashtag_wall(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "hashtag_wall",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Local tick scores briefs #buildinpublic",
+            "Unlike Loki, this scores briefs locally #buildinpublic",
+            "Merged PR #190: Treat GitHub repo root as a ship artifact",
+            f"A stranger asked on {FEEDBACK_COMMENT}",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_hashtag_wall(text))
+
 
 class ScoreBriefTests(unittest.TestCase):
     def _brief(self, **overrides: object) -> Brief:
@@ -651,6 +677,41 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "engagement_bait")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_hashtag_wall_is_killed(self) -> None:
+        walls = (
+            "#buildinpublic #saas #ai",
+            "Local tick scores briefs #buildinpublic #saas #indiehackers",
+            "Local tick scores briefs\n#buildinpublic #saas",
+        )
+        for text in walls:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hashtag_wall")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_one_inline_hashtag_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs #buildinpublic", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn("#buildinpublic", decision.draft.body)
 
     def test_naming_a_predecessor_or_offering_help_can_still_draft(self) -> None:
         allowed = (

@@ -1,33 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=114 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=113 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #114 — Bait na klik to nie kąt
+Issue: #113 — Ściana hashtagów to nie kostium
 
 ## Goal
 
-Bait na klik to nie kąt. „Agree?”, „like if”, „comment one word”, strzałka w dół = cisza. Pytanie z feedbacku jest ok; prośba o gest nie.
+Ściana hashtagów to nie kostium. Draft z dumpem tagów (więcej niż jeden-dwa, albo sam ogonek tagów) = cisza. Dwór i agora nie są katalogiem SEO.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_engagement_bait` + `ENGAGEMENT_BAIT_RE`
-- `influenzer/hom.py` — score kill `engagement_bait`
-- `influenzer/hom_draft.py` — dress fail-closed even if score says draft
-- `tests/test_hom_operator.py` — detector + score tests
-- `tests/test_hom_draft.py` — dress silence vs feedback question
+- `influenzer/playbook.py` — `looks_like_hashtag_wall`; court/agora wave lines
+- `influenzer/hom.py` — score kill `hashtag_wall`
+- `influenzer/hom_draft.py` — dress silence on blob and body
+- `tests/test_hom_operator.py` — detector + score
+- `tests/test_hom_draft.py` — dress fail-closed on HN/X/LinkedIn
 
 ## Test plan
 
-- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q --tb=short`
+- `python3 -m pytest tests/test_hom_draft.py tests/test_hom_operator.py -q --tb=short`
 
 ## Non-goals
 
-- Do not treat a sourced feedback question as bait.
-- Do not invent a new costume or arena.
+- Do not invent a new costume. One or two inline tags can stay.
+- Do not treat `#190` / URL fragments as tags.
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Same fail-closed pattern as #114 (engagement bait) and #116 (dunking).
+- Neighbor of #45 (voice) and #63 (format): court and agora stay insight/reply, not an SEO catalog.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
