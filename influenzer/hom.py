@@ -38,6 +38,7 @@ from influenzer.playbook import (
     looks_like_commit_noise,
     looks_like_contest,
     looks_like_dunk,
+    looks_like_foreign_wave,
     looks_like_engagement_bait,
     looks_like_ranking_dump,
     looks_like_thread,
@@ -444,6 +445,8 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "superlative_without_proof")
     if looks_like_dunk(blob):
         return _kill(brief, "dunking")
+    if looks_like_foreign_wave(_fact_triples(brief)):
+        return _kill(brief, "foreign_wave")
     if looks_like_engagement_bait(blob):
         return _kill(brief, "engagement_bait")
     if looks_like_contest(blob):

@@ -309,6 +309,62 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("Loki sucks", dumped)
         self.assertNotIn("Show HN:", dumped)
 
+    def test_foreign_wave_is_undressable_even_when_score_says_draft(self) -> None:
+        parent = "https://x.com/other/status/123456789"
+        brief = _ship_brief(
+            facts=(
+                Fact(kind="parent", text="rising mid-KOL post", artifact_url=parent),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.X,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.X].wave,
+            canon_url=ARENAS[ArenaId.X].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "x",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.X].wave),
+                    "canon_url": ARENAS[ArenaId.X].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        dumped = json.dumps(payload)
+        self.assertNotIn(parent, dumped)
+        self.assertNotIn("rising mid-KOL", dumped)
+
+    def test_reply_under_our_ship_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.X,
+            facts=(
+                Fact(
+                    kind="parent",
+                    text="Show HN about mikolaj92/influenzer",
+                    artifact_url="https://news.ycombinator.com/item?id=1",
+                ),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("Show HN about mikolaj92/influenzer", decision.draft.body)
+
     def test_naming_a_predecessor_can_still_dress(self) -> None:
         brief = _ship_brief(
             preferred_arena=ArenaId.HN,
