@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from github_survey import GhCall, classify_gh_argv, run_gh, survey_public_repo
-from github_survey.gh import decode_gh_bytes, isolated_gh_cwd, loads_json, required_json
+from github_survey.gh import decode_gh_bytes, gh_argv, isolated_gh_argv, isolated_gh_cwd, loads_json, required_json
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -202,3 +202,41 @@ class RunGhTests(unittest.TestCase):
         self.assertEqual(call.returncode, 0)
         self.assertEqual(call.stdout, "")
         self.assertEqual(call.stderr, "")
+
+    def test_gh_is_argv_list_never_a_shell_string(self) -> None:
+        self.assertEqual(gh_argv(["repo", "view", REPO]), ["gh", "repo", "view", REPO])
+        self.assertTrue(isolated_gh_argv(["gh", "repo", "view", REPO]))
+        self.assertIsNone(gh_argv(f"gh repo view {REPO}; rm -rf /"))
+        self.assertFalse(isolated_gh_argv(f"gh repo view {REPO}; rm -rf /"))
+        self.assertFalse(isolated_gh_argv(["sh", "-c", f"gh repo view {REPO}"]))
+        self.assertIsNone(gh_argv(None))
+        seen: list[object] = []
+
+        def fake_run(*args, **kwargs):
+            cmd = args[0] if args else kwargs.get("args")
+            seen.append(cmd)
+            self.assertIsInstance(cmd, list)
+            self.assertEqual(cmd[0], "gh")
+            self.assertFalse(kwargs.get("shell", False))
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"{}", stderr=b"")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(seen, [["gh", "repo", "view", REPO]])
+
+    def test_shell_string_or_bad_slug_is_silence_not_a_spawn(self) -> None:
+        def fake_run(*args, **kwargs):
+            raise AssertionError("gh must not spawn a shell string or a bad slug")
+
+        with patch("subprocess.run", side_effect=fake_run):
+            shell = run_gh("repo view owner/name; id")  # type: ignore[arg-type]
+            bad = run_gh(["repo", "view", "owner/name; id"])
+            injected = run_gh(["api", "repos/owner/name;id/readme"])
+        self.assertEqual(shell.returncode, 0)
+        self.assertEqual(shell.stdout, "")
+        self.assertEqual(shell.stderr, "")
+        self.assertEqual(bad.returncode, 0)
+        self.assertEqual(bad.stdout, "")
+        self.assertEqual(injected.returncode, 0)
+        self.assertEqual(injected.stdout, "")

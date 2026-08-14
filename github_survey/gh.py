@@ -2,6 +2,10 @@
 
 The child cwd is an empty temporary directory, never HOME and never the host
 checkout. A cwd outside that empty temp is silence, not a spawn.
+
+gh is always an argv list, never a shell string. A watch slug is validated
+before it reaches the process. A string from the database does not compose
+a command.
 """
 
 from __future__ import annotations
@@ -35,7 +39,7 @@ GhRunner = Callable[[Sequence[str]], GhCall]
 
 
 def invalid_repo_reason(repo_slug: str) -> str | None:
-    if not REPO_RE.fullmatch(repo_slug.strip()):
+    if not isinstance(repo_slug, str) or not REPO_RE.fullmatch(repo_slug.strip()):
         return "repo must be owner/name"
     return None
 
@@ -121,6 +125,45 @@ def isolated_gh_cwd(path: Path) -> bool:
     )
 
 
+def _argv_repo_slug(argv: Sequence[str]) -> str | None:
+    """Repo slug that would reach the child, if this argv carries one."""
+    if len(argv) >= 4 and argv[0] == "gh" and argv[1] == "repo" and argv[2] == "view":
+        return argv[3]
+    if "--repo" in argv:
+        index = argv.index("--repo")
+        if index + 1 < len(argv):
+            return argv[index + 1]
+    if len(argv) >= 3 and argv[0] == "gh" and argv[1] == "api":
+        parts = str(argv[2]).split("/")
+        if len(parts) >= 3 and parts[0] == "repos":
+            return f"{parts[1]}/{parts[2].split('?', 1)[0]}"
+    return None
+
+
+def gh_argv(argv: object) -> list[str] | None:
+    """Build the child argv. A shell string is not a command."""
+    if isinstance(argv, (str, bytes, bytearray)) or not isinstance(argv, Sequence):
+        return None
+    tokens = list(argv)
+    if not tokens or any(not isinstance(item, str) or "\x00" in item for item in tokens):
+        return None
+    return ["gh", *tokens]
+
+
+def isolated_gh_argv(argv: object) -> bool:
+    """True only for an argv list headed by gh. A shell string is silence."""
+    if isinstance(argv, (str, bytes, bytearray)) or not isinstance(argv, Sequence):
+        return False
+    if not argv or argv[0] != "gh":
+        return False
+    if any(not isinstance(item, str) or "\x00" in item for item in argv):
+        return False
+    slug = _argv_repo_slug(argv)
+    if slug is not None and invalid_repo_reason(slug):
+        return False
+    return True
+
+
 def _remove_gh_cwd(cwd: str | None) -> None:
     if cwd is None:
         return
@@ -136,15 +179,19 @@ def _remove_gh_cwd(cwd: str | None) -> None:
 def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
     cwd: str | None = None
     try:
+        child_argv = gh_argv(argv)
+        if child_argv is None or not isolated_gh_argv(child_argv):
+            return GhCall(returncode=0, stdout="", stderr="")
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
         completed = subprocess.run(
-            ["gh", *argv],
+            child_argv,
             capture_output=True,
             timeout=timeout,
             check=False,
             cwd=cwd,
+            shell=False,
         )
     except FileNotFoundError:
         return GhCall(returncode=127, stdout="", stderr="gh not found", missing=True)
