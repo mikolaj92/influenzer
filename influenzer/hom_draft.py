@@ -40,6 +40,7 @@ from influenzer.playbook import (
     has_fair_hook,
     has_named_subreddit,
     is_blog_host_url,
+    is_launch_host_url,
     is_merge_log_texts,
     is_news_host_url,
     is_ranking_host_url,
@@ -64,6 +65,7 @@ from influenzer.playbook import (
     looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    looks_like_launch_pitch,
     looks_like_superlative,
     looks_like_login_gate,
     looks_like_roadmap,
@@ -140,6 +142,7 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
             and not is_video_host_url(url)
             and not is_store_host_url(url)
             and not is_blog_host_url(url)
+            and not is_launch_host_url(url)
             and not is_ranking_host_url(url)
             and not is_news_host_url(url)
             and url not in found
@@ -289,11 +292,14 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
         or is_video_host_url(url)
         or is_store_host_url(url)
         or is_blog_host_url(url)
+        or is_launch_host_url(url)
         or is_ranking_host_url(url)
         or is_news_host_url(url)
     ):
         return None
     if looks_like_store_pitch("\n".join((bits.one_liner, *bits.rest))):
+        return None
+    if looks_like_launch_pitch("\n".join((bits.one_liner, *bits.rest))):
         return None
     parts = [_show_hn_title(bits.one_liner), url]
     backstory = _join_rest(bits)

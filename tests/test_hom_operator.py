@@ -27,6 +27,7 @@ from influenzer.playbook import (
     StoryKind,
     Verdict,
     is_blog_host_url,
+    is_launch_host_url,
     is_news_host_url,
     is_ranking_host_url,
     is_store_host_url,
@@ -54,6 +55,7 @@ from influenzer.playbook import (
     looks_like_world_commentary,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    looks_like_launch_pitch,
     looks_like_superlative,
     metric_tokens,
     quote_without_sourced_excerpt,
@@ -234,6 +236,29 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_blog_host_url("https://notmedium.com/we-shipped"))
         self.assertFalse(is_blog_host_url("https://medium.com.evil.com/we-shipped"))
 
+    def test_launch_host_is_product_hunt_or_betalist_not_a_repo(self) -> None:
+        boards = (
+            "https://www.producthunt.com/posts/local-tick",
+            "https://producthunt.com/posts/local-tick",
+            "https://www.betalist.com/startups/local-tick",
+            "https://betalist.com/startups/local-tick",
+        )
+        for url in boards:
+            with self.subTest(url=url):
+                self.assertTrue(is_launch_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+                self.assertFalse(is_store_host_url(url))
+                self.assertFalse(is_blog_host_url(url))
+        self.assertFalse(is_launch_host_url(SHIP_REPO))
+        self.assertFalse(is_launch_host_url("https://example.com/producthunt"))
+        self.assertFalse(is_launch_host_url("https://notproducthunt.com/posts/local-tick"))
+        self.assertFalse(is_launch_host_url("https://producthunt.com.evil.com/posts/local-tick"))
+        self.assertTrue(looks_like_launch_pitch("launch on PH today"))
+        self.assertTrue(looks_like_launch_pitch("we launched on Product Hunt"))
+        self.assertTrue(looks_like_launch_pitch("see us on BetaList"))
+        self.assertFalse(looks_like_launch_pitch("a stranger can click and run the demo"))
+
     def test_ranking_host_is_hn_star_chart_or_badge_not_a_repo(self) -> None:
         charts = (
             "https://news.ycombinator.com/item?id=123",
@@ -255,6 +280,7 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertFalse(is_video_host_url(url))
                 self.assertFalse(is_store_host_url(url))
                 self.assertFalse(is_blog_host_url(url))
+                self.assertFalse(is_launch_host_url(url))
         self.assertFalse(is_ranking_host_url(SHIP_REPO))
         self.assertFalse(is_ranking_host_url(SHIP_PR))
         self.assertFalse(is_ranking_host_url("https://example.com/hn-front"))
@@ -1994,6 +2020,68 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "hn_not_a_blog")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_hunt_or_betalist_as_only_url_is_not_show_hn(self) -> None:
+        boards = (
+            "https://www.producthunt.com/posts/local-tick",
+            "https://producthunt.com/posts/local-tick",
+            "https://www.betalist.com/startups/local-tick",
+            "https://betalist.com/startups/local-tick",
+        )
+        for url in boards:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="see the launch card", artifact_url=url),
+                        Fact(text="strangers can click the board today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_an_aggregator")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_launch_on_ph_pitch_is_not_show_hn(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(
+                    text="launch on PH from our homepage",
+                    artifact_url="https://example.com/demo",
+                ),
+                Fact(text="strangers can click the board today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "hn_not_an_aggregator")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_launch_board_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="also listed on the launch board as evidence",
+                    artifact_url="https://www.producthunt.com/posts/local-tick",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("producthunt.com", decision.draft.body)
 
     def test_hn_front_star_chart_or_badge_as_only_url_is_not_an_artifact(self) -> None:
         charts = (
