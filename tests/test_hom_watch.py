@@ -18,7 +18,7 @@ from influenzer.cli import setup_parser
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.hom_watch import interval_tick, set_watch, show_watch
+from influenzer.hom_watch import get_watch, interval_tick, set_watch, show_watch
 from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
@@ -231,6 +231,17 @@ class HomWatchTests(unittest.TestCase):
         missing = set_watch(self.repo, project_id="nope", repo_slug=REPO)
         self.assertEqual(missing["reason"], "project not found")
         self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_poisoned_watch_slug_is_silence_not_a_process(self) -> None:
+        poison = "owner/name; rm -rf /"
+        self.repo.set_hom_watch("app-1", poison, created_at=NOW)
+        self.assertEqual(self.repo.get_hom_watch()["repo"], poison)
+        self.assertIsNone(get_watch(self.repo))
+        out, fake = self._tick()
+        self.assertNotIn("scan", out)
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse(out.get("published", False))
 
 
 class HomWatchCLIFAlaTests(unittest.TestCase):

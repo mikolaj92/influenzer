@@ -35,10 +35,14 @@ class Watch:
 
 
 def get_watch(repo: StateRepository) -> Watch | None:
+    """Declared watch, or None. A bad slug from the database is silence."""
     row = repo.get_hom_watch()
     if row is None:
         return None
-    return Watch(project_id=row["project_id"], repo_slug=row["repo"], created_at=row["created_at"])
+    slug = str(row["repo"] or "").strip()
+    if invalid_repo_reason(slug):
+        return None
+    return Watch(project_id=row["project_id"], repo_slug=slug, created_at=row["created_at"])
 
 
 def set_watch(
@@ -88,7 +92,7 @@ def interval_tick(
     clock = now or utc_now()
     if allow_hom_pass:
         watch = get_watch(repo)
-        if watch is not None:
+        if watch is not None and not invalid_repo_reason(watch.repo_slug):
             blocked = scan_due_reason(
                 repo,
                 project_id=watch.project_id,
