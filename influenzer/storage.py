@@ -20,6 +20,7 @@ from .domain import content_hash
 from .hom import Brief, Draft, Score, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
 from .playbook import ArenaId, StoryKind, Verdict
+from .security import chmod_private_file, mkdir_private
 
 
 class StorageError(RuntimeError):
@@ -114,7 +115,7 @@ class ArtifactStore:
 
     def __init__(self, root: str | os.PathLike[str]):
         self.root = Path(root) / "sha256"
-        self.root.mkdir(parents=True, exist_ok=True)
+        mkdir_private(self.root, parents=True)
 
     def put(self, data: bytes, *, media_type: str = "application/octet-stream") -> dict[str, Any]:
         digest = hashlib.sha256(data).hexdigest()
@@ -143,7 +144,7 @@ class StateRepository:
 
     def __init__(self, db_path: str | os.PathLike[str], *, artifact_root: str | os.PathLike[str] | None = None):
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        mkdir_private(self.db_path.parent, parents=True)
         self.artifacts = ArtifactStore(artifact_root or self.db_path.parent / "artifacts")
         raw = sqlite3.connect(self.db_path, timeout=30, isolation_level=None)
         raw.row_factory = sqlite3.Row
@@ -151,6 +152,10 @@ class StateRepository:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA busy_timeout = 30000")
         self.conn.execute("PRAGMA journal_mode = WAL")
+        chmod_private_file(self.db_path)
+        for sidecar in (Path(f"{self.db_path}-wal"), Path(f"{self.db_path}-shm")):
+            if sidecar.exists():
+                chmod_private_file(sidecar)
         migrate(raw)
 
     def close(self) -> None:

@@ -12,7 +12,7 @@ from typing import Any
 from urllib.parse import urlencode, urlparse
 
 from influenzer import __version__
-from influenzer.config import Config, load_config, write_config
+from influenzer.config import Config, ensure_home, load_config, write_config
 from influenzer.domain import (
     AccountStatus,
     Campaign,
@@ -270,8 +270,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
 
 def _repo(args: argparse.Namespace) -> StateRepository:
     cfg = load_config(args.config)
-    cfg.home.mkdir(parents=True, exist_ok=True)
-    (cfg.home / "artifacts" / "sha256").mkdir(parents=True, exist_ok=True)
+    ensure_home(cfg.home)
     return StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts")
 
 
@@ -290,8 +289,7 @@ def handle_cli(args: argparse.Namespace) -> int:
         home = Path(args.home) if getattr(args, "home", None) else cfg.home
         config_file = Path(args.config) if args.config else home / "config.json"
         write_config(config_file, Config(home=home))
-        home.mkdir(parents=True, exist_ok=True)
-        (home / "artifacts" / "sha256").mkdir(parents=True, exist_ok=True)
+        ensure_home(home)
         # Open once so schema migrates.
         with StateRepository(home / "state.db", artifact_root=home / "artifacts"):
             pass

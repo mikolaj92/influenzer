@@ -200,14 +200,22 @@ def mode_is_looser(mode: int, allowed: int) -> bool:
 
 
 def require_mode(path: Path, allowed: int) -> None:
-    """Fail closed when an existing path is world/group-readable or otherwise looser."""
+    """Make an existing path private. Fail closed if it remains looser."""
     if not path.exists():
         return
     mode = file_mode(path)
     if mode_is_looser(mode, allowed):
-        raise WorkspacePermissionError(
-            f"{path} mode {mode:04o} is looser than {allowed:04o}"
-        )
+        try:
+            os.chmod(path, allowed)
+        except OSError as exc:
+            raise WorkspacePermissionError(
+                f"{path} mode {mode:04o} is looser than {allowed:04o}"
+            ) from exc
+        mode = file_mode(path)
+        if mode_is_looser(mode, allowed):
+            raise WorkspacePermissionError(
+                f"{path} mode {mode:04o} is looser than {allowed:04o}"
+            )
 
 
 def mkdir_private(path: Path, *, parents: bool = False) -> Path:
