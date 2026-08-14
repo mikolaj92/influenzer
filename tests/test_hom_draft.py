@@ -150,6 +150,78 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertIsNone(compose_draft(patch_brief, patch_score))
         self.assertIsNone(dress_brief(patch_brief, patch_score))
 
+    def test_hn_refuses_all_caps_title_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            facts=(
+                Fact(text="WE SHIPPED THE OPERATOR TODAY", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "hn",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                    "canon_url": ARENAS[ArenaId.HN].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        self.assertNotIn("Show HN:", json.dumps(payload))
+        self.assertNotIn("WE SHIPPED", json.dumps(payload.get("body") or ""))
+
+    def test_github_refuses_all_caps_title_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.GITHUB,
+            facts=(
+                Fact(text="LOCAL TICK SCORES BRIEFS AND EMITS A DRAFT", artifact_url=SHIP_PR),
+                Fact(text="Dry-run still default"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.GITHUB,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.GITHUB].wave,
+            canon_url=ARENAS[ArenaId.GITHUB].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "github",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.GITHUB].wave),
+                    "canon_url": ARENAS[ArenaId.GITHUB].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        self.assertNotIn("LOCAL TICK", json.dumps(payload.get("body") or ""))
+
     def test_hn_refuses_merged_pr_title_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(
             facts=(

@@ -29,6 +29,7 @@ from influenzer.playbook import (
     is_blog_host_url,
     is_store_host_url,
     is_video_host_url,
+    looks_like_shouting_title,
     looks_like_store_pitch,
 )
 from influenzer.scheduler import tick
@@ -125,6 +126,16 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertTrue(looks_like_store_pitch("download the app on TestFlight"))
         self.assertTrue(looks_like_store_pitch("Get it on the App Store"))
         self.assertFalse(looks_like_store_pitch("a stranger can click and run the demo"))
+
+    def test_shouting_title_is_whole_title_caps_not_one_or_two_acronyms(self) -> None:
+        self.assertTrue(looks_like_shouting_title("WE SHIPPED THE OPERATOR TODAY"))
+        self.assertTrue(looks_like_shouting_title("Show HN: LOCAL TICK SCORES BRIEFS"))
+        self.assertTrue(looks_like_shouting_title("API FOR LOCAL TICK SCORES"))
+        self.assertFalse(looks_like_shouting_title("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_shouting_title("API for local tick scores"))
+        self.assertFalse(looks_like_shouting_title("LLM CLI scores briefs"))
+        self.assertFalse(looks_like_shouting_title("Show HN: API for local tick scores"))
+        self.assertFalse(looks_like_shouting_title(""))
 
     def test_blog_host_is_medium_substack_devto_hashnode_not_a_repo(self) -> None:
         blogs = (
@@ -354,6 +365,48 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "press_release_tone")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_all_caps_title_is_silence_on_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="WE SHIPPED THE OPERATOR TODAY", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "shouting_title")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_all_caps_title_is_silence_on_github(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.GITHUB,
+            facts=(
+                Fact(text="LOCAL TICK SCORES BRIEFS AND EMITS A DRAFT", artifact_url=SHIP_PR),
+                Fact(text="Dry-run still default"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "shouting_title")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_one_or_two_acronyms_in_title_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="API for local tick scores", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN: API for local tick scores"))
 
     def test_youtube_without_package_is_killed(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.YOUTUBE)

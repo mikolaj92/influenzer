@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show.",
+            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no shouting CAPS.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -294,6 +294,8 @@ COMMIT_NOISE_RE = re.compile(
 )
 # A window of merged PRs is changelog, not a clickable product.
 MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
+# Letter-words only. One or two all-caps tokens are acronyms; the whole title in CAPS is a shout.
+TITLE_LETTER_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
@@ -472,6 +474,19 @@ def looks_like_press_release(text: str) -> bool:
     return bool(PRESS_RELEASE_RE.search(text))
 
 
+def looks_like_shouting_title(text: str) -> bool:
+    """True when the whole title is CAPS. One or two acronym words are allowed."""
+    title = text.strip()
+    if title.lower().startswith("show hn:"):
+        title = title.split(":", 1)[1].strip()
+    words = TITLE_LETTER_WORD_RE.findall(title)
+    if not words:
+        return False
+    if not all(word.isupper() for word in words):
+        return False
+    return len(words) > 2
+
+
 def has_named_subreddit(text: str) -> bool:
     return bool(SUBREDDIT_RE.search(text))
 
@@ -526,6 +541,7 @@ __all__ = [
     "looks_like_commit_noise",
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
+    "looks_like_shouting_title",
     "looks_like_store_pitch",
     "looks_like_waitlist",
     "parse_arena",

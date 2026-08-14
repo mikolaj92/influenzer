@@ -1,6 +1,5 @@
 {
   "paths": [
-    "influenzer/host.py",
     "influenzer",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
@@ -30,6 +29,7 @@
     "influenzer/hom_pass.py",
     "influenzer/hom_verdict.py",
     "influenzer/hom_watch.py",
+    "influenzer/host.py",
     "influenzer/migrations.py",
     "influenzer/playbook.py",
     "influenzer/policy.py",
@@ -39,18 +39,11 @@
     "influenzer/storage.py",
     "influenzer/tick.py",
     "influenzer/tick_all.py",
-    "Medium/Substack/dev.to/hashnode"
+    "influenzer/adapters"
   ],
   "source": "deterministic",
-  "seed_paths": [
-    "Medium/Substack/dev.to/hashnode"
-  ],
+  "seed_paths": [],
   "matched_tokens": [
-    "Medium",
-    "Substack",
-    "dev",
-    "hashnode",
-    "host",
     "influenzer"
   ],
   "notes": [
@@ -58,7 +51,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__122-show-hn-nie-jest-blogiem-url-na-medium-s-08cbb81a",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__120-krzykliwy-caps-w-tytule-cisza-na-hn-gith-bc720cb8",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

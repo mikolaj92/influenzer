@@ -45,6 +45,7 @@ from influenzer.playbook import (
     is_video_host_url,
     looks_like_merged_pr_fact,
     looks_like_press_release,
+    looks_like_shouting_title,
     looks_like_store_pitch,
     looks_like_waitlist,
 )
@@ -198,6 +199,8 @@ def _dress_github(bits: CopyBits, score: Score) -> str | None:
     """Workshop: README one-liner → what it is → working quickstart URL."""
     if not bits.one_liner:
         return None
+    if looks_like_shouting_title(bits.one_liner):
+        return None
     lines = [bits.one_liner.rstrip("."), ""]
     what = _join_rest(bits)
     if what:
@@ -224,7 +227,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     title_src = bits.one_liner.strip()
     if title_src.lower().startswith("show hn:"):
         title_src = title_src.split(":", 1)[1].strip()
-    if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
+    if looks_like_shouting_title(title_src) or looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
         return None
     url = _proof_url(bits)
     if not url or is_video_host_url(url) or is_store_host_url(url) or is_blog_host_url(url):
