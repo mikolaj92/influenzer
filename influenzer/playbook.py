@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no blog-as-Show, no store-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -367,6 +367,25 @@ RANKING_DUMP_RE = re.compile(
 
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
+)
+# A calendar is not a ship. Coming Q3 / soon / on the roadmap without a
+# tryable artifact is social silence. Changelog may keep the date.
+# Pair of waitlist: mailing list vs calendar. "as soon as" is not vapor.
+ROADMAP_RE = re.compile(
+    r"(?i)(?:"
+    r"\bon\s+(?:the|our|this)\s+roadmap\b"
+    r"|\bcoming\s+(?:in\s+)?q[1-4]\b"
+    r"|\bcoming\s+(?:this|next)\s+(?:quarter|year|month)\b"
+    r"|\bcoming\s+20\d{2}\b"
+    r"|\b(?:coming|shipping|launching|arriving|dropping|releasing|available)\s+soon\b"
+    r"|(?:^|(?<=[.!?:]\s))soon(?:\s*[.!]|$)"
+    r"|\bplanned\s+for\s+q[1-4]\b"
+    r"|\bna\s+roadmap(?:ie)?\b"
+    r"|\bw\s+roadmap(?:ie)?\b"
+    r"|\bna\s+mapie\s+drogowej\b"
+    r"|\bwkr[oó]tce\b"
+    r"|\bplanowane\s+na\s+q[1-4]\b"
+    r")"
 )
 PRESS_RELEASE_RE = re.compile(
     r"(?i)\b(?:excited to announce|humbled to announce|we are (?:excited|pleased|proud) to|"
@@ -951,6 +970,13 @@ def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
 
+def looks_like_roadmap(text: str) -> bool:
+    """True for Coming Q3 / soon / on the roadmap. A calendar is not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(ROADMAP_RE.search(text))
+
+
 def looks_like_press_release(text: str) -> bool:
     return bool(PRESS_RELEASE_RE.search(text))
 
@@ -1433,6 +1459,7 @@ __all__ = [
     "QUOTE_MARKS",
     "RANKING_DUMP_RE",
     "RANKING_HOSTS",
+    "ROADMAP_RE",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
     "SOURCE_AVAILABLE_LICENSE_RE",
@@ -1493,6 +1520,7 @@ __all__ = [
     "looks_like_emoji_title",
     "looks_like_superlative",
     "looks_like_store_pitch",
+    "looks_like_roadmap",
     "looks_like_waitlist",
     "parse_arena",
     "quote_without_sourced_excerpt",

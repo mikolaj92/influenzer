@@ -47,6 +47,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_roadmap,
     looks_like_source_available_as_oss,
     looks_like_source_available_license,
     looks_like_world_commentary,
@@ -766,6 +767,42 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertFalse(looks_like_hire_fundraise(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
+    def test_roadmap_is_a_calendar_not_a_ship(self) -> None:
+        vapor = (
+            "coming Q3",
+            "Coming in Q4",
+            "coming this quarter",
+            "coming next year",
+            "coming 2027",
+            "soon",
+            "shipping soon",
+            "on the roadmap",
+            "planned for Q2",
+            "na roadmapie",
+            "w roadmapie",
+            "na mapie drogowej",
+            "wkrotce",
+            "wkrótce",
+            "planowane na Q3",
+        )
+        for text in vapor:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_roadmap(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "as soon as you install, the local tick scores",
+            "the timeout fires too soon",
+            "soon after install the local tick scores",
+            "roadmap.md lists shipped gates",
+            "the product roadmap page is a changelog",
+            "soon-to-be-deleted cache is gone after install",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_roadmap(text))
+
     def test_source_available_plus_open_source_is_a_license_lie(self) -> None:
         lies = (
             "BUSL open source",
@@ -1077,6 +1114,54 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_roadmap_ship_claim_is_killed(self) -> None:
+        vapor = (
+            "coming Q3",
+            "on the roadmap",
+            "shipping soon",
+            "na roadmapie",
+            "wkrótce",
+        )
+        for text in vapor:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "roadmap_not_a_ship")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_roadmap_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="coming Q3", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "roadmap_not_a_ship")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_roadmap_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="as soon as you install, the local tick scores"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_superlative_without_tryable_artifact_is_killed(self) -> None:
         slogans = (
