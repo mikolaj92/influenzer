@@ -43,6 +43,7 @@ from influenzer.playbook import (
     is_merge_log_texts,
     is_store_host_url,
     is_video_host_url,
+    looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
     looks_like_emoji_title,
@@ -419,6 +420,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or _superlative_without_proof(brief, bits)
         or looks_like_dunk(bits.blob)
         or looks_like_engagement_bait(bits.blob)
+        or looks_like_contest(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
     ):
         return None
@@ -434,6 +436,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or unquotable_reason(triples, extra=body)
         or looks_like_dunk(body)
         or looks_like_engagement_bait(body)
+        or looks_like_contest(body)
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
     ):

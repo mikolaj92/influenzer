@@ -1,33 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=112 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=135 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #112 — Draft nie pinguje ludzi
+Issue: #135 — Konkurs nie jest kątem
 
 ## Goal
 
-Draft nie pinguje ludzi. Żadnego znaku at plus login w body. Nie zaciągamy kogoś do wątku. Strip albo cisza.
+Konkurs nie jest kątem. Giveaway, raffle, „RT to win”, nagroda za follow = cisza. To nie produkt.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — detect `@login`, strip it, fail-closed on operator summons
-- `influenzer/hom_draft.py` — strip mentions from wearable copy; silence leftover summons
-- `tests/test_hom_draft.py`
-- `tests/test_hom_operator.py`
+- `influenzer/playbook.py` — contest detector (`CONTEST_RE`, `looks_like_contest`) and `unquotable_reason`
+- `influenzer/hom.py` — score a contest brief as kill
+- `influenzer/hom_draft.py` — refuse to dress a leaked contest draft
+- `tests/test_hom_operator.py` — detector + score kill
+- `tests/test_hom_draft.py` — undressable even when score says draft
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_draft.py tests/test_hom_operator.py tests/test_hom_pass.py tests/test_hom_feedback.py tests/test_hom_outbox.py`
+- `python3 -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
 
 ## Non-goals
 
-- Do not change github_feedback ingest (`@login:` stays as source attribution).
-- Do not treat emails or URL paths (`medium.com/@someone`) as pings.
+- Do not treat "follow the README" / "star the repo after you try it" as a contest.
+- Do not start collection or publish.
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- Fail-closed: operator `@login` in a signal = kill / undressable. Feedback `@login:` prefix is stripped from the dressed body.
+- Same fail-closed shape as #114 (engagement bait) and #130 (hire/fundraise): playbook regex, score kill, dress silence.
+- Neighbors: #28 (no begging for stars/RT) is a gesture ask; this issue is a contest, not a gesture.
