@@ -35,6 +35,7 @@ from influenzer.playbook import (
     is_store_host_url,
     is_video_host_url,
     looks_like_commit_noise,
+    looks_like_listicle_title,
     looks_like_press_release,
     looks_like_store_pitch,
     looks_like_waitlist,
@@ -364,6 +365,9 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "hn_not_a_store"
     if arena is ArenaId.HN and _blog_only_urls(brief):
         return Verdict.KILL, "hn_not_a_blog"
+    title = next(iter(_wearable_fact_texts(brief)), "")
+    if arena is ArenaId.HN and looks_like_listicle_title(title):
+        return Verdict.KILL, "hn_not_a_listicle"
     if gate.require_clickable_url and not _has_clickable_url(brief):
         return Verdict.KILL, gate.reason
     if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
