@@ -42,6 +42,7 @@ from influenzer.playbook import (
     looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
+    looks_like_hire_fundraise,
     looks_like_invented_opinion,
     looks_like_listicle_title,
     looks_like_person_mention,
@@ -716,6 +717,51 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_world_commentary(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_hire_fundraise_is_not_a_product(self) -> None:
+        notices = (
+            "we're hiring a CMO",
+            "we are hiring engineers",
+            "hiring for a founding engineer",
+            "join our team",
+            "open roles on the product team",
+            "job board is live",
+            "now hiring",
+            "we are raising a seed round",
+            "fundraise: series A",
+            "closed our seed round",
+            "announcing our series A",
+            "team offsite next week",
+            "rekrutacja na CMO",
+            "szukamy osoby do produktu",
+            "otwarte stanowisko: engineer",
+            "tablica ogłoszeń",
+            "runda seed zamknięta",
+            "wyjazd zespołu w góry",
+        )
+        for text in notices:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_hire_fundraise(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "hire_fundraise",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "star the repo after you try it",
+            "Unlike Loki, this scores briefs locally",
+            "job application form validates a resume",
+            "funding README explains how the grant is spent",
+            "hire the local tick to score briefs",
+            "round-trip the draft through dress",
+            "seed the ICP graph with two-line adds",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_hire_fundraise(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_private_conversation_is_slack_mail_or_dm_not_a_public_issue(self) -> None:
@@ -1408,6 +1454,42 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_hire_fundraise_is_killed(self) -> None:
+        notices = (
+            "we're hiring a CMO",
+            "we are raising a seed round",
+            "team offsite next week",
+            "rekrutacja na CMO",
+            "tablica ogłoszeń",
+        )
+        for text in notices:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hire_fundraise")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_hire_fundraise_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="job application form validates a resume"),
             ),
         )
         score = score_brief(brief)
