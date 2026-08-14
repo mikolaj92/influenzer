@@ -10,16 +10,21 @@ a command.
 GhRunner has a positive allowlist: read-only catalog (repo view, pr list,
 release list, GET api). An argv outside that catalog is silence, not a
 comment, label, close, or push. The catalog is the latch, not compose.
+
+The child environment is an allowlist, never the host world. Host secrets
+do not reach the process. Only what gh must have. An env outside the
+allowlist is silence, not a spawn.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,6 +35,28 @@ _LIMIT_RE = re.compile(r"^[1-9]\d{0,2}$")
 _FIELDS_RE = re.compile(r"^[A-Za-z0-9_]+(?:,[A-Za-z0-9_]+)*$")
 _SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _SLUG_PATH = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
+_GH_ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+GH_CHILD_ENV_ALLOWLIST = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TZ",
+        "TMPDIR",
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_ENTERPRISE_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GH_HOST",
+        "GH_CONFIG_DIR",
+        "GH_NO_UPDATE_NOTIFIER",
+        "GH_PROMPT_DISABLED",
+        "NO_COLOR",
+        "XDG_CONFIG_HOME",
+    }
+)
 REPO_JSON_FIELDS = "nameWithOwner,isPrivate,url,description,homepageUrl"
 PR_JSON_FIELDS = "number,title,url,mergedAt,body"
 RELEASE_JSON_FIELDS = "tagName,name,isDraft,isPrerelease,publishedAt"
@@ -291,6 +318,40 @@ def allowlisted_gh_argv(argv: object) -> bool:
     return False
 
 
+def _allowlisted_env_item(key: object, value: object) -> bool:
+    if not isinstance(key, str) or not isinstance(value, str):
+        return False
+    if not _GH_ENV_NAME.fullmatch(key) or key not in GH_CHILD_ENV_ALLOWLIST:
+        return False
+    if "\x00" in key or "\x00" in value:
+        return False
+    return True
+
+
+def gh_child_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Copy only the gh allowlist. Host secrets stay on the host."""
+    source = os.environ if environ is None else environ
+    child: dict[str, str] = {}
+    for key, value in source.items():
+        if _allowlisted_env_item(key, value):
+            child[key] = value
+    child.setdefault("GH_PROMPT_DISABLED", "1")
+    child.setdefault("GH_NO_UPDATE_NOTIFIER", "1")
+    return child
+
+
+def isolated_gh_env(environ: object) -> bool:
+    """True only when every key is on the allowlist. The host world is silence."""
+    if not isinstance(environ, Mapping):
+        return False
+    if not environ:
+        return False
+    for key, value in environ.items():
+        if not _allowlisted_env_item(key, value):
+            return False
+    return True
+
+
 def _remove_gh_cwd(cwd: str | None) -> None:
     if cwd is None:
         return
@@ -309,6 +370,9 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         child_argv = gh_argv(argv)
         if child_argv is None or not isolated_gh_argv(child_argv) or not allowlisted_gh_argv(child_argv):
             return GhCall(returncode=0, stdout="", stderr="")
+        child_env = gh_child_env()
+        if not isolated_gh_env(child_env):
+            return GhCall(returncode=0, stdout="", stderr="")
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
@@ -319,6 +383,7 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
             check=False,
             cwd=cwd,
             shell=False,
+            env=child_env,
         )
     except FileNotFoundError:
         return GhCall(returncode=127, stdout="", stderr="gh not found", missing=True)

@@ -11,8 +11,10 @@ from github_survey.gh import (
     allowlisted_gh_argv,
     decode_gh_bytes,
     gh_argv,
+    gh_child_env,
     isolated_gh_argv,
     isolated_gh_cwd,
+    isolated_gh_env,
     loads_json,
     required_json,
 )
@@ -302,3 +304,74 @@ class RunGhTests(unittest.TestCase):
                     self.assertEqual(call.returncode, 0)
                     self.assertEqual(call.stdout, "")
                     self.assertEqual(call.stderr, "")
+
+    def test_child_env_is_allowlist_not_the_host_world(self) -> None:
+        host = {
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/tmp/influenzer-home",
+            "LANG": "C",
+            "GH_TOKEN": "gh-only-token",
+            "AWS_SECRET_ACCESS_KEY": "host-secret",
+            "SSH_AUTH_SOCK": "/tmp/ssh-agent",
+            "GITHUB_TOKEN": "github-only-token",
+            "UNSAFE_PARENT": "do-not-inherit",
+        }
+        child = gh_child_env(host)
+        self.assertEqual(child["PATH"], "/usr/bin:/bin")
+        self.assertEqual(child["GH_TOKEN"], "gh-only-token")
+        self.assertEqual(child["GITHUB_TOKEN"], "github-only-token")
+        self.assertEqual(child["GH_PROMPT_DISABLED"], "1")
+        self.assertEqual(child["GH_NO_UPDATE_NOTIFIER"], "1")
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", child)
+        self.assertNotIn("SSH_AUTH_SOCK", child)
+        self.assertNotIn("UNSAFE_PARENT", child)
+        self.assertTrue(isolated_gh_env(child))
+        self.assertFalse(isolated_gh_env(host))
+        self.assertFalse(isolated_gh_env(None))
+        self.assertFalse(isolated_gh_env({}))
+        self.assertFalse(isolated_gh_env({"AWS_SECRET_ACCESS_KEY": "host-secret"}))
+
+        seen: list[dict[str, str]] = []
+
+        def fake_run(*args, **kwargs):
+            env = kwargs.get("env")
+            self.assertIsInstance(env, dict)
+            seen.append(env)
+            self.assertTrue(isolated_gh_env(env))
+            self.assertNotIn("AWS_SECRET_ACCESS_KEY", env)
+            self.assertNotIn("SSH_AUTH_SOCK", env)
+            self.assertNotIn("UNSAFE_PARENT", env)
+            return subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=b"{}", stderr=b"")
+
+        with patch.dict(
+            "os.environ",
+            {
+                "PATH": "/usr/bin:/bin",
+                "AWS_SECRET_ACCESS_KEY": "host-secret",
+                "SSH_AUTH_SOCK": "/tmp/ssh-agent",
+                "UNSAFE_PARENT": "do-not-inherit",
+            },
+            clear=True,
+        ), patch("subprocess.run", side_effect=fake_run):
+            call = run_gh(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0]["PATH"], "/usr/bin:/bin")
+        self.assertNotIn("AWS_SECRET_ACCESS_KEY", seen[0])
+
+    def test_env_outside_allowlist_is_silence_not_a_spawn(self) -> None:
+        def fake_run(*args, **kwargs):
+            raise AssertionError("gh must not spawn when env is not allowlisted")
+
+        leak = {
+            "PATH": "/usr/bin:/bin",
+            "AWS_SECRET_ACCESS_KEY": "host-secret",
+        }
+        with patch("github_survey.gh.gh_child_env", return_value=leak), patch(
+            "subprocess.run", side_effect=fake_run
+        ):
+            call = run_gh(["repo", "view", REPO])
+        self.assertFalse(isolated_gh_env(leak))
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "")
+        self.assertEqual(call.stderr, "")
