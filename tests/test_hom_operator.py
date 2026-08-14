@@ -33,6 +33,7 @@ from influenzer.playbook import (
     looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
+    looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
     looks_like_invented_opinion,
@@ -423,6 +424,42 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertFalse(looks_like_contest(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
+    def test_thread_is_numbering_thread_or_storm_not_a_serial(self) -> None:
+        serials = (
+            "1/7 local tick scores briefs",
+            "1/n local tick scores briefs",
+            "2 / n: local tick",
+            "thread: local tick scores briefs",
+            "a launch thread for the local tick",
+            "tweetstorm about the local tick",
+            "tweet-storm of the local tick",
+            "storm of posts about the local tick",
+            "wątek 1 o lokalnym ticku",
+            "watek o lokalnym ticku",
+            "🧵 local tick scores briefs",
+        )
+        for text in serials:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_thread(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "thread",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "thread-safe local tick",
+            "pthread pool for the local tick",
+            "multithreaded local tick",
+            "main thread stays free",
+            "24/7 local tick",
+            "hook in 1-3s: brief in, draft out",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_thread(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
     def test_hashtag_wall_is_a_tag_dump_not_one_inline_tag(self) -> None:
         walls = (
             "#buildinpublic #saas #ai",
@@ -786,6 +823,27 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_thread_serial_is_killed(self) -> None:
+        serials = (
+            "1/7 local tick scores briefs",
+            "1/n local tick scores briefs",
+            "a launch thread for the local tick",
+            "tweetstorm about the local tick",
+        )
+        for text in serials:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "thread")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_hashtag_wall_is_killed(self) -> None:
         walls = (
             "#buildinpublic #saas #ai",
@@ -984,7 +1042,7 @@ class ScoreBriefTests(unittest.TestCase):
             tryable=False,
             claims_ship=False,
             preferred_arena=ArenaId.X,
-            facts=(Fact(text="thinking about posting a launch thread"),),
+            facts=(Fact(text="thinking about posting a launch reply"),),
         )
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)

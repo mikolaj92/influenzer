@@ -46,6 +46,7 @@ from influenzer.playbook import (
     looks_like_contest,
     looks_like_dunk,
     looks_like_engagement_bait,
+    looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
     looks_like_listicle_title,
@@ -421,6 +422,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_dunk(bits.blob)
         or looks_like_engagement_bait(bits.blob)
         or looks_like_contest(bits.blob)
+        or looks_like_thread(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
     ):
         return None
@@ -437,6 +439,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_dunk(body)
         or looks_like_engagement_bait(body)
         or looks_like_contest(body)
+        or looks_like_thread(body)
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
     ):
