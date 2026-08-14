@@ -233,6 +233,45 @@ class HomDraftCostumeTests(unittest.TestCase):
         triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
         self.assertIsNone(invented_metric_reason(triples, extra=decision.draft.body))
 
+    def test_superlative_without_proof_is_undressable_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(
+                Fact(text="the world's first local tick"),
+                Fact(text="strangers should hear about it today"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "hn",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                    "canon_url": ARENAS[ArenaId.HN].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        dumped = json.dumps(payload)
+        self.assertNotIn("world's first", dumped)
+        self.assertNotIn("Show HN:", dumped)
+
     def test_users_love_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(
             facts=(

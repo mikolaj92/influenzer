@@ -294,6 +294,11 @@ PRESS_RELEASE_RE = re.compile(
     r"(?i)\b(?:excited to announce|humbled to announce|we are (?:excited|pleased|proud) to|"
     r"game[- ]changer|revolutionary|disrupt(?:ing|s)? the)\b"
 )
+# A superlative is a slogan, not a story. Revolutionary / world's first /
+# AI-powered without a tryable GitHub artifact is silence. Proof or nothing.
+SUPERLATIVE_RE = re.compile(
+    r"(?i)\b(?:revolutionary|world'?s\s+first|world-first|ai[- ]powered)\b"
+)
 COMMIT_NOISE_RE = re.compile(
     r"(?i)^\s*(?:chore|typo|lint|ci|wip|bump\s+(?:version|deps)|fix(?:es)?\s+tests|merge\s+branch)\b"
 )
@@ -529,6 +534,11 @@ def looks_like_press_release(text: str) -> bool:
     return bool(PRESS_RELEASE_RE.search(text))
 
 
+def looks_like_superlative(text: str) -> bool:
+    """True for a slogan such as revolutionary / world's first / AI-powered."""
+    return bool(SUPERLATIVE_RE.search(text))
+
+
 def looks_like_invented_opinion(text: str) -> bool:
     """True for unsourced praise such as 'users love'. Not a quote."""
     return bool(INVENTED_OPINION_RE.search(text))
@@ -691,6 +701,7 @@ __all__ = [
     "SOCIAL_ARENAS",
     "STORE_HOSTS",
     "STORE_PITCH_RE",
+    "SUPERLATIVE_RE",
     "VIDEO_HOSTS",
     "StoryKind",
     "Verdict",
@@ -717,6 +728,7 @@ __all__ = [
     "looks_like_merged_pr_fact",
     "looks_like_press_release",
     "looks_like_shouty_title",
+    "looks_like_superlative",
     "looks_like_store_pitch",
     "looks_like_waitlist",
     "parse_arena",
