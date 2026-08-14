@@ -1,1 +1,62 @@
-{"paths":["github_survey/gh.py","tests/test_github_survey.py","influenzer","influenzer/__init__.py","influenzer/adapters/__init__.py","influenzer/adapters/base.py","influenzer/adapters/child_worker.py","influenzer/adapters/contract.py","influenzer/adapters/fake_provider.py","influenzer/adapters/http_fake.py","influenzer/adapters/platforms.py","influenzer/adapters/registry.py","influenzer/adapters/subprocess_harness.py","influenzer/brief_admit.py","influenzer/brief_scan.py","influenzer/campaigns.py","influenzer/catalog.py","influenzer/cli.py","influenzer/config.py","influenzer/content.py","influenzer/domain.py","influenzer/effector.py","influenzer/envelope.py","influenzer/fala_result.py","influenzer/hom.py","influenzer/hom_draft.py","influenzer/hom_feedback.py","influenzer/hom_outbox.py","influenzer/hom_pass.py","influenzer/hom_verdict.py","influenzer/hom_watch.py","influenzer/host.py","influenzer/migrations.py","influenzer/playbook.py","influenzer/policy.py","influenzer/scan_due.py","influenzer/scheduler.py","influenzer/security.py","influenzer/storage.py","influenzer/tick.py","influenzer/tick_all.py","comment/label/close/push"],"source":"deterministic","seed_paths":["comment/label/close/push"],"matched_tokens":["comment","influenzer"],"notes":["Agentless-style localization: deterministic paths only (no embeddings).","Empty path list fails closed — run_agent must not start.","Repo tree entries considered: 137.","Inspection refined the spawn site to github_survey/gh.py; github_survey must not import influenzer. comment/label/close/push is the fail-closed set, not a path."],"worktree":"/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__105-ghrunner-pozytywna-allowlista-tylko-odcz-0bb75d52","wrote":false,"localize_rel":".lokay/localize.json"}
+{
+  "paths": [
+    "influenzer",
+    "influenzer/__init__.py",
+    "influenzer/adapters/__init__.py",
+    "influenzer/adapters/base.py",
+    "influenzer/adapters/child_worker.py",
+    "influenzer/adapters/contract.py",
+    "influenzer/adapters/fake_provider.py",
+    "influenzer/adapters/http_fake.py",
+    "influenzer/adapters/platforms.py",
+    "influenzer/adapters/registry.py",
+    "influenzer/adapters/subprocess_harness.py",
+    "influenzer/brief_admit.py",
+    "influenzer/brief_scan.py",
+    "influenzer/campaigns.py",
+    "influenzer/catalog.py",
+    "influenzer/cli.py",
+    "influenzer/config.py",
+    "influenzer/content.py",
+    "influenzer/domain.py",
+    "influenzer/effector.py",
+    "influenzer/envelope.py",
+    "influenzer/fala_result.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
+    "influenzer/hom_feedback.py",
+    "influenzer/hom_outbox.py",
+    "influenzer/hom_pass.py",
+    "influenzer/hom_verdict.py",
+    "influenzer/hom_watch.py",
+    "influenzer/host.py",
+    "influenzer/migrations.py",
+    "influenzer/playbook.py",
+    "influenzer/policy.py",
+    "influenzer/scan_due.py",
+    "influenzer/scheduler.py",
+    "influenzer/security.py",
+    "influenzer/storage.py",
+    "influenzer/tick.py",
+    "comment/label/close/push",
+    "issues/PR/repo"
+  ],
+  "source": "deterministic",
+  "seed_paths": [
+    "comment/label/close/push",
+    "issues/PR/repo"
+  ],
+  "matched_tokens": [
+    "comment",
+    "issues",
+    "influenzer"
+  ],
+  "notes": [
+    "Agentless-style localization: deterministic paths only (no embeddings).",
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
+  ],
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__104-look-nic-nie-zapisuje-na-githubie-63b82ec4",
+  "wrote": false,
+  "localize_rel": ".lokay/localize.json"
+}

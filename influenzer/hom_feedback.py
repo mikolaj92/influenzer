@@ -9,6 +9,8 @@ Does not survey releases/PRs (that is github_survey). Does not grow github_surve
 Does not auto-post replies. Does not scrape X or LinkedIn. Does not call hop.
 Does not enable Ads. Does not run every tick interval. Does not open runtime.db.
 Does not embed a Fala host.
+Does not comment, label, close, or push. Look is GitHub GET only.
+Reply and code are not this path.
 """
 
 from __future__ import annotations
