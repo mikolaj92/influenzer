@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=94 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=93 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #94 — Zła albo readonly state.db nie idzie w wipe
+Issue: #93 — Redirect artefaktu nie ucieka z allowlisty
 
 ## Goal
 
-Zła albo readonly state.db nie idzie w wipe i nie zabija pętli. Look milczy, baza zostaje. Odzysk to człowiek/hop, nie „zrób nową pustą i udawaj CMO”.
+Redirect artefaktu nie ucieka z allowlisty. Max kilka hopów, każdy host na liście. Zejście na skracacz/inny origin = nie tryable. To łańcuch, nie pierwszy URL.
 
 ## Files likely touched
 
