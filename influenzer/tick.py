@@ -5,6 +5,9 @@ scores every time. If a declared watch exists and scan-due would consider
 it due, it also runs hom_pass once. `--once` stays score-only (same
 mutator as influenzer-tick-all) unless `--pass-if-due`.
 
+The loop writes status (cisza / admitted / scored), never angle copy.
+Body only through explicit `angle` / pass stdout. Copy in journald is a leak.
+
 Does not publish. Does not enable live social. Not a laptop LaunchAgent.
 Not a hosted service. A human starts this process on the always-on box;
 the repo does not SSH or deploy. Fala may conduct the score-only one-shot
@@ -24,6 +27,54 @@ from influenzer.hom_watch import run_watched_tick
 from influenzer.host import HostPower, HostUnsuitable, require_always_on_host
 
 DEFAULT_INTERVAL_SECONDS = 300
+
+
+def _scored_count(result: dict[str, Any]) -> int:
+    tick = result.get("tick")
+    if isinstance(tick, dict):
+        raw = tick.get("scored")
+        if isinstance(raw, int):
+            return raw
+    operator = result.get("operator")
+    if isinstance(operator, dict):
+        raw = operator.get("processed")
+        if isinstance(raw, int):
+            return raw
+    return 0
+
+
+def loop_status(result: dict[str, Any]) -> dict[str, Any]:
+    """Journal line for the always-on loop. Status, never angle copy."""
+    if result.get("status") == "failed":
+        return {
+            "status": "failed",
+            "reason": str(result.get("reason") or "failed"),
+            "mutated": False,
+            "published": False,
+        }
+    scan = result.get("scan")
+    admitted = isinstance(scan, dict) and scan.get("status") == "admitted"
+    scored = _scored_count(result)
+    if admitted:
+        status = "admitted"
+    elif scored:
+        status = "scored"
+    else:
+        status = "cisza"
+    out: dict[str, Any] = {
+        "status": status,
+        "mutated": bool(result.get("mutated")),
+        "published": False,
+    }
+    if admitted:
+        brief_id = scan.get("brief_id")
+        extra = {"status": "admitted"}
+        if isinstance(brief_id, str) and brief_id:
+            extra["brief_id"] = brief_id
+        out["scan"] = extra
+    if scored:
+        out["tick"] = {"scored": scored}
+    return out
 
 
 def guarded_tick(
@@ -87,9 +138,10 @@ def main(
         description=(
             "Always-on HoM tick loop for a Mac mini / always-on host: score pending "
             "briefs into drafts or kills. Interval loop may run hom_pass when a "
-            "declared watch is due. --once is score-only unless --pass-if-due. "
-            "Dry-run default. Not a laptop LaunchAgent. No live social publish. "
-            "Battery laptops fail closed for the interval loop."
+            "declared watch is due. Writes cisza/admitted/scored, never angle copy. "
+            "--once is score-only unless --pass-if-due. Dry-run default. Not a laptop "
+            "LaunchAgent. No live social publish. Battery laptops fail closed for "
+            "the interval loop."
         ),
     )
     parser.add_argument("--config", help="path to config.json")
@@ -146,9 +198,14 @@ def main(
             allow_hom_pass=not bool(args.once) or bool(args.pass_if_due),
         )
 
+    def logged_tick() -> dict[str, Any]:
+        out = guarded_tick(tick_once, supervise=not bool(args.once))()
+        print(json.dumps(loop_status(out), sort_keys=True))
+        return out
+
     try:
-        results = loop_ticks(
-            guarded_tick(tick_once, supervise=not bool(args.once)),
+        loop_ticks(
+            logged_tick,
             interval=args.interval,
             once=bool(args.once),
             max_ticks=args.max_ticks,
@@ -158,8 +215,6 @@ def main(
     except ValueError as exc:
         print(json.dumps({"status": "failed", "reason": str(exc)}, sort_keys=True))
         return 2
-    # Last envelope on stdout (same shape as tick-all). Loop traces stay in state.db.
-    print(json.dumps(results[-1], sort_keys=True))
     return 0
 
 

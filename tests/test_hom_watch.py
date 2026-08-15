@@ -408,7 +408,10 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["status"], "admitted")
         self.assertEqual(payload["scan"]["status"], "admitted")
+        self.assertNotIn("angle", payload)
+        self.assertNotIn("body", payload)
         self.assertTrue(fake.calls)
         self.assertFalse(payload["published"])
         self.assertFalse((self.home / "runtime.db").exists())
@@ -452,14 +455,25 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
                 inspect_host=lambda: ALWAYS_ON,
             )
         self.assertEqual(code, 0)
-        payload = json.loads(buf.getvalue())
+        logged = buf.getvalue()
+        payload = json.loads(logged)
+        self.assertEqual(payload["status"], "admitted")
         self.assertEqual(payload["scan"]["status"], "admitted")
         self.assertEqual(payload["tick"]["scored"], 1)
-        self.assertNotIn("Costume:", payload["angle"]["body"])
+        self.assertNotIn("angle", payload)
+        self.assertNotIn("body", payload)
+        self.assertNotIn("Show HN:", logged)
+        self.assertNotIn("Costume:", logged)
         self.assertFalse(payload["published"])
         self.assertTrue(fake.calls)
         self.assertFalse((self.home / "runtime.db").exists())
         self.assertFalse(json.loads(self.config.read_text(encoding="utf-8"))["scheduler"]["live_enabled"])
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            draft = repo.get_operator_draft("app-1", "scan-v0-1-0")
+            self.assertIsNotNone(draft)
+            assert draft is not None
+            self.assertTrue(draft.body.startswith("Show HN:"))
+            self.assertNotIn(draft.body, logged)
 
 
 class HomWatchBlockBoundaryTests(unittest.TestCase):

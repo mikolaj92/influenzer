@@ -22,6 +22,7 @@ from influenzer.storage import StateRepository
 from influenzer.tick import (
     DEFAULT_INTERVAL_SECONDS,
     guarded_tick,
+    loop_status,
     loop_ticks,
     main as tick_main,
 )
@@ -133,6 +134,42 @@ class TickLoopTests(unittest.TestCase):
                 sleep=lambda _n: None,
             )
 
+    def test_loop_status_is_cisza_admitted_or_scored_never_copy(self) -> None:
+        leak = "Show HN: secret angle copy that must not hit journald"
+        self.assertEqual(
+            loop_status({"status": "noop", "mutated": False, "published": False}),
+            {"status": "cisza", "mutated": False, "published": False},
+        )
+        admitted = loop_status(
+            {
+                "status": "ok",
+                "scan": {"status": "admitted", "brief_id": "scan-1"},
+                "tick": {"scored": 1},
+                "angle": {"status": "ok", "body": leak},
+                "mutated": False,
+                "published": False,
+            }
+        )
+        self.assertEqual(admitted["status"], "admitted")
+        self.assertEqual(admitted["scan"], {"status": "admitted", "brief_id": "scan-1"})
+        self.assertEqual(admitted["tick"], {"scored": 1})
+        self.assertNotIn("angle", admitted)
+        self.assertNotIn(leak, json.dumps(admitted))
+        scored = loop_status(
+            {
+                "status": "ok",
+                "operator": {
+                    "processed": 1,
+                    "outcomes": [{"body": leak}],
+                },
+                "mutated": False,
+            }
+        )
+        self.assertEqual(
+            scored,
+            {"status": "scored", "tick": {"scored": 1}, "mutated": False, "published": False},
+        )
+
     def test_cli_once_scores_pending_brief_like_tick_all(self) -> None:
         brief = Brief.create(
             project_id="app-1",
@@ -143,15 +180,26 @@ class TickLoopTests(unittest.TestCase):
             tryable=True,
         )
         self.repo.save_brief(brief)
-        code = tick_main(
-            ["--config", str(self.home / "config.json"), "--once", "--live"],
-            inspect_host=lambda: LAPTOP,
-        )
+        stdout = io.StringIO()
+        with patch("sys.stdout", stdout):
+            code = tick_main(
+                ["--config", str(self.home / "config.json"), "--once", "--live"],
+                inspect_host=lambda: LAPTOP,
+            )
         self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "scored")
+        self.assertEqual(payload["tick"], {"scored": 1})
+        self.assertNotIn("angle", payload)
+        self.assertNotIn("operator", payload)
+        self.assertNotIn("body", payload)
         stored = self.repo.get_brief("app-1", "loop-1")
         assert stored is not None
         self.assertEqual(stored.status, "processed")
-        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "loop-1"))
+        draft = self.repo.get_operator_draft("app-1", "loop-1")
+        self.assertIsNotNone(draft)
+        assert draft is not None
+        self.assertNotIn(draft.body, stdout.getvalue())
         self.assertFalse((self.home / "runtime.db").exists())
 
     def test_cli_tick_loop_subcommand_once_is_dry_and_does_not_open_runtime_db(self) -> None:

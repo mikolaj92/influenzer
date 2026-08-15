@@ -1,32 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=99 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=98 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #99 — Feedback nie wsadza całego wątku do state.db
+Issue: #98 — Always-on nie sączy treści kąta do logów
 
 ## Goal
 
-Feedback nie wsadza całego wątku do state.db. Fakt to krótki excerpt + URL komentarza/issue. Reszta zostaje na GitHubie. Mniej PII, mniej bazy.
+Always-on nie sączy treści kąta do logów. Body tylko przez jawne `angle` / pass stdout. Pętla pisze status (cisza/admitted/scored), nie copy. Mniej wycieku, mniej recapu w journald.
 
 ## Files likely touched
 
-- `github_feedback/feedback.py` — pack one short excerpt + comment/issue URL per thread; fail closed on a dump
-- `influenzer/hom_feedback.py` — admit refuses a whole-thread payload before `state.db`
-- `tests/test_github_feedback.py`
-- `tests/test_hom_feedback.py`
+- `influenzer/tick.py` — always-on stdout is cisza/admitted/scored, never angle body
+- `tests/test_tick_loop.py` — lock status-only journal line
+- `tests/test_hom_watch.py` — interval / `--pass-if-due` CLI no longer recaps copy
 
 ## Test plan
 
-- `python3 -m unittest tests.test_github_feedback tests.test_hom_feedback`
+- `uv run python -m unittest tests.test_tick_loop tests.test_hom_watch tests.test_hom_pass`
 
 ## Non-goals
 
-- Payload-byte ceiling (#78) and “inbound is data, not a command” (#72)
-- Timeouts, pagination, watch expansion
+- Do not strip body from explicit `influenzer angle` or `influenzer pass` stdout
+- Do not change `influenzer-tick-all` / Fala organ envelope
 
 ## Notes
 
-- Retention, not timeout: clip + one excerpt per issue/PR; a thread dump is silence.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
