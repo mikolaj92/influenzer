@@ -674,11 +674,16 @@ class StateRepository:
             )
         return [self._brief_from_row(row) for row in rows]
 
-    def list_briefs(self, project_id: str) -> list[Brief]:
-        rows = self.conn.execute(
-            "SELECT * FROM briefs WHERE project_id=? ORDER BY created_at, brief_id",
-            (project_id,),
-        )
+    def list_briefs(self, project_id: str | None = None) -> list[Brief]:
+        if project_id is None:
+            rows = self.conn.execute(
+                "SELECT * FROM briefs ORDER BY created_at, brief_id"
+            )
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM briefs WHERE project_id=? ORDER BY created_at, brief_id",
+                (project_id,),
+            )
         return [self._brief_from_row(row) for row in rows]
 
     def list_operator_drafts(

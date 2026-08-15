@@ -228,6 +228,27 @@ class ScanDueTests(unittest.TestCase):
         self.assertEqual(out["status"], "ok")
         self.assertTrue(fake.calls)
 
+    def test_other_project_same_repo_watermark_is_one_look(self) -> None:
+        _project(self.repo, "app-2")
+        self.repo.record_github_scan("app-1", REPO, scanned_at=NOW)
+        self.assertIsNotNone(last_scan_at(self.repo, "app-2", REPO))
+        fake = ScriptedGh(ship_script())
+        with (
+            patch("subprocess.run", side_effect=AssertionError("scan-due must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("scan-due must not fetch")),
+        ):
+            out = scan_github_if_due(
+                self.repo,
+                project_id="app-2",
+                repo_slug=REPO,
+                gh=fake,
+                now=NOW,
+            )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "not due")
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(self.repo.list_briefs("app-2"), [])
+
     def test_always_run_scan_ignores_the_window(self) -> None:
         from influenzer.brief_scan import scan_github
 
