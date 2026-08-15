@@ -11,6 +11,8 @@ Does not run pass every interval. Does not open runtime.db.
 Does not embed a Fala host. Watch set is host CLI only.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
+Does not launch the project. Tryable is a README+URL heuristic, not a run.
+Foreign and our own code in look is untrusted. Launching the project is silence.
 Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 """
