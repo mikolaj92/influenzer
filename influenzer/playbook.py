@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -521,6 +521,30 @@ EMPTY_REPO_RE = re.compile(
     r"|\bnie\s+ma\s+nawet\s+kartk"
     r"|\bdiskUsage\"?\s*[:=]\s*\"?0\b"
     r"|\bdisk_usage\"?\s*[:=]\s*\"?0\b"
+    r")"
+)
+# A default server splash is not a product. Welcome to nginx / Apache
+# default / Caddy placeholder = cisza. Pair of #25 (broken site) and
+# #157 (parked domain): here the box answered, the page is stock.
+# A working nginx/Apache/Caddy config stays; the factory page does not.
+SERVER_SPLASH_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwelcome\s+to\s+nginx\b"
+    r"|\bnginx\s+(?:default|welcome|test)\s+page\b"
+    r"|\bit\s+works!\s+this\s+is\s+the\s+default\s+web\s+page\s+for\s+this\s+server\b"
+    r"|\bapache2?(?:\s+\w+){0,3}\s+default\s+page\b"
+    r"|\bapache2?\s+(?:http\s+server\s+)?(?:default|test)\s+page\b"
+    r"|\btest\s+page\s+(?:for|powered\s+by).{0,40}\bapache\b"
+    r"|\bthis\s+page\s+is\s+used\s+to\s+test\s+the\s+proper\s+operation\s+of\s+the\s+apache\b"
+    r"|\bif\s+you\s+see\s+this\s+page,\s+the\s+nginx\s+web\s+server\s+is\s+successfully\s+installed\b"
+    r"|\bcaddy\s+(?:default|placeholder|welcome)\s+page\b"
+    r"|\bcaddy\s+works!?\b"
+    r"|\bcongratulations,?\s+caddy\s+is\s+working\b"
+    r"|\bcaddy\s+is\s+(?:up\s+and\s+running|working)\b"
+    r"|\bserver\s+splash\b"
+    r"|\bsplash\s+serwera\b"
+    r"|\bdomy[sś]ln[aey]\s+stron[aey]\s+serwera\b"
+    r"|\bstrona\s+domy[sś]lna\s+serwera\b"
     r")"
 )
 # A listed release asset that 404s/410s is not a ship. The file is on
@@ -1207,6 +1231,13 @@ def looks_like_empty_repo(text: str) -> bool:
     return bool(EMPTY_REPO_RE.search(text))
 
 
+def looks_like_server_splash(text: str) -> bool:
+    """True for Welcome to nginx / Apache default / Caddy placeholder. A splash is not a product."""
+    if not text or not text.strip():
+        return False
+    return bool(SERVER_SPLASH_RE.search(text))
+
+
 def looks_like_dead_release_asset(text: str) -> bool:
     """True for a listed release asset whose download is 404/410. A missing file is not a ship."""
     if not text or not text.strip():
@@ -1765,6 +1796,7 @@ __all__ = [
     "FORK_RE",
     "EMPTY_REPO_RE",
     "LOGIN_GATE_RE",
+    "SERVER_SPLASH_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
     "MIN_FACT_CHARS",
@@ -1847,6 +1879,7 @@ __all__ = [
     "looks_like_fork",
     "looks_like_empty_repo",
     "looks_like_login_gate",
+    "looks_like_server_splash",
     "looks_like_roadmap",
     "looks_like_waitlist",
     "parse_arena",

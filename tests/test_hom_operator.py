@@ -56,6 +56,7 @@ from influenzer.playbook import (
     looks_like_fork,
     looks_like_empty_repo,
     looks_like_login_gate,
+    looks_like_server_splash,
     looks_like_roadmap,
     looks_like_source_available_as_oss,
     looks_like_source_available_license,
@@ -952,6 +953,48 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_empty_repo(text))
 
+    def test_server_splash_is_not_a_product(self) -> None:
+        splashes = (
+            "Welcome to nginx",
+            "nginx default page",
+            "nginx welcome page",
+            "It works! This is the default web page for this server",
+            "Apache2 Debian Default Page",
+            "Apache2 Ubuntu Default Page",
+            "Apache default page",
+            "Apache HTTP Server Test Page",
+            "Test Page for the Apache HTTP Server",
+            "This page is used to test the proper operation of the Apache",
+            "If you see this page, the nginx web server is successfully installed",
+            "Caddy default page",
+            "Caddy placeholder page",
+            "Caddy works!",
+            "Congratulations, Caddy is working",
+            "server splash",
+            "splash serwera",
+            "domyslna strona serwera",
+            "domyślna strona serwera",
+            "strona domyslna serwera",
+        )
+        for text in splashes:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_server_splash(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "nginx reverse proxy fronts the demo",
+            "Apache config for the product site",
+            "Caddyfile serves the working demo",
+            "welcome to the operator",
+            "default branch is main",
+            "parked domain is a different gate",
+            "HTTP 200 on the demo",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_server_splash(text))
+
     def test_dead_link_is_not_tryable(self) -> None:
         corpses = (
             "HEAD 404",
@@ -1506,6 +1549,41 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, "empty_repo_not_a_site")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_server_splash_is_killed_even_when_a_release_exists(self) -> None:
+        splashes = (
+            "Welcome to nginx",
+            "Apache2 Debian Default Page",
+            "Caddy placeholder page",
+            "domyślna strona serwera",
+        )
+        for text in splashes:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.GITHUB,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "server_splash_not_a_product")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_server_splash_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="nginx reverse proxy fronts the demo"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_product_copy_without_empty_repo_can_still_draft(self) -> None:
         brief = self._brief(
