@@ -1,33 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=89 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=96 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #89 — Puste repo nie ma witryny
+Issue: #96 — Pad zapisu Fala nie cofa score/draft
 
 ## Goal
 
-Puste repo nie ma witryny. Brak drzewa albo brak README → look milczy. To nie „README bez GIF-a” (#48) — tu nie ma nawet kartki.
+Pad zapisu Fala (reaction dir) nie cofa score/draft w state.db i nie zabija pętli. Domena wygrywa. Journal jest obserwacją, nie właścicielem historii.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_empty_repo` + wave copy
-- `influenzer/brief_scan.py` — `repo_is_empty` / missing README is silence
-- `influenzer/brief_admit.py` — packed empty-repo facts stay silent
-- `influenzer/hom.py` / `influenzer/hom_draft.py` / `influenzer/hom_feedback.py` — score, dress, inbound
-- tests for the gate, distinct from README-without-demo
+- `influenzer/fala_result.py` — swallow OSError on reaction-dir write
+- `tests/test_hom_operator.py` — pad keeps score/draft; organ exits 0
 
 ## Test plan
 
-- `uv run python -m unittest` on brief admit, operator, draft, feedback
+- `tests/test_hom_operator.py::TickBriefPathTests.test_tick_all_writes_fala_subprocess_result_without_opening_runtime_db`
+- `tests/test_hom_operator.py::TickBriefPathTests.test_fala_reaction_dir_pad_keeps_score_draft_and_does_not_kill_tick`
 
 ## Non-goals
 
-- Do not treat a present README without a GIF as this gate (#48).
-- Do not clone, make a worktree, or run the project.
+- Do not wipe or recreate state.db (#94).
+- Do not make the journal the owner of score/draft history.
+- Do not stop the organ / interval loop on a reaction-dir pad.
 
 ## Notes
 
+- Persist in `state.db` already happens before `write_fala_result`. The hole was the journal write raising and killing the organ after domain had already committed.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Same fail-closed shape as #90 (fork is not a website).
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.

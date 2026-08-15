@@ -17,13 +17,14 @@ def write_fala_result(
     """Write result.json when the host injected FALA_EFFECTOR_OUTPUT_DIR.
 
     Does not import or embed a Fala host. Domain state stays in state.db.
+    A pad of the reaction dir is observation-only: it does not raise, wipe,
+    or roll back score/draft. Journal is not the owner of history.
     """
     source = os.environ if env is None else env
     output_dir = source.get("FALA_EFFECTOR_OUTPUT_DIR")
     if not output_dir:
         return None
     path = Path(output_dir) / "result.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
     wrapped = {
         "values": dict(payload),
         "associations": [],
@@ -39,7 +40,14 @@ def write_fala_result(
             "mutated": bool(payload.get("mutated")),
         },
     }
-    path.write_text(json.dumps(wrapped, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(wrapped, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+    except OSError:
+        return None
     return path
 
 
