@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import patch
 
 from github_survey import GhCall
+from github_survey.survey import look_argv_leaves_declared_repo
 
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main as cli_main
@@ -243,6 +244,31 @@ class HomWatchTests(unittest.TestCase):
         self.assertEqual(self.repo.list_briefs("app-1"), [])
         self.assertFalse(out.get("published", False))
 
+    def test_inbound_foreign_repo_link_does_not_expand_watch(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        inbound = ship_script()
+        inbound["prs"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    {
+                        "number": 12,
+                        "title": "feat: local HoM operator scores briefs",
+                        "url": SHIP_PR,
+                        "mergedAt": "2026-08-12T12:00:00Z",
+                        "body": "See also https://github.com/other/tool — not our watch.",
+                    }
+                ]
+            ),
+        )
+        out, fake = self._tick(inbound)
+        self.assertEqual(out["scan"]["status"], "admitted")
+        self.assertEqual(show_watch(self.repo)["repo"], REPO)
+        self.assertNotEqual(show_watch(self.repo)["repo"], "other/tool")
+        self.assertTrue(fake.calls)
+        self.assertFalse(any(look_argv_leaves_declared_repo(list(argv), REPO) for argv in fake.calls))
+        self.assertFalse(out.get("published", False))
+
 
 class HomWatchCLIFAlaTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -441,6 +467,8 @@ class HomWatchBlockBoundaryTests(unittest.TestCase):
         src = Path(__file__).resolve().parents[1] / "influenzer" / "hom_watch.py"
         blob = src.read_text(encoding="utf-8")
         self.assertIn("Does not invent a repo inventory", blob)
+        self.assertIn("Inbound does not expand the watch", blob)
+        self.assertIn("Look stays on the declared repo", blob)
         self.assertIn("Does not copy scan_due or hom_pass", blob)
         self.assertIn("Does not publish", blob)
         self.assertIn("Does not enable live social", blob)

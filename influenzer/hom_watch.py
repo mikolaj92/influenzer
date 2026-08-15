@@ -13,6 +13,8 @@ Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
 Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
+Inbound does not expand the watch. A foreign repo link in an issue stays
+text, not a new survey. Look stays on the declared repo.
 """
 
 from __future__ import annotations

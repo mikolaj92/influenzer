@@ -3,6 +3,8 @@
 Survey is gh api only. git clone / worktree on the host is silence.
 Mini is not a checkout cache.
 Look stops after N pages. Whole-repo history in one look is silence.
+Inbound does not expand the watch. A foreign repo link in an issue stays
+text, not a new survey. Look stays on the declared repo.
 """
 
 from __future__ import annotations
@@ -173,6 +175,64 @@ def look_argv_is_unbounded_pages(argv: object) -> bool:
     return False
 
 
+def _look_argv_repo_slug(argv: object) -> str | None:
+    """Repo slug this argv would look at, if it carries one."""
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return None
+    if tokens and tokens[0] == "gh":
+        tokens = tokens[1:]
+    if len(tokens) >= 3 and tokens[0] == "repo" and tokens[1] == "view":
+        return tokens[2]
+    if "--repo" in tokens:
+        index = tokens.index("--repo")
+        if index + 1 < len(tokens):
+            return tokens[index + 1]
+    if tokens[:1] == ["api"] and len(tokens) >= 2:
+        path = tokens[1]
+        lowered = path.lower()
+        marker = "repos/"
+        if lowered.startswith(marker):
+            rest = path[len(marker) :]
+        elif marker in lowered:
+            rest = path[lowered.index(marker) + len(marker) :]
+        else:
+            return None
+        parts = rest.split("/")
+        if len(parts) >= 2:
+            return f"{parts[0]}/{parts[1].split('?', 1)[0]}"
+    return None
+
+
+def look_argv_leaves_declared_repo(argv: object, declared: str) -> bool:
+    """True when argv would survey a repo other than the declared watch."""
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return True
+    wanted = declared.strip()
+    if not wanted or invalid_repo_reason(wanted):
+        return True
+    slug = _look_argv_repo_slug(argv)
+    if slug is None:
+        return False
+    if invalid_repo_reason(slug):
+        return True
+    return slug.strip().casefold() != wanted.casefold()
+
+
+def look_declared_gh(repo_slug: str, gh: GhRunner | None = None) -> GhRunner:
+    """Look stays on the declared repo. A foreign slug is silence, not a survey."""
+    runner = gh if gh is not None else run_gh
+    slug = repo_slug.strip()
+
+    def _declared(argv: Sequence[str]) -> GhCall:
+        if look_argv_leaves_declared_repo(argv, slug):
+            return GhCall(returncode=0, stdout="", stderr="")
+        return runner(argv)
+
+    return _declared
+
+
 def look_short_gh(gh: GhRunner | None = None) -> GhRunner:
     """Look is short. After MAX_PAGES, stop. Whole-history is silence."""
     runner = look_api_only_gh(gh)
@@ -312,7 +372,7 @@ def survey_public_repo(
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return _silence("repo must be owner/name", repo=slug)
-    runner = look_short_gh(gh)
+    runner = look_declared_gh(slug, look_short_gh(gh))
     clock = parse_now(now)
     try:
         survey, reason = collect_survey(slug, gh=runner, now=clock)

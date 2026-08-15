@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from github_survey import GhCall
+from github_survey.survey import look_argv_leaves_declared_repo
+
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
@@ -177,6 +180,38 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.assertIn("issue_comments", classified)
         self.assertNotIn("prs", classified)
         self.assertNotIn("releases", classified)
+
+    def test_inbound_foreign_repo_link_stays_text_not_a_survey(self) -> None:
+        self.repo.set_hom_watch("app-1", REPO, created_at=NOW)
+        inbound = (
+            "How do I install this when uv is missing? "
+            "See https://github.com/other/tool for a similar crash."
+        )
+        script = feedback_question_script()
+        script["issue_comments"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    {
+                        "id": 101,
+                        "html_url": ISSUE_COMMENT,
+                        "body": inbound,
+                        "user": {"login": "alice", "type": "User"},
+                        "created_at": "2026-08-12T12:00:00Z",
+                    }
+                ]
+            ),
+        )
+        fake = ScriptedGh(script)
+        with patch("subprocess.run", side_effect=AssertionError("feedback must not call subprocess")):
+            out = collect_and_admit(self.repo, project_id="app-1", repo_slug=REPO, gh=fake, now=NOW)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["repo"], REPO)
+        stored = self.repo.get_brief("app-1", out["brief_id"])
+        assert stored is not None
+        self.assertIn("https://github.com/other/tool", stored.facts[0].text)
+        self.assertEqual(self.repo.get_hom_watch()["repo"], REPO)
+        self.assertFalse(any(look_argv_leaves_declared_repo(list(argv), REPO) for argv in fake.calls))
 
 
 class HomFeedbackCLITests(unittest.TestCase):
