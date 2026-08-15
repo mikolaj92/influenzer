@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=95 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=94 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #95 — Zegar wstecz nie odpala drugiego looku
+Issue: #94 — Zła albo readonly state.db nie idzie w wipe
 
 ## Goal
 
-Zegar wstecz nie odpala drugiego looku. Jeśli now < last_scan (NTP, ręczny cofnięty czas) — cisza, nie „znowu poniedziałek”. Look jest monotoniczny.
+Zła albo readonly state.db nie idzie w wipe i nie zabija pętli. Look milczy, baza zostaje. Odzysk to człowiek/hop, nie „zrób nową pustą i udawaj CMO”.
 
 ## Files likely touched
 
