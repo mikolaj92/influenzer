@@ -60,6 +60,7 @@ from influenzer.playbook import (
     looks_like_login_gate,
     looks_like_server_splash,
     looks_like_roadmap,
+    looks_like_prerelease,
     looks_like_source_available_as_oss,
     looks_like_source_available_license,
     looks_like_world_commentary,
@@ -1177,6 +1178,62 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_roadmap(text))
 
+    def test_draft_and_prerelease_are_not_a_ship(self) -> None:
+        vapor = (
+            "isDraft: true",
+            "is_draft: true",
+            "isPrerelease: true",
+            "is_prerelease: true",
+            "draft release",
+            "release is a draft",
+            "unpublished github release",
+            "github draft",
+            "prerelease",
+            "pre-release",
+            "pre release",
+            "release candidate",
+            "public beta",
+            "closed beta",
+            "open beta",
+            "rc release",
+            "beta release",
+            "alpha release",
+            "v1.2.3-rc.1",
+            "v0.1.0-beta",
+            "1.0.0-rc1",
+            "v2.0.0-alpha.2",
+            "v1.0.0-pre",
+            "rc-1",
+            "beta-2",
+            "https://github.com/mikolaj92/influenzer/releases/tag/v1.0.0-rc.1",
+            "wydanie robocze",
+            "wydanie szkic",
+            "wydanie wstępne",
+            "przedpremiera",
+            "szkic wydania",
+        )
+        for text in vapor:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_prerelease(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "as soon as you install, the local tick scores",
+            "the product draft is the wearable copy",
+            "Tag the draft after a human pass",
+            "Released v1.2.3",
+            "Released v0.1.0",
+            "HTTP 200 on the demo",
+            "see us on BetaList",
+            "operator emits drafts",
+            "join the waitlist",
+            "coming Q3",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_prerelease(text))
+
     def test_source_available_plus_open_source_is_a_license_lie(self) -> None:
         lies = (
             "BUSL open source",
@@ -1901,6 +1958,54 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="as soon as you install, the local tick scores"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_prerelease_ship_claim_is_killed(self) -> None:
+        vapor = (
+            "draft release",
+            "isPrerelease: true",
+            "v1.2.3-rc.1",
+            "public beta",
+            "wydanie robocze",
+        )
+        for text in vapor:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "prerelease_not_a_ship")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_prerelease_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="v1.2.3-rc.1", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "prerelease_not_a_ship")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_prerelease_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="Released v1.2.3"),
             ),
         )
         score = score_brief(brief)
