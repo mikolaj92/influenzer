@@ -66,6 +66,7 @@ from influenzer.playbook import (
     looks_like_login_gate,
     looks_like_server_splash,
     looks_like_roadmap,
+    looks_like_prerelease,
     looks_like_waitlist,
     ranking_urls_only,
     unquotable_reason,
@@ -504,6 +505,10 @@ def score_brief(brief: Brief) -> Score:
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "waitlist_not_tryable")
         return _changelog(brief, "waitlist_not_tryable")
+    if looks_like_prerelease(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "prerelease_not_a_ship")
+        return _changelog(brief, "prerelease_not_a_ship")
     if looks_like_login_gate(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "login_gate_not_tryable")

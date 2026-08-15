@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -378,6 +378,32 @@ RANKING_DUMP_RE = re.compile(
 
 WAITLIST_RE = re.compile(
     r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
+)
+# A GitHub draft / prerelease / RC / beta is not a ship. Only a published,
+# non-prerelease release (or a merge with a tryable artifact) may claim
+# ship. Changelog may keep the tag. Pair of waitlist: mailing list vs
+# unpublished channel. "emits a draft" is operator copy, not this gate.
+PRERELEASE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bisDraft\"?\s*[:=]\s*\"?true\b"
+    r"|\bis_draft\"?\s*[:=]\s*\"?true\b"
+    r"|\bisPrerelease\"?\s*[:=]\s*\"?true\b"
+    r"|\bis_prerelease\"?\s*[:=]\s*\"?true\b"
+    r"|\bdraft\s+release\b"
+    r"|\brelease\s+(?:is\s+)?(?:a\s+)?draft\b"
+    r"|\bunpublished\s+(?:github\s+)?(?:draft\s+)?release\b"
+    r"|\bgithub\s+draft\b"
+    r"|\bpre[- ]?release\b"
+    r"|\brelease\s+candidate\b"
+    r"|\b(?:public|closed|open)\s+beta\b"
+    r"|\b(?:rc|beta|alpha)\s+release\b"
+    r"|\bv?\d+(?:\.\d+){1,3}[-.](?:rc|beta|alpha|pre)(?:[.-]?\d+)*\b"
+    r"|\b(?:rc|beta|alpha)[.-]\d+\b"
+    r"|/releases/tag/[A-Za-z0-9._~-]*(?:rc|beta|alpha|pre|draft)[A-Za-z0-9._~-]*"
+    r"|\bwydanie\s+(?:robocze|szkic|wst[eę]pne)\b"
+    r"|\bprzedpremier"
+    r"|\bszkic\s+(?:wydania|release)\b"
+    r")"
 )
 # A login wall is not a tryable artifact. HEAD/GET 401/403 = a stranger
 # cannot run it. Silence on Show HN / ship claims. This is a gate, not a
@@ -1323,6 +1349,13 @@ def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
 
+def looks_like_prerelease(text: str) -> bool:
+    """True for a GitHub draft / prerelease / RC / beta. That is not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(PRERELEASE_RE.search(text))
+
+
 def looks_like_login_gate(text: str) -> bool:
     """True for a login wall / HEAD-GET 401/403. A stranger must run it without logging in."""
     if not text or not text.strip():
@@ -1946,6 +1979,7 @@ __all__ = [
     "RANKING_DUMP_RE",
     "RANKING_HOSTS",
     "ROADMAP_RE",
+    "PRERELEASE_RE",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
     "SOURCE_AVAILABLE_LICENSE_RE",
@@ -2022,6 +2056,7 @@ __all__ = [
     "looks_like_login_gate",
     "looks_like_server_splash",
     "looks_like_roadmap",
+    "looks_like_prerelease",
     "looks_like_waitlist",
     "parse_arena",
     "quote_without_sourced_excerpt",

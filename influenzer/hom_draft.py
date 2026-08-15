@@ -77,6 +77,7 @@ from influenzer.playbook import (
     looks_like_login_gate,
     looks_like_server_splash,
     looks_like_roadmap,
+    looks_like_prerelease,
     looks_like_waitlist,
     strip_open_source_claim,
     strip_person_mentions,
@@ -229,6 +230,7 @@ def _proof_url(bits: CopyBits) -> str | None:
 def _undressable_blob(bits: CopyBits) -> bool:
     return (
         looks_like_waitlist(bits.blob)
+        or looks_like_prerelease(bits.blob)
         or looks_like_login_gate(bits.blob)
         or looks_like_dead_link(bits.blob)
         or looks_like_dead_release_asset(bits.blob)
