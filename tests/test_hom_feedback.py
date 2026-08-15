@@ -14,7 +14,8 @@ from github_survey.survey import look_argv_leaves_declared_repo
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.hom_feedback import SOURCE, collect_and_admit, main as feedback_main
+from github_feedback.feedback import MAX_STORED_FACT_CHARS, WHOLE_THREAD
+from influenzer.hom_feedback import SOURCE, admit_feedback, collect_and_admit, main as feedback_main
 from influenzer.playbook import ArenaId, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
@@ -212,6 +213,103 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.assertIn("https://github.com/other/tool", stored.facts[0].text)
         self.assertEqual(self.repo.get_hom_watch()["repo"], REPO)
         self.assertFalse(any(look_argv_leaves_declared_repo(list(argv), REPO) for argv in fake.calls))
+
+    def test_same_issue_stores_one_excerpt_not_the_thread(self) -> None:
+        second = ISSUE_COMMENT.replace("issuecomment-101", "issuecomment-199")
+        long_body = (
+            "How do I install this when uv is missing? "
+            + ("The traceback and env dump go on. " * 40)
+        )
+        script = feedback_question_script()
+        script["issue_comments"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    {
+                        "id": 101,
+                        "html_url": ISSUE_COMMENT,
+                        "body": long_body,
+                        "user": {"login": "alice", "type": "User"},
+                        "created_at": "2026-08-12T12:00:00Z",
+                    },
+                    {
+                        "id": 199,
+                        "html_url": second,
+                        "body": "Does this also break when the same issue has a later reply?",
+                        "user": {"login": "bob", "type": "User"},
+                        "created_at": "2026-08-12T12:30:00Z",
+                    },
+                ]
+            ),
+        )
+        script["pull_comments"] = GhCall(0, "[]")
+        out = self._run(script)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["fact_count"], 1)
+        stored = self.repo.get_brief("app-1", out["brief_id"])
+        assert stored is not None
+        self.assertEqual(len(stored.facts), 1)
+        self.assertEqual(stored.facts[0].artifact_url, ISSUE_COMMENT)
+        self.assertLessEqual(len(stored.facts[0].text), MAX_STORED_FACT_CHARS)
+        self.assertNotIn(long_body, stored.facts[0].text)
+        dumped = json.dumps([dict(row) for row in self.repo.events("app-1")], default=str)
+        self.assertNotIn(long_body, dumped)
+        self.assertNotIn(second, dumped)
+
+    def test_whole_thread_pack_is_silence_and_writes_no_brief(self) -> None:
+        packed = {
+            "status": "ok",
+            "ok": True,
+            "repo": REPO,
+            "brief_id": "fb-dump",
+            "source": SOURCE,
+            "story_kind": "hard_issue",
+            "claims_ship": False,
+            "tryable": False,
+            "facts": [
+                {
+                    "kind": "issue_comment",
+                    "text": "@alice: How do I install this when uv is missing?",
+                    "artifact_url": ISSUE_COMMENT,
+                },
+                {
+                    "kind": "issue_comment",
+                    "text": "@bob: later reply on the same issue",
+                    "artifact_url": ISSUE_COMMENT.replace(
+                        "issuecomment-101", "issuecomment-199"
+                    ),
+                },
+            ],
+        }
+        out = admit_feedback(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], WHOLE_THREAD)
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_long_excerpt_is_silence_and_writes_no_brief(self) -> None:
+        packed = {
+            "status": "ok",
+            "ok": True,
+            "repo": REPO,
+            "brief_id": "fb-long",
+            "source": SOURCE,
+            "story_kind": "hard_issue",
+            "claims_ship": False,
+            "tryable": False,
+            "facts": [
+                {
+                    "kind": "issue_comment",
+                    "text": "@alice: " + ("x" * 500),
+                    "artifact_url": ISSUE_COMMENT,
+                }
+            ],
+        }
+        out = admit_feedback(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], WHOLE_THREAD)
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
 
 class HomFeedbackCLITests(unittest.TestCase):

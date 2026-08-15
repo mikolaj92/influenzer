@@ -7,6 +7,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from github_feedback import collect_feedback, is_feedback_signal, is_noise_comment
+from github_feedback.feedback import (
+    MAX_FACT_CHARS,
+    MAX_STORED_FACT_CHARS,
+    WHOLE_THREAD,
+    is_feedback_excerpt_url,
+    whole_thread_reason,
+)
 from github_survey import GhCall, classify_gh_argv
 from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_short_gh
 
@@ -99,6 +106,83 @@ class CollectFeedbackTests(unittest.TestCase):
         self.assertIn(ISSUE_COMMENT_BUG, urls)
         self.assertIn(PR_COMMENT, urls)
         self.assertEqual(out["brief_id"], "fb-101")
+        for item in out["facts"]:
+            self.assertLessEqual(len(item["text"]), MAX_STORED_FACT_CHARS)
+            self.assertTrue(is_feedback_excerpt_url(item["artifact_url"]))
+            self.assertEqual(set(item), {"kind", "text", "artifact_url"})
+        self.assertIsNone(whole_thread_reason(out))
+
+    def test_same_issue_keeps_one_excerpt_not_the_thread(self) -> None:
+        second = ISSUE_COMMENT.replace("issuecomment-101", "issuecomment-199")
+        long_body = (
+            "How do I install this when uv is missing? "
+            + ("The traceback and env dump go on. " * 40)
+        )
+        script = feedback_question_script()
+        script["issue_comments"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(html_url=ISSUE_COMMENT, body=long_body, comment_id=101),
+                    gh_comment(
+                        html_url=second,
+                        body="The Windows install fails with a traceback on the same issue",
+                        login="bob",
+                        comment_id=199,
+                        created_at="2026-08-12T12:30:00Z",
+                    ),
+                ]
+            ),
+        )
+        script["pull_comments"] = GhCall(0, "[]")
+        out = self._collect(script)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(len(out["facts"]), 1)
+        fact = out["facts"][0]
+        self.assertEqual(fact["artifact_url"], ISSUE_COMMENT)
+        self.assertLessEqual(len(fact["text"]), MAX_STORED_FACT_CHARS)
+        self.assertIn("...", fact["text"])
+        self.assertNotIn(second, json.dumps(out))
+        self.assertNotIn(long_body, json.dumps(out))
+        self.assertLess(len(fact["text"]), len(long_body))
+        self.assertIsNone(whole_thread_reason(out))
+
+    def test_raw_thread_payload_is_whole_thread_not_storage(self) -> None:
+        dump = {
+            "status": "ok",
+            "facts": [
+                {
+                    "kind": "issue_comment",
+                    "text": "@alice: How do I install this when uv is missing?",
+                    "artifact_url": ISSUE_COMMENT,
+                    "body": "full comment body plus later replies",
+                    "user": {"login": "alice"},
+                }
+            ],
+            "comments": [{"body": "later reply on the same issue"}],
+        }
+        self.assertEqual(whole_thread_reason(dump), WHOLE_THREAD)
+        self.assertGreater(MAX_FACT_CHARS, 0)
+
+    def test_two_excerpts_from_one_issue_are_whole_thread(self) -> None:
+        payload = {
+            "status": "ok",
+            "facts": [
+                {
+                    "kind": "issue_comment",
+                    "text": "@alice: How do I install this when uv is missing?",
+                    "artifact_url": ISSUE_COMMENT,
+                },
+                {
+                    "kind": "issue_comment",
+                    "text": "@bob: The Windows install fails with a traceback",
+                    "artifact_url": ISSUE_COMMENT.replace(
+                        "issuecomment-101", "issuecomment-199"
+                    ),
+                },
+            ],
+        }
+        self.assertEqual(whole_thread_reason(payload), WHOLE_THREAD)
 
     def test_missing_gh_is_silence(self) -> None:
         out = self._collect({"repo": GhCall(127, "", "gh not found", missing=True)})

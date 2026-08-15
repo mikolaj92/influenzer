@@ -3,6 +3,10 @@
 Feedback is gh api only. git clone / worktree on the host is silence.
 Mini is not a checkout cache.
 Look stops after N pages. Whole-repo history in one look is silence.
+
+A fact is a short excerpt + comment/issue URL. One excerpt per thread.
+The rest stays on GitHub. A whole thread in state.db is silence, not storage.
+This is retention, not a timeout.
 """
 
 from __future__ import annotations
@@ -28,7 +32,41 @@ from github_survey.survey import LOOKBACK_DAYS, in_window, look_short_gh, parse_
 SOURCE = "github-feedback"
 MAX_FACTS = 8
 MAX_FACT_CHARS = 240
+# @login: prefix on a clipped body. Longer than this is a dump, not an excerpt.
+MAX_STORED_FACT_CHARS = MAX_FACT_CHARS + 48
 MIN_BODY_CHARS = 12
+WHOLE_THREAD = "whole_thread"
+
+_COMMENT_URL_RE = re.compile(
+    r"^https://github\.com/"
+    r"(?P<owner>[A-Za-z0-9_.-]+)/(?P<name>[A-Za-z0-9_.-]+)/"
+    r"(?P<kind>issues|pull)/(?P<number>\d+)"
+    r"(?:#(?P<anchor>issuecomment-\d+|discussion_r\d+|pullrequestreview-\d+|issue-\d+))?$",
+    re.I,
+)
+_RAW_THREAD_FACT_KEYS = frozenset(
+    {
+        "body",
+        "user",
+        "comments",
+        "timeline",
+        "reactions",
+        "issue",
+        "pull_request",
+        "review_comments",
+        "html_url",
+    }
+)
+_RAW_THREAD_PAYLOAD_KEYS = frozenset(
+    {
+        "comments",
+        "survey",
+        "timeline",
+        "issue",
+        "pull_request",
+        "review_comments",
+    }
+)
 
 _BOT_LOGINS = frozenset(
     {
@@ -73,6 +111,66 @@ def _clip(text: str, limit: int = MAX_FACT_CHARS) -> str:
     if len(collapsed) <= limit:
         return collapsed
     return collapsed[: limit - 3].rstrip() + "..."
+
+
+def _thread_key(url: str) -> str | None:
+    match = _COMMENT_URL_RE.fullmatch(url.strip().rstrip("/"))
+    if match is None:
+        return None
+    return "/".join(
+        (
+            match.group("owner").lower(),
+            match.group("name").lower(),
+            match.group("kind").lower(),
+            match.group("number"),
+        )
+    )
+
+
+def is_feedback_excerpt_url(url: str) -> bool:
+    return _thread_key(url) is not None
+
+
+_EXCERPT_FACT_KEYS = frozenset({"kind", "text", "artifact_url"})
+
+
+def _is_excerpt_shaped(item: Any) -> bool:
+    if not isinstance(item, dict):
+        return False
+    if set(item) - _EXCERPT_FACT_KEYS:
+        return False
+    if any(key in item for key in _RAW_THREAD_FACT_KEYS):
+        return False
+    kind = str(item.get("kind") or "").strip().lower()
+    if kind not in {"excerpt", "issue_comment", "pull_comment"}:
+        return False
+    text = str(item.get("text") or "").strip()
+    url = str(item.get("artifact_url") or "").strip()
+    if not text or not is_feedback_excerpt_url(url):
+        return False
+    if len(text) > MAX_STORED_FACT_CHARS:
+        return False
+    return True
+
+
+def whole_thread_reason(payload: Any) -> str | None:
+    """Silence when a pack would store a thread dump instead of excerpts."""
+    if not isinstance(payload, dict):
+        return WHOLE_THREAD
+    if any(key in payload for key in _RAW_THREAD_PAYLOAD_KEYS):
+        return WHOLE_THREAD
+    facts = payload.get("facts")
+    if not isinstance(facts, list) or not facts:
+        return None
+    seen_threads: set[str] = set()
+    for item in facts:
+        if not _is_excerpt_shaped(item):
+            return WHOLE_THREAD
+        key = _thread_key(str(item.get("artifact_url") or ""))
+        if key is None or key in seen_threads:
+            return WHOLE_THREAD
+        seen_threads.add(key)
+    return None
 
 
 def _login(user: Any) -> str:
@@ -187,21 +285,24 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
 
 def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
     facts: list[dict[str, Any]] = []
-    seen: set[str] = set()
+    seen_urls: set[str] = set()
+    seen_threads: set[str] = set()
     for kind, item in collected.get("comments") or []:
         fact = _fact_from_comment(item, kind=kind)
         if fact is None:
             continue
         url = str(fact.get("artifact_url") or "")
-        if url in seen:
+        thread = _thread_key(url)
+        if not url or thread is None or url in seen_urls or thread in seen_threads:
             continue
-        seen.add(url)
+        seen_urls.add(url)
+        seen_threads.add(thread)
         facts.append(fact)
         if len(facts) >= MAX_FACTS:
             break
     if not facts:
         return _silence("comment_noise", repo=repo_slug)
-    return {
+    packed = {
         "status": "ok",
         "ok": True,
         "repo": repo_slug,
@@ -212,6 +313,9 @@ def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
         "tryable": False,
         "facts": facts,
     }
+    if whole_thread_reason(packed):
+        return _silence(WHOLE_THREAD, repo=repo_slug)
+    return packed
 
 
 def collect_feedback(
