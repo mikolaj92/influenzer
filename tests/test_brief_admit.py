@@ -15,7 +15,8 @@ from influenzer.playbook import ArenaId, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from github_survey import GhCall
-from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, noise_script, repo_json, ship_script, ScriptedGh
+from github_survey.survey import MAX_GH_LOOK_BYTES
+from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, b64_readme, noise_script, repo_json, ship_script, ScriptedGh
 
 
 def _project(repo: StateRepository, project_id: str = "app-1") -> None:
@@ -332,6 +333,61 @@ class AdmitAndComposeTests(unittest.TestCase):
         )
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "not_tryable")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_oversized_readme_is_empty_look_and_writes_no_brief(self) -> None:
+        huge = "# Demo\n\n" + ("uv run influenzer-tick --once\n" * 80_000)
+        out = self._scan(ship_script(readme=GhCall(0, b64_readme(huge))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_oversized_pack_is_empty_look_not_stored(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0 " + ("x" * (MAX_GH_LOOK_BYTES + 1)),
+                        "artifact_url": SHIP_RELEASE,
+                    }
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_fifty_meg_payload_is_silence_not_stored(self) -> None:
+        packed = {
+            "status": "ok",
+            "repo": REPO,
+            "brief_id": "scan-v0-1-0",
+            "tryable": True,
+            "facts": [
+                {
+                    "kind": "release",
+                    "text": "Released v0.1.0",
+                    "artifact_url": SHIP_RELEASE,
+                }
+            ],
+        }
+        with patch("influenzer.brief_admit.state_bytes_over_limit", return_value=True):
+            out = admit_pack(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_tick_scores_scanned_brief_without_publishing(self) -> None:

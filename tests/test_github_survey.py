@@ -20,16 +20,22 @@ from github_survey.gh import (
     required_json,
 )
 from github_survey.survey import (
+    LOOK_OVER_LIMIT,
+    MAX_GH_LOOK_BYTES,
     MAX_PAGES,
+    MAX_STATE_BYTES,
     look_api_only_gh,
     look_argv_is_unbounded_pages,
     look_argv_launches_project,
     look_argv_leaves_declared_repo,
+    look_bytes_over_limit,
     look_declared_gh,
+    look_payload_reason,
     look_short_gh,
+    state_bytes_over_limit,
 )
 
-from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, b64_readme, noise_script, repo_json, ship_script, ScriptedGh
 
 
 class ClassifyArgvTests(unittest.TestCase):
@@ -117,6 +123,23 @@ class SurveySilenceTests(unittest.TestCase):
         self.assertEqual(len(out["survey"]["prs"]), 3)
         self.assertEqual(out["survey"]["releases"], [])
 
+    def test_oversized_readme_is_empty_look_not_a_feast(self) -> None:
+        huge = "# Demo\n\n" + ("uv run influenzer-tick --once\n" * 80_000)
+        self.assertTrue(look_bytes_over_limit(huge))
+        out = self._survey(ship_script(readme=GhCall(0, b64_readme(huge))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+        self.assertNotIn("brief_id", out)
+
+    def test_oversized_json_from_gh_is_empty_look(self) -> None:
+        pad = "x" * (MAX_GH_LOOK_BYTES + 1)
+        out = self._survey({"repo": GhCall(0, json.dumps({"nameWithOwner": REPO, "pad": pad}))})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+
 
 class RunGhTests(unittest.TestCase):
     def test_run_gh_missing_binary_is_not_a_crash(self) -> None:
@@ -154,6 +177,26 @@ class RunGhTests(unittest.TestCase):
         data, reason = required_json(call)
         self.assertIsNone(data)
         self.assertEqual(reason, "empty_survey")
+
+    def test_hard_byte_limit_is_a_look_not_a_feast(self) -> None:
+        self.assertEqual(MAX_GH_LOOK_BYTES, 1 * 1024 * 1024)
+        self.assertEqual(MAX_STATE_BYTES, 50 * 1024 * 1024)
+        self.assertGreater(MAX_STATE_BYTES, MAX_GH_LOOK_BYTES)
+        self.assertFalse(look_bytes_over_limit("ok"))
+        self.assertTrue(look_bytes_over_limit("x" * (MAX_GH_LOOK_BYTES + 1)))
+        self.assertFalse(state_bytes_over_limit("ok"))
+        with patch("github_survey.survey.MAX_STATE_BYTES", 16):
+            self.assertTrue(state_bytes_over_limit("x" * 64))
+
+    def test_look_drops_oversized_stdout(self) -> None:
+        def inner(_argv: object) -> GhCall:
+            return GhCall(0, "x" * (MAX_GH_LOOK_BYTES + 1))
+
+        call = look_short_gh(inner)(["repo", "view", REPO])
+        self.assertEqual(call.returncode, 0)
+        self.assertEqual(call.stdout, "")
+        self.assertEqual(call.stderr, LOOK_OVER_LIMIT)
+        self.assertEqual(look_payload_reason(call), "empty_survey")
 
     def test_run_gh_bad_json_bytes_are_empty_not_a_crash(self) -> None:
         completed = subprocess.CompletedProcess(

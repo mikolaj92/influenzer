@@ -14,6 +14,7 @@ from github_feedback.feedback import (
     is_feedback_excerpt_url,
     whole_thread_reason,
 )
+from github_survey.survey import MAX_GH_LOOK_BYTES
 from github_survey import GhCall, classify_gh_argv
 from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_short_gh
 
@@ -206,6 +207,20 @@ class CollectFeedbackTests(unittest.TestCase):
         self.assertEqual(out["reason"], "empty_feedback")
         self.assertTrue(out["ok"])
         self.assertIsNone(out["brief_id"])
+
+    def test_oversized_comments_json_is_empty_look(self) -> None:
+        pad = "How do I install this when uv is missing? " + ("x" * (MAX_GH_LOOK_BYTES + 1))
+        script = feedback_question_script()
+        script["issue_comments"] = GhCall(
+            0,
+            json.dumps([gh_comment(html_url=ISSUE_COMMENT, body=pad, comment_id=101)]),
+        )
+        out = self._collect(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("facts", out)
 
     def test_decode_error_from_runner_is_silence_not_crash(self) -> None:
         def boom(_argv: object) -> GhCall:

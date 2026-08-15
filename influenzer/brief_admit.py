@@ -16,6 +16,8 @@ import argparse
 from collections.abc import Sequence
 from typing import Any
 
+from github_survey.survey import look_bytes_over_limit, state_bytes_over_limit
+
 from influenzer.config import load_config
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
@@ -78,6 +80,8 @@ def admit_pack(
     now: str | None = None,
 ) -> dict[str, Any]:
     slug = str(payload.get("repo") or "")
+    if look_bytes_over_limit(payload) or state_bytes_over_limit(payload):
+        return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
     blocked = open_story_reason(repo, project_id)
