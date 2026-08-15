@@ -14,6 +14,8 @@ Does not merge scan_due, tick, and outbox into one file.
 Does not open runtime.db. Does not embed a Fala host.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
+Does not run the project. Launching on watch is silence.
+Tryable is a README+URL heuristic. Code in look is untrusted.
 Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays

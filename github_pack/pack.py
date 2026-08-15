@@ -1,4 +1,8 @@
-"""Pack a survey into ship+tryable facts, or silence. No gh. No SQLite."""
+"""Pack a survey into ship+tryable facts, or silence. No gh. No SQLite.
+
+Tryable is a README+URL heuristic. Look does not run the project.
+Launching on watch is silence. Code in look is untrusted.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +21,7 @@ from github_pack.classify import (
     is_tryable,
     looks_like_patch_only,
     looks_like_waitlist,
-    readme_installable,
+    readme_tryable_url,
 )
 
 _SLUG_CLEAN_RE = re.compile(r"[^a-z0-9]+")
@@ -66,12 +70,12 @@ def facts_from_survey(repo_slug: str, survey: dict[str, Any]) -> list[dict[str, 
             continue
         add(kind="tag", text=f"Tag {name}")
 
-    if readme_installable(str(survey.get("readme_text") or "")):
-        url = str(survey.get("readme_url") or survey["meta"].get("url") or "")
+    readme_url = readme_tryable_url(survey)
+    if readme_url:
         add(
             kind="readme",
             text="README has an install/quickstart a stranger can run",
-            artifact_url=url if url.startswith("https://") else None,
+            artifact_url=readme_url,
         )
 
     description = str(survey["meta"].get("description") or "").strip()
@@ -110,7 +114,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     if facts_are_merge_log(facts) and not survey.get("releases"):
         return _silence("not_tryable", repo=slug)
     claims_ship = any(is_ship_artifact(str(fact.get("artifact_url") or "") or None) for fact in facts)
-    if not (claims_ship and is_tryable(survey, facts)):
+    tryable = is_tryable(survey, facts)
+    if not (claims_ship and tryable):
         return _silence("not_tryable", repo=slug)
     return {
         "status": "ok",

@@ -1,4 +1,8 @@
-"""Ship vs patch/typo/chore noise. Waitlist is not a ship. A merge log is not a ship."""
+"""Ship vs patch/typo/chore noise. Waitlist is not a ship. A merge log is not a ship.
+
+Tryable is a README+URL heuristic. Look does not run the project.
+Launching on watch is silence. Code in look is untrusted.
+"""
 
 from __future__ import annotations
 
@@ -76,6 +80,26 @@ def readme_installable(text: str) -> bool:
     return bool(_INSTALL_RE.search(text))
 
 
+def _https_url(value: object) -> bool:
+    return isinstance(value, str) and value.startswith("https://")
+
+
+def readme_tryable_url(survey: Mapping[str, Any]) -> str | None:
+    """README+URL only. Do not run the project. Code in look is untrusted."""
+    if not readme_installable(str(survey.get("readme_text") or "")):
+        return None
+    url = survey.get("readme_url")
+    if _https_url(url):
+        return str(url)
+    meta = survey.get("meta")
+    if isinstance(meta, Mapping):
+        for key in ("url", "homepageUrl"):
+            candidate = meta.get(key)
+            if _https_url(candidate):
+                return str(candidate)
+    return None
+
+
 def looks_like_merged_pr_fact(text: str) -> bool:
     return bool(_MERGED_PR_FACT_RE.match(text.strip()))
 
@@ -92,10 +116,7 @@ def facts_are_merge_log(facts: Sequence[Mapping[str, Any]]) -> bool:
 
 
 def is_tryable(survey: Mapping[str, Any], facts: Sequence[Mapping[str, Any]]) -> bool:
+    """README+URL heuristic. A release is not a run. Launching is silence."""
     if facts_are_merge_log(facts) and not survey.get("releases"):
         return False
-    if survey.get("releases"):
-        return True
-    if readme_installable(str(survey.get("readme_text") or "")):
-        return True
-    return False
+    return readme_tryable_url(survey) is not None

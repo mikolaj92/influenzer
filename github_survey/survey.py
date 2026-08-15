@@ -2,6 +2,8 @@
 
 Survey is gh api only. git clone / worktree on the host is silence.
 Mini is not a checkout cache.
+Look does not run the project. Launching on watch is silence.
+Tryable is a README+URL heuristic. Code in look is untrusted.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
@@ -39,6 +41,57 @@ _GH_PAGE_SIZE = 100
 _PAGED_KINDS = frozenset({"prs", "releases", "tags", "issue_comments", "pull_comments"})
 _GIT_HEADS = frozenset({"git", "git-clone", "git-worktree"})
 _CLONE_OR_WORKTREE = frozenset({"clone", "worktree"})
+_PROJECT_LAUNCH_HEADS = frozenset(
+    {
+        "python",
+        "python2",
+        "python3",
+        "pypy",
+        "pypy3",
+        "uv",
+        "pip",
+        "pip3",
+        "pipx",
+        "poetry",
+        "hatch",
+        "pdm",
+        "pixi",
+        "rye",
+        "npm",
+        "npx",
+        "pnpm",
+        "yarn",
+        "bun",
+        "node",
+        "deno",
+        "cargo",
+        "go",
+        "make",
+        "gmake",
+        "cmake",
+        "docker",
+        "docker-compose",
+        "compose",
+        "podman",
+        "bash",
+        "sh",
+        "zsh",
+        "fish",
+        "brew",
+        "ruby",
+        "perl",
+        "php",
+        "java",
+        "gradle",
+        "mvn",
+        "open",
+        "xdg-open",
+        "osascript",
+        "codespace",
+        "devcontainer",
+        "act",
+    }
+)
 
 
 def _look_argv_tokens(argv: object) -> list[str] | None:
@@ -80,12 +133,28 @@ def look_argv_is_clone_or_worktree(argv: object) -> bool:
     return any(token.startswith("--work-tree") for token in lowered)
 
 
+def look_argv_launches_project(argv: object) -> bool:
+    """True when argv would run the watched project. Launching is silence."""
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return True
+    if look_argv_is_clone_or_worktree(tokens):
+        return True
+    lowered = [token.lower() for token in tokens]
+    if not lowered:
+        return False
+    head = Path(lowered[0]).name
+    if head.endswith(".exe"):
+        head = head[:-4]
+    return head in _PROJECT_LAUNCH_HEADS
+
+
 def look_api_only_gh(gh: GhRunner | None = None) -> GhRunner:
-    """Survey/feedback only through gh api. clone/worktree is silence, not a spawn."""
+    """Survey/feedback only through gh api. clone/worktree/launch is silence."""
     runner = run_gh if gh is None else gh
 
     def _api_only(argv: Sequence[str]) -> GhCall:
-        if look_argv_is_clone_or_worktree(argv):
+        if look_argv_launches_project(argv):
             return GhCall(returncode=0, stdout="", stderr="")
         child = gh_argv(argv)
         if child is None or not allowlisted_gh_argv(child):

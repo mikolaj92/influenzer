@@ -19,7 +19,15 @@ from github_survey.gh import (
     loads_json,
     required_json,
 )
-from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_argv_leaves_declared_repo, look_declared_gh, look_short_gh
+from github_survey.survey import (
+    MAX_PAGES,
+    look_api_only_gh,
+    look_argv_is_unbounded_pages,
+    look_argv_launches_project,
+    look_argv_leaves_declared_repo,
+    look_declared_gh,
+    look_short_gh,
+)
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -496,3 +504,42 @@ class LookStaysOnDeclaredRepoTests(unittest.TestCase):
             out["survey"]["prs"][0]["body"],
             "See also https://github.com/other/tool — not our watch.",
         )
+
+
+class LookDoesNotLaunchProjectTests(unittest.TestCase):
+    def test_install_and_run_argv_launches_project(self) -> None:
+        self.assertTrue(look_argv_launches_project(["uv", "run", "influenzer-tick", "--once"]))
+        self.assertTrue(look_argv_launches_project(["/usr/bin/python3", "-m", "demo"]))
+        self.assertTrue(look_argv_launches_project("npm install && npm start"))
+        self.assertTrue(look_argv_launches_project(["make", "dev"]))
+        self.assertTrue(look_argv_launches_project(["docker", "compose", "up"]))
+        self.assertTrue(look_argv_launches_project(["git", "clone", f"https://github.com/{REPO}.git"]))
+        self.assertFalse(look_argv_launches_project(["repo", "view", REPO]))
+        self.assertFalse(look_argv_launches_project(["api", f"repos/{REPO}/readme"]))
+
+    def test_launch_argv_is_silence_not_a_spawn(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise AssertionError("look must not run the watched project")
+
+        runner = look_api_only_gh(boom)
+        for argv in (
+            ["uv", "run", "influenzer-tick", "--once"],
+            ["python3", "setup.py", "install"],
+            ["npm", "start"],
+            ["make", "test"],
+            ["docker", "compose", "up"],
+            ["git", "clone", f"https://github.com/{REPO}.git"],
+        ):
+            with self.subTest(argv=argv):
+                call = runner(argv)
+                self.assertEqual(call.returncode, 0)
+                self.assertEqual(call.stdout, "")
+                self.assertEqual(call.stderr, "")
+
+    def test_survey_does_not_launch_the_project(self) -> None:
+        fake = ScriptedGh(ship_script())
+        with patch("subprocess.run", side_effect=AssertionError("survey must not call subprocess")):
+            out = survey_public_repo(REPO, gh=fake, now=NOW)
+        self.assertEqual(out["status"], "ok")
+        self.assertTrue(fake.calls)
+        self.assertFalse(any(look_argv_launches_project(list(argv)) for argv in fake.calls))

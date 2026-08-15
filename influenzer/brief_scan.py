@@ -7,6 +7,8 @@ Does not score. Does not publish. Does not enable live social.
 Does not implement `gh` — that is github_survey's job.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
+Does not run the project. Launching on watch is silence.
+Tryable is a README+URL heuristic. Code in look is untrusted.
 Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
@@ -28,7 +30,7 @@ from influenzer.storage import StateRepository
 
 
 def look_only_gh(gh: GhRunner | None, repo_slug: str | None = None) -> GhRunner:
-    """Look may only GET the declared repo via gh api. After N pages, stop."""
+    """Look may only GET the declared repo via gh api. Launching is silence."""
     runner = look_short_gh(gh)
     slug = (repo_slug or "").strip()
     if not slug:

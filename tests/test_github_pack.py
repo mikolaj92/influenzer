@@ -5,10 +5,10 @@ import unittest
 from unittest.mock import patch
 
 from github_pack import looks_like_patch_only, looks_like_ship_title, pack_survey
-from github_pack.classify import facts_are_merge_log, looks_like_merged_pr_fact
+from github_pack.classify import facts_are_merge_log, is_tryable, looks_like_merged_pr_fact
 from github_survey import GhCall, survey_public_repo
 
-from tests.gh_scripts import NOW, REPO, merge_log_script, noise_script, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
 
 
 class HeuristicTests(unittest.TestCase):
@@ -75,6 +75,23 @@ class PackSilenceTests(unittest.TestCase):
         self.assertTrue(out["ok"])
         self.assertIsNone(out["brief_id"])
         self.assertNotIn("facts", out)
+
+    def test_release_without_readme_url_is_not_tryable(self) -> None:
+        out = self._pack(ship_script(readme=GhCall(0, b64_readme("# Demo\nWIP\n"))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "not_tryable")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertFalse(
+            is_tryable(
+                {
+                    "releases": [{"tagName": "v0.1.0"}],
+                    "readme_text": "# Demo\nWIP\n",
+                    "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                },
+                [{"text": "Released v0.1.0", "artifact_url": "https://github.com/mikolaj92/demo/releases/tag/v0.1.0"}],
+            )
+        )
 
     def test_waitlist_release_is_silence(self) -> None:
         out = self._pack(

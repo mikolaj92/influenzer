@@ -11,7 +11,7 @@ from typing import Any
 from unittest.mock import patch
 
 from github_survey import GhCall
-from github_survey.survey import look_argv_leaves_declared_repo
+from github_survey.survey import look_argv_launches_project, look_argv_leaves_declared_repo
 
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main as cli_main
@@ -267,6 +267,18 @@ class HomWatchTests(unittest.TestCase):
         self.assertNotEqual(show_watch(self.repo)["repo"], "other/tool")
         self.assertTrue(fake.calls)
         self.assertFalse(any(look_argv_leaves_declared_repo(list(argv), REPO) for argv in fake.calls))
+        self.assertFalse(any(look_argv_launches_project(list(argv)) for argv in fake.calls))
+        self.assertFalse(out.get("published", False))
+
+    def test_watch_look_does_not_launch_the_project(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        out, fake = self._tick()
+        self.assertEqual(out["scan"]["status"], "admitted")
+        stored = self.repo.get_brief("app-1", "scan-v0-1-0")
+        assert stored is not None
+        self.assertTrue(stored.tryable)
+        self.assertTrue(fake.calls)
+        self.assertFalse(any(look_argv_launches_project(list(argv)) for argv in fake.calls))
         self.assertFalse(out.get("published", False))
 
 
@@ -476,6 +488,9 @@ class HomWatchBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not know Heimdall", blob)
         self.assertIn("Does not run pass every interval", blob)
         self.assertIn("Does not open runtime.db", blob)
+        self.assertIn("Does not run the project", blob)
+        self.assertIn("Launching on watch is silence", blob)
+        self.assertIn("Tryable is a README+URL heuristic", blob)
         self.assertNotIn("run_gh", blob)
         self.assertNotIn("pack_survey", blob)
         self.assertNotIn("survey_public_repo", blob)
