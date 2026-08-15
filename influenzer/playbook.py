@@ -681,20 +681,30 @@ COMMIT_NOISE_RE = re.compile(
 # look. This is not #85 (bot bumps): author does not matter.
 DOCS_TYPO_CHORE_RE = re.compile(
     r"(?i)(?:"
-    r"^\s*(?:docs|style|test|refactor|build|chore|typo|lint|ci|wip|patch)"
-    r"(?:\([^)]*\))?\s*[:=-]|"
-    r"^\s*(?:docs|style|test|refactor|build|chore|typo|lint|ci|wip|patch)\s*$|"
+    # conventional type, optional scope / bang: docs(readme)!: …
+    r"^\s*(?:docs|style|test|tests|refactor|build|chore|typo|lint|ci|wip|patch)"
+    r"(?:\([^)]*\))?\!?(?:\s*[:=-]\s*|\s+|$)"
+    r"|"
+    # fix(docs): / fix(readme): is still a text change, not a ship
+    r"^\s*fix(?:es)?\([^)]*"
+    r"\b(?:docs?|documentation|readme|typo|chore|style)\b"
+    r"[^)]*\)\!?(?:\s*[:=-]|$)"
+    r"|"
     r"^\s*(?:fix(?:es)?\s+)?(?:a\s+)?typo\b|"
     r"^\s*(?:chore|typo|lint|ci|wip)\b|"
+    r"\bchore\s*[:=-]|"
     r"^\s*bump\s+(?:version|deps)\b|"
     r"^\s*fix(?:es)?\s+tests\b|"
     r"^\s*merge\s+branch\b|"
     r"\btypo\b|"
     r"\bdocs?[- /]+(?:only|typo|chore)\b|"
-    r"\b(?:samo|only)\s+(?:docs|typo|chore)\b|"
-    r"\bpoprawk[aię]\s+tekst|"
+    r"\b(?:samo|only|tylko)\s+(?:docs|typo|chore|dokument)\b|"
+    r"\bpoprawk[aię]\s+(?:tekst|dokument)|"
     r"\bdocument(?:ation|s)?\s+(?:update|fix|typo|chore|only|badge)s?\b|"
-    r"\b(?:update|fix)(?:s|d)?\s+(?:the\s+)?(?:docs?|documentation|readme)\b"
+    r"\b(?:update|fix|improve|clarif(?:y|ied)|correct|reword|rewrite|tweak|polish)"
+    r"(?:s|d|es|ed)?\s+(?:the\s+)?(?:docs?|documentation|readme|changelog|spelling|grammar|wording|typos?)\b|"
+    r"\b(?:docs?|documentation|readme)\s+(?:wording|spelling|grammar|typos?|nits?)\b|"
+    r"^\s*(?:docs?|documentation|readme|changelog|spelling|grammar|wording|nits?)\s*$"
     r")"
 )
 # github_pack prefixes a release/tag name. Peel that wrapper so a human

@@ -1020,6 +1020,17 @@ class PlaybookCopyTests(unittest.TestCase):
             "Released chore: tidy lockfile",
             "Released Documentation updates",
             "Tag docs-only",
+            "fix(docs): update badge",
+            "docs!: rewrite guide",
+            "Improve documentation",
+            "Clarify README install",
+            "Correct spelling",
+            "Fix grammar",
+            "tylko docs",
+            "poprawka dokumentacji",
+            "human chore: tidy",
+            "Released Documentation",
+            "Released Fix README",
         )
         for text in noise:
             with self.subTest(text=text):
@@ -1044,6 +1055,17 @@ class PlaybookCopyTests(unittest.TestCase):
                 (
                     "Released docs: fix badge",
                     "Merged PR #8: typo in README",
+                    "README has an install/quickstart a stranger can run",
+                    "Local operator with a working install",
+                ),
+                kinds=("release", "pull", "readme", "signal"),
+            )
+        )
+        self.assertTrue(
+            looks_like_docs_typo_chore_window(
+                (
+                    "Released fix(docs): update badge",
+                    "Merged PR #8: Improve documentation",
                     "README has an install/quickstart a stranger can run",
                     "Local operator with a working install",
                 ),
@@ -1548,6 +1570,64 @@ class ScoreBriefTests(unittest.TestCase):
                 Fact(
                     kind="pull",
                     text="Merged PR #8: typo in README",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/8",
+                ),
+                Fact(
+                    kind="readme",
+                    text="README has an install/quickstart a stranger can run",
+                    artifact_url="https://github.com/mikolaj92/influenzer#readme",
+                ),
+                Fact(kind="signal", text="Local operator with a working install"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "docs_typo_chore")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
+    def test_human_prose_docs_window_is_changelog_not_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(
+                    kind="release",
+                    text="Released Documentation",
+                    artifact_url=SHIP_RELEASE,
+                ),
+                Fact(
+                    kind="pull",
+                    text="Merged PR #8: Improve documentation",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/8",
+                ),
+                Fact(
+                    kind="readme",
+                    text="README has an install/quickstart a stranger can run",
+                    artifact_url="https://github.com/mikolaj92/influenzer#readme",
+                ),
+                Fact(kind="signal", text="Local operator with a working install"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "docs_typo_chore")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
+    def test_fix_docs_scope_window_is_changelog_not_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(
+                    kind="release",
+                    text="Released fix(docs): update badge",
+                    artifact_url=SHIP_RELEASE,
+                ),
+                Fact(
+                    kind="pull",
+                    text="Merged PR #8: fix(docs): badge",
                     artifact_url="https://github.com/mikolaj92/influenzer/pull/8",
                 ),
                 Fact(

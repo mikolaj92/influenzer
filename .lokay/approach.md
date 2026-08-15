@@ -7,9 +7,7 @@ Issue: #86 — Samo docs/typo/chore to nie ship
 
 ## Goal
 
-A look window of only docs / typo / chore — even human-authored — is not a ship.
-Social look is silence. Changelog on GitHub is allowed. This is not bot-bumpy
-(#85); author does not matter. A human feat next to a typo still drafts.
+Samo docs/typo/chore — nawet ludzkie — to nie ship. Jeśli w oknie nie ma nic poza poprawkami tekstu i chore, look milczy społecznie. Changelog na GitHubie wolno. To nie bot-bumpy (#85); to brak historii.
 
 ## Files likely touched
 
@@ -34,5 +32,5 @@ Social look is silence. Changelog on GitHub is allowed. This is not bot-bumpy
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- `github_pack` prefixes release/tag names as `Released …` / `Tag …`. The window
-  detector must peel that wrapper or a human docs-only release still drafts Show HN.
+- `github_pack` prefixes release/tag names as `Released …` / `Tag …`. Peel that wrapper.
+- Conventional `fix(docs):` / `docs!:` and human-prose titles (`Improve documentation`) are still a docs window, not Show HN.

@@ -1304,6 +1304,8 @@ class HomDraftCostumeTests(unittest.TestCase):
             "typo in README",
             "chore: tidy lockfile",
             "Released docs: fix badge",
+            "Released fix(docs): update badge",
+            "Released Documentation",
         )
         for text in chores:
             with self.subTest(text=text):
