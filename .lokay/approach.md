@@ -1,29 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=90 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=89 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #90 — Fork nie jest witryną
+Issue: #89 — Puste repo nie ma witryny
 
 ## Goal
 
-Fork nie jest witryną. `isFork` → look milczy, nawet gdy owner nasz. Kąt idzie z kanonicznego źródła, nie z kopii. Pomoc upstream to cisza u nas, nie „nasz launch”.
+Puste repo nie ma witryny. Brak drzewa albo brak README → look milczy. To nie „README bez GIF-a” (#48) — tu nie ma nawet kartki.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — `looks_like_empty_repo` + wave copy
+- `influenzer/brief_scan.py` — `repo_is_empty` / missing README is silence
+- `influenzer/brief_admit.py` — packed empty-repo facts stay silent
+- `influenzer/hom.py` / `influenzer/hom_draft.py` / `influenzer/hom_feedback.py` — score, dress, inbound
+- tests for the gate, distinct from README-without-demo
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `uv run python -m unittest` on brief admit, operator, draft, feedback
 
 ## Non-goals
 
-- (none stated)
+- Do not treat a present README without a GIF as this gate (#48).
+- Do not clone, make a worktree, or run the project.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Same fail-closed shape as #90 (fork is not a website).

@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -498,6 +498,29 @@ FORK_RE = re.compile(
     r"|\bfork\s+nie\s+jest\b"
     r"|\bkopi[ae]\s+(?:repo|repozytorium|upstream)\b"
     r"|\bto\s+jest\s+fork\b"
+    r")"
+)
+# An empty repo is not a website. No tree or no README is silence.
+# This is not README-without-a-GIF (#48): here there is not even a card.
+# Pair of puste and kartka. A working README stays; an empty tree does not.
+EMPTY_REPO_RE = re.compile(
+    r"(?i)(?:"
+    r"\bisEmpty\"?\s*[:=]\s*\"?true\b"
+    r"|\bis_empty\"?\s*[:=]\s*\"?true\b"
+    r"|\bthis\s+(?:repo(?:sitory)?|project)\s+is\s+empty\b"
+    r"|\bempty\s+(?:git\s+)?tree\b"
+    r"|\bno\s+default\s+branch\b"
+    r"|\bwithout\s+(?:a\s+)?default\s+branch\b"
+    r"|\bno\s+readme(?:\s+file)?\b"
+    r"|\bwithout\s+(?:a\s+)?readme(?:\s+file)?\b"
+    r"|\bmissing\s+readme(?:\s+file)?\b"
+    r"|\bbrak\s+(?:drzewa|readme)\b"
+    r"|\bbez\s+readme\b"
+    r"|\bpuste\s+repo\b"
+    r"|\bnie\s+ma\s+witryn"
+    r"|\bnie\s+ma\s+nawet\s+kartk"
+    r"|\bdiskUsage\"?\s*[:=]\s*\"?0\b"
+    r"|\bdisk_usage\"?\s*[:=]\s*\"?0\b"
     r")"
 )
 # A listed release asset that 404s/410s is not a ship. The file is on
@@ -1177,6 +1200,13 @@ def looks_like_fork(text: str) -> bool:
     return bool(FORK_RE.search(text))
 
 
+def looks_like_empty_repo(text: str) -> bool:
+    """True when there is no tree or no README. An empty repo is not a website."""
+    if not text or not text.strip():
+        return False
+    return bool(EMPTY_REPO_RE.search(text))
+
+
 def looks_like_dead_release_asset(text: str) -> bool:
     """True for a listed release asset whose download is 404/410. A missing file is not a ship."""
     if not text or not text.strip():
@@ -1733,6 +1763,7 @@ __all__ = [
     "DEAD_RELEASE_ASSET_RE",
     "ISSUES_DISABLED_RE",
     "FORK_RE",
+    "EMPTY_REPO_RE",
     "LOGIN_GATE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
@@ -1814,6 +1845,7 @@ __all__ = [
     "looks_like_dead_release_asset",
     "looks_like_issues_disabled",
     "looks_like_fork",
+    "looks_like_empty_repo",
     "looks_like_login_gate",
     "looks_like_roadmap",
     "looks_like_waitlist",
