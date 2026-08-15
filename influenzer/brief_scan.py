@@ -32,6 +32,7 @@ from github_survey import GhRunner, invalid_repo_reason, survey_public_repo
 from github_survey.survey import look_declared_gh, look_short_gh
 from influenzer.playbook import (
     looks_like_empty_repo,
+    looks_like_failed_ci,
     looks_like_fork,
     looks_like_pending_ci,
     looks_like_template,
@@ -147,11 +148,8 @@ def _payload_is_empty_repo(payload: dict[str, Any]) -> bool:
     return looks_like_empty_repo("\n".join(bits))
 
 
-def _payload_has_pending_ci(payload: dict[str, Any]) -> bool:
-    """Pending / yellow CI is unknown. Not a ship, not a fail, not a stored brief."""
-    bits: list[str] = []
-    if looks_like_pending_ci(str(payload.get("reason") or "")):
-        return True
+def _payload_ci_bits(payload: dict[str, Any]) -> str:
+    bits: list[str] = [str(payload.get("reason") or "")]
     survey = payload.get("survey")
     if isinstance(survey, dict):
         bits.append(str(survey.get("readme_text") or ""))
@@ -174,7 +172,17 @@ def _payload_has_pending_ci(payload: dict[str, Any]) -> bool:
         for item in facts:
             if isinstance(item, dict):
                 bits.append(str(item.get("text") or ""))
-    return looks_like_pending_ci("\n".join(bits))
+    return "\n".join(bits)
+
+
+def _payload_has_pending_ci(payload: dict[str, Any]) -> bool:
+    """Pending / yellow CI is unknown. Not a ship, not a fail, not a stored brief."""
+    return looks_like_pending_ci(_payload_ci_bits(payload))
+
+
+def _payload_has_failed_ci(payload: dict[str, Any]) -> bool:
+    """Failed / red CI on the default branch is a false launch. Not tryable."""
+    return looks_like_failed_ci(_payload_ci_bits(payload))
 
 
 def _payload_is_template(payload: dict[str, Any]) -> bool:
@@ -229,6 +237,8 @@ def scan_github(
             return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
         if _payload_has_pending_ci(surveyed):
             return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
+        if _payload_has_failed_ci(surveyed):
+            return host_silence("failed_ci_not_tryable", project_id=project_id, repo_slug=slug)
         packed = pack_survey(surveyed)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)

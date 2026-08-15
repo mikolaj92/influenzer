@@ -1,7 +1,8 @@
 {
   "paths": [
+    "github_survey/survey.py",
     "influenzer",
-    "influenzer/content.py",
+    "influenzer/adapters/spike_scores.json",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -18,6 +19,7 @@
     "influenzer/catalog.py",
     "influenzer/cli.py",
     "influenzer/config.py",
+    "influenzer/content.py",
     "influenzer/domain.py",
     "influenzer/effector.py",
     "influenzer/envelope.py",
@@ -37,14 +39,13 @@
     "influenzer/scheduler.py",
     "influenzer/security.py",
     "influenzer/storage.py",
-    "influenzer/tick.py",
-    "influenzer/tick_all.py",
-    "influenzer/adapters"
+    "influenzer/tick.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "Ten",
+    "survey",
+    "score",
     "influenzer"
   ],
   "notes": [
@@ -52,7 +53,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__82-te-pending-ci-to-nie-ziele-f2dc6cd8",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__81-czerwone-ci-na-default-branch-to-fa-szyw-d9be8da1",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

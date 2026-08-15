@@ -25,6 +25,7 @@ from influenzer.playbook import (
     StoryKind,
     is_social_arena,
     looks_like_empty_repo,
+    looks_like_failed_ci,
     looks_like_fork,
     looks_like_pending_ci,
 )
@@ -106,6 +107,8 @@ def admit_pack(
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
     if looks_like_pending_ci(fact_blob):
         return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
+    if looks_like_failed_ci(fact_blob):
+        return host_silence("failed_ci_not_tryable", project_id=project_id, repo_slug=slug)
     try:
         brief = brief_from_mapping(
             {

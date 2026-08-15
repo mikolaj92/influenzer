@@ -61,6 +61,7 @@ from influenzer.playbook import (
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_pending_ci,
+    looks_like_failed_ci,
     looks_like_prerelease,
     looks_like_source_available_as_oss,
     looks_like_source_available_license,
@@ -1272,6 +1273,43 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_pending_ci(text))
 
+    def test_failed_or_red_ci_is_not_tryable(self) -> None:
+        broken = (
+            "CI failed",
+            "checks failed",
+            "failed CI",
+            "red CI",
+            "red or failed CI",
+            "workflow is failing",
+            "statusCheckRollup: FAILURE",
+            "check-run: failure",
+            "default branch is red",
+            "main is failed",
+            "czerwone CI",
+            "padnięte checki",
+            "CI padło",
+        )
+        for text in broken:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_failed_ci(text))
+                self.assertFalse(looks_like_pending_ci(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "failed brief",
+            "status: failed",
+            "Released v1.2.3",
+            "CI passed",
+            "checks succeeded",
+            "CI is pending",
+            "yellow CI",
+            "join the waitlist",
+            "coming Q3",
+            "github-actions bumps is not a story",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_failed_ci(text))
+
     def test_source_available_plus_open_source_is_a_license_lie(self) -> None:
         lies = (
             "BUSL open source",
@@ -2077,7 +2115,7 @@ class ScoreBriefTests(unittest.TestCase):
         brief = self._brief(
             claims_ship=False,
             tryable=False,
-            facts=(Fact(text="CI is pending", artifact_url=SHIP_PR),),
+            facts=(Fact(text="checks are pending", artifact_url=SHIP_PR),),
         )
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
@@ -2098,17 +2136,52 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.arena, ArenaId.HN)
         self.assertIsNotNone(compose_draft(brief, score))
 
-    def test_failed_ci_is_not_this_pending_gate(self) -> None:
+    def test_failed_ci_ship_claim_is_killed(self) -> None:
+        broken = (
+            "CI failed",
+            "red CI",
+            "statusCheckRollup: FAILURE",
+            "czerwone CI",
+        )
+        for text in broken:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "failed_ci_not_tryable")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_failed_ci_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="checks failed", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "failed_ci_not_tryable")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_failed_ci_can_still_draft(self) -> None:
         brief = self._brief(
             preferred_arena=ArenaId.HN,
             facts=(
-                Fact(text="CI failed", artifact_url=SHIP_PR),
-                Fact(text="strangers can click and run the demo today"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="CI passed"),
             ),
         )
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.DRAFT)
-        self.assertNotEqual(score.reason, "pending_ci_unknown")
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_superlative_without_tryable_artifact_is_killed(self) -> None:
         slogans = (

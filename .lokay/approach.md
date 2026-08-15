@@ -1,29 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=82 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=81 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #82 — Żółte/pending CI to nie zieleń
+Issue: #81 — Czerwone CI na default branch to fałszywy launch
 
 ## Goal
 
-Żółte/pending CI to nie zieleń. Ten look milczy — nie ship, nie „jest zepsute”. Nie znamy wyniku, więc nie kłamiemy. Następny poniedziałek może ruszyć.
+Czerwone CI na default branch to fałszywy launch. Look widzi padnięte checki → nie tryable, nie Show HN. Changelog wolno. Nie mówimy że działa, gdy main jest czerwony.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — `FAILED_CI_RE` / `looks_like_failed_ci`, sibling of #82 pending CI
+- `influenzer/brief_scan.py` — look silence before admit
+- `influenzer/brief_admit.py` — pack silence
+- `influenzer/hom.py` — score: kill ship/social, changelog otherwise
+- `influenzer/hom_draft.py` — undress even if a score says draft
+- tests for admit / score / dress
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python -m pytest tests/test_brief_admit.py tests/test_hom_operator.py tests/test_hom_draft.py`
 
 ## Non-goals
 
-- (none stated)
+- Fetch GitHub Checks API (gh allowlist stays GET catalog from #82/#105).
+- Treat pending/yellow CI as this gate (that is #82).
+- Claim “it works” or emit Show HN when main is red.
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Same fail-closed shape as #82: text heuristic on survey/facts, not a new gh call.
+- Passing / green CI stays tryable.
+- Collector boundary: no unbounded collection.

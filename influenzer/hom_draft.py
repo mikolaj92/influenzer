@@ -78,6 +78,7 @@ from influenzer.playbook import (
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_pending_ci,
+    looks_like_failed_ci,
     looks_like_prerelease,
     looks_like_waitlist,
     strip_open_source_claim,
@@ -232,6 +233,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
     return (
         looks_like_waitlist(bits.blob)
         or looks_like_pending_ci(bits.blob)
+        or looks_like_failed_ci(bits.blob)
         or looks_like_prerelease(bits.blob)
         or looks_like_login_gate(bits.blob)
         or looks_like_dead_link(bits.blob)

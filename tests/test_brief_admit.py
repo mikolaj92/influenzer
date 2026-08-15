@@ -276,8 +276,44 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
-    def test_failed_ci_look_is_not_this_pending_gate(self) -> None:
+    def test_failed_ci_pack_is_silence_not_tryable(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": "CI failed"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "failed_ci_not_tryable")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_failed_ci_look_is_silence_so_next_monday_can_look(self) -> None:
         out = self._scan(ship_script(repo=GhCall(0, repo_json(description="CI failed"))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "failed_ci_not_tryable")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_green_ci_look_is_not_this_failed_gate(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(description="CI passed"))))
         self.assertEqual(out["status"], "ok")
         self.assertEqual(out["brief_id"], "scan-v0-1-0")
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)

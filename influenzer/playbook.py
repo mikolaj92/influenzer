@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -399,6 +399,30 @@ PENDING_CI_RE = re.compile(
     r"|\b(?:ci|check(?:i|ów)?|test(?:y|ów)?)\s+(?:oczekuj[aą]c[aey]|w\s+toku)\b"
     r"|\bżółt[aey]\s+(?:ci|check(?:i|ów)?)\b"
     r"|\b(?:ci|check(?:i|ów)?)\s+żółt[aey]\b"
+    r")"
+)
+# Failed / red CI on the default branch is a false launch. Look stays
+# silent: not tryable, not Show HN. Changelog may keep the tag. We do
+# not say it works when main is red. Pending / yellow is a different
+# gate (#82). A passing check / green CI stays. Pair of waitlist:
+# broken vs unpublished.
+FAILED_CI_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:ci|checks?|check[- ]?runs?|check[- ]?suites?|status[- ]?checks?|"
+    r"workflows?|actions|statusCheckRollup|status_check_rollup)"
+    r"\s*(?:is\s+|are\s+|still\s+)?(?:failed|failing|failure|broken|red)\b"
+    r"|\b(?:failed|failing|failure|broken|red)\s+"
+    r"(?:ci|checks?|check[- ]?runs?|check[- ]?suites?|status[- ]?checks?|workflows?|actions)\b"
+    r"|\b(?:statusCheckRollup|status_check_rollup|check[- ]?run|check[- ]?suite|"
+    r"workflow[- ]?run)\"?\s*[:=]\s*\"?(?:failure|failed|error|timed_out|startup_failure)\b"
+    r"|\bred\s+(?:or\s+)?failed\s+ci\b"
+    r"|\bfailed\s+(?:or\s+)?red\s+ci\b"
+    r"|\b(?:default\s+branch|main)\s+(?:is\s+)?(?:red|failed)\b"
+    r"|\b(?:ci|checks?)\s+(?:na\s+)?(?:default\s+branch|main)\s+(?:pad[lł][oay]?|czerwon)\b"
+    r"|\bczerwon[aey]\s+(?:ci|check(?:i|ów)?|main)\b"
+    r"|\b(?:ci|check(?:i|ów)?|main)\s+czerwon[aey]\b"
+    r"|\bpadni[eę]t[aey]\s+(?:ci|check(?:i|ów)?)\b"
+    r"|\b(?:ci|check(?:i|ów)?)\s+pad[lł][oay]?\b"
     r")"
 )
 # A GitHub draft / prerelease / RC / beta is not a ship. Only a published,
@@ -1378,6 +1402,13 @@ def looks_like_pending_ci(text: str) -> bool:
     return bool(PENDING_CI_RE.search(text))
 
 
+def looks_like_failed_ci(text: str) -> bool:
+    """True for failed / red CI. A red default branch is not tryable."""
+    if not text or not text.strip():
+        return False
+    return bool(FAILED_CI_RE.search(text))
+
+
 def looks_like_prerelease(text: str) -> bool:
     """True for a GitHub draft / prerelease / RC / beta. That is not a ship."""
     if not text or not text.strip():
@@ -2009,6 +2040,7 @@ __all__ = [
     "RANKING_HOSTS",
     "ROADMAP_RE",
     "PENDING_CI_RE",
+    "FAILED_CI_RE",
     "PRERELEASE_RE",
     "SHIP_ARTIFACT_RE",
     "SOCIAL_ARENAS",
@@ -2087,6 +2119,7 @@ __all__ = [
     "looks_like_server_splash",
     "looks_like_roadmap",
     "looks_like_pending_ci",
+    "looks_like_failed_ci",
     "looks_like_prerelease",
     "looks_like_waitlist",
     "parse_arena",
