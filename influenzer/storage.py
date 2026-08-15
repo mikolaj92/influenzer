@@ -30,6 +30,17 @@ class ArtifactCorruptionError(StorageError):
     """An artifact's bytes no longer match its content address."""
 
 
+STATE_UNUSABLE = "state_unusable"
+_SQLITE_HEADER = b"SQLite format 3\x00"
+
+
+class StateUnusable(StorageError):
+    """Existing state.db is bad or not writable.
+
+    Do not wipe. Do not replace it with an empty CMO. Recovery is a human.
+    """
+
+
 class CrossProjectError(StorageError):
     """A relationship attempts to cross a project boundary."""
 
@@ -75,6 +86,30 @@ def reject_unbound_sql(sql: Any) -> None:
     """Fail closed when a DML string looks spliced instead of bound."""
     if sql_has_inbound_literal(sql if isinstance(sql, str) else ""):
         raise UnboundSqlError("sql must use bind parameters")
+
+
+def is_state_unusable(exc: BaseException | None) -> bool:
+    """True for a bad or readonly existing state.db. Missing is not this."""
+    return isinstance(exc, StateUnusable)
+
+
+def _sqlite_uri(path: Path, *, mode: str) -> str:
+    return f"{path.resolve().as_uri()}?mode={mode}"
+
+
+def _looks_like_sqlite(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(len(_SQLITE_HEADER)) == _SQLITE_HEADER
+    except OSError:
+        return False
+
+
+def _writable_file(path: Path) -> bool:
+    try:
+        return os.access(path, os.W_OK) and bool(path.stat().st_mode & 0o222)
+    except OSError:
+        return False
 
 
 class _BindOnlyConnection:
