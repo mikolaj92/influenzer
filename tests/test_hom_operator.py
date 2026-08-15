@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from influenzer.cli import main
 from influenzer.config import Config, write_config
@@ -2614,6 +2615,46 @@ class TickBriefPathTests(unittest.TestCase):
         self.assertEqual(data["reactions"][0]["kind"], "hom.decision")
         self.assertFalse((self.home / "runtime.db").exists())
         self.assertIsNone(write_fala_result(payload, env={}))
+
+    def test_fala_reaction_dir_pad_does_not_raise_or_own_history(self) -> None:
+        from influenzer.fala_result import write_fala_result
+
+        blocked = self.home / "fala-out-is-a-file"
+        blocked.write_text("not a directory", encoding="utf-8")
+        payload = {"status": "ok", "mutated": False, "operator": {"processed": 1}}
+        self.assertIsNone(write_fala_result(payload, env={"FALA_EFFECTOR_OUTPUT_DIR": str(blocked)}))
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_tick_all_fala_write_pad_keeps_score_draft_and_returns_ok(self) -> None:
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="ship-fala",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(brief)
+        blocked = self.home / "fala-out-is-a-file"
+        blocked.write_text("not a directory", encoding="utf-8")
+        stdout = io.StringIO()
+        with redirect_stdout(stdout), patch.dict(
+            "os.environ", {"FALA_EFFECTOR_OUTPUT_DIR": str(blocked)}
+        ):
+            code = tick_all_main(["--config", str(self.home / "config.json")])
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["operator"]["processed"], 1)
+        stored = self.repo.get_brief("app-1", "ship-fala")
+        assert stored is not None
+        self.assertEqual(stored.status, "processed")
+        self.assertIsNotNone(self.repo.get_operator_score("app-1", "ship-fala"))
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "ship-fala"))
+        again = tick_all_main(["--config", str(self.home / "config.json")])
+        self.assertEqual(again, 0)
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "ship-fala"))
+        self.assertFalse((self.home / "runtime.db").exists())
 
 
 class FalaPackageAndCatalogTests(unittest.TestCase):

@@ -121,6 +121,44 @@ class TickLoopTests(unittest.TestCase):
         self.assertEqual(results[2]["n"], 3)
         self.assertIn("transient tick fault", stderr.getvalue())
 
+    def test_fala_reaction_dir_pad_does_not_undo_score_or_stop_loop(self) -> None:
+        from influenzer.fala_result import write_fala_result
+
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="loop-fala",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(brief)
+        out = run_tick(config_path=str(self.home / "config.json"))
+        self.assertEqual(out["operator"]["processed"], 1)
+        blocked = self.home / "fala-out-is-a-file"
+        blocked.write_text("not a directory", encoding="utf-8")
+        self.assertIsNone(write_fala_result(out, env={"FALA_EFFECTOR_OUTPUT_DIR": str(blocked)}))
+        self.assertIsNotNone(self.repo.get_operator_score("app-1", "loop-fala"))
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "loop-fala"))
+
+        n = {"i": 0}
+
+        def tick_once() -> dict:
+            n["i"] += 1
+            write_fala_result(
+                {"status": "ok", "n": n["i"], "mutated": False, "published": False},
+                env={"FALA_EFFECTOR_OUTPUT_DIR": str(blocked)},
+            )
+            return {"status": "ok", "n": n["i"], "mutated": False, "published": False}
+
+        results = loop_ticks(tick_once, interval=1, max_ticks=3, sleep=lambda _n: None)
+        self.assertEqual([item["n"] for item in results], [1, 2, 3])
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "loop-fala"))
+        stored = self.repo.get_brief("app-1", "loop-fala")
+        assert stored is not None
+        self.assertEqual(stored.status, "processed")
+        self.assertFalse((self.home / "runtime.db").exists())
+
     def test_guarded_once_does_not_swallow_errors(self) -> None:
         def tick_once() -> dict:
             raise RuntimeError("one-shot must fail closed")

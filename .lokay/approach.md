@@ -1,21 +1,23 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=94 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=96 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #94 — Zła albo readonly state.db nie idzie w wipe
+Issue: #96 — Pad zapisu Fala nie cofa score/draft
 
 ## Goal
 
-Zła albo readonly state.db nie idzie w wipe i nie zabija pętli. Look milczy, baza zostaje. Odzysk to człowiek/hop, nie „zrób nową pustą i udawaj CMO”.
+Pad zapisu Fala (reaction dir) nie cofa score/draft w state.db i nie zabija pętli. Domena wygrywa. Journal jest obserwacją, nie właścicielem historii.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/fala_result.py` — swallow OSError on reaction-dir write
+- `tests/test_hom_operator.py` — pad keeps score/draft; tick-all still returns 0
+- `tests/test_tick_loop.py` — pad does not stop the interval loop
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python3 -m unittest tests.test_hom_operator.TickBriefPathTests tests.test_tick_loop.TickLoopTests.test_fala_reaction_dir_pad_does_not_undo_score_or_stop_loop`
 
 ## Non-goals
 
