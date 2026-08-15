@@ -1,13 +1,6 @@
 {
   "paths": [
-    "github_feedback/README.md",
-    "github_survey/README.md",
-    "README.md",
-    "github_feedback/feedback.py",
-    "github_pack/README.md",
-    "github_survey/survey.py",
     "influenzer",
-    "influenzer/hom_feedback.py",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -31,6 +24,7 @@
     "influenzer/fala_result.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
+    "influenzer/hom_feedback.py",
     "influenzer/hom_outbox.py",
     "influenzer/hom_pass.py",
     "influenzer/hom_verdict.py",
@@ -39,17 +33,17 @@
     "influenzer/migrations.py",
     "influenzer/playbook.py",
     "influenzer/policy.py",
-    "README/komentarze/JSON"
+    "influenzer/scan_due.py",
+    "influenzer/scheduler.py",
+    "influenzer/security.py",
+    "influenzer/storage.py",
+    "influenzer/tick.py",
+    "influenzer/tick_all.py",
+    "influenzer/adapters"
   ],
   "source": "deterministic",
-  "seed_paths": [
-    "README/komentarze/JSON"
-  ],
+  "seed_paths": [],
   "matched_tokens": [
-    "README",
-    "komentarze",
-    "survey",
-    "feedback",
     "influenzer"
   ],
   "notes": [
@@ -57,7 +51,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__78-za-du-y-payload-z-gh-to-cisza-nie-ucztow-1323c7b0",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__77-schemat-url-jest-cz-ci-bramki-tylko-http-a4edbfed",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

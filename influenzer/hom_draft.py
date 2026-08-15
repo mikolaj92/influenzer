@@ -46,6 +46,7 @@ from influenzer.playbook import (
     is_ranking_host_url,
     is_store_host_url,
     is_social_arena,
+    is_tryable_artifact_url,
     is_video_host_url,
     looks_like_bot_bump_week,
     looks_like_contest,
@@ -149,13 +150,8 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
                 found.append(url)
             continue
         if (
-            url.startswith("https://")
-            and not is_video_host_url(url)
-            and not is_store_host_url(url)
-            and not is_blog_host_url(url)
-            and not is_launch_host_url(url)
+            is_tryable_artifact_url(url)
             and not is_ranking_host_url(url)
-            and not is_news_host_url(url)
             and url not in found
         ):
             found.append(url)
@@ -309,6 +305,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     url = _proof_url(bits)
     if (
         not url
+        or not is_tryable_artifact_url(url)
         or is_video_host_url(url)
         or is_store_host_url(url)
         or is_blog_host_url(url)
