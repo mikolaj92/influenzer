@@ -20,15 +20,24 @@ An empty repo is not a website. No tree or no README is silence. This is
 not README-without-a-GIF: here there is not even a card.
 A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
+A hung gh is silence, not a stuck loop. Timeout is harder and shorter
+than the tick interval. After it: cisza, the child is gone, next tick
+goes. This is not auth-fail.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import signal
+import threading
+import time
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from github_pack import pack_survey
-from github_survey import GhRunner, invalid_repo_reason, survey_public_repo
+from github_survey import GhCall, GhRunner, invalid_repo_reason, survey_public_repo
 from github_survey.survey import look_declared_gh, look_short_gh
 from influenzer.playbook import (
     looks_like_empty_repo,
@@ -41,11 +50,57 @@ from influenzer.playbook import (
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
 from influenzer.domain import utc_now
 from influenzer.storage import StateRepository
+from influenzer.tick import DEFAULT_INTERVAL_SECONDS
+
+# Harder and shorter than the always-on tick interval. A hang is not auth.
+GH_HANG_TIMEOUT_S = 20.0
+assert GH_HANG_TIMEOUT_S < DEFAULT_INTERVAL_SECONDS
+
+
+def _kill_lingering_gh() -> None:
+    """Best-effort: a timed-out gh child must not stay. Next tick goes."""
+    try:
+        os.killpg(0, signal.SIGKILL)
+    except (OSError, ProcessLookupError, PermissionError):
+        return
+
+
+def look_hard_gh(gh: GhRunner | None = None, *, timeout_s: float = GH_HANG_TIMEOUT_S) -> GhRunner:
+    """One gh call may not hang the loop. After timeout: cisza, child gone."""
+    from github_survey import run_gh
+
+    inner = gh if gh is not None else run_gh
+    deadline = max(0.1, float(timeout_s))
+
+    def _hard(argv: Sequence[str]) -> GhCall:
+        box: dict[str, Any] = {}
+
+        def _run() -> None:
+            try:
+                box["call"] = inner(argv)
+            except BaseException as exc:  # hang path must stay silent
+                box["exc"] = exc
+
+        worker = threading.Thread(target=_run, name="influenzer-gh", daemon=True)
+        worker.start()
+        worker.join(deadline)
+        if worker.is_alive():
+            _kill_lingering_gh()
+            return GhCall(returncode=124, stdout="", stderr="gh timeout")
+        exc = box.get("exc")
+        if isinstance(exc, BaseException):
+            return GhCall(returncode=124, stdout="", stderr="gh timeout")
+        call = box.get("call")
+        if isinstance(call, GhCall):
+            return call
+        return GhCall(returncode=124, stdout="", stderr="gh timeout")
+
+    return _hard
 
 
 def look_only_gh(gh: GhRunner | None, repo_slug: str | None = None) -> GhRunner:
     """Look may only GET the declared repo via gh api. Launching is silence."""
-    runner = look_short_gh(gh)
+    runner = look_hard_gh(look_short_gh(gh))
     slug = (repo_slug or "").strip()
     if not slug:
         return runner

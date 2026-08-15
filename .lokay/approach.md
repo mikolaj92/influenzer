@@ -1,25 +1,21 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=80 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=79 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #80 — Jedna pętla na jeden state.db
+Issue: #79 — gh nie może zawiesić pętli
 
 ## Goal
 
-Jedna pętla na jeden state.db. Druga instancja ticka (ręczna + always-on) dostaje lock i wychodzi ciszą, nie robi drugiego looku. Advisory lock jak u Lokaya, nie dwa CMO w jednym domu.
+gh nie może zawiesić pętli. Timeout twardszy i krótszy niż interval ticka. Po czasie: cisza, proces nie zostaje, następny tick idzie. To nie auth-fail (#68) — to hang.
 
 ## Files likely touched
 
-- `influenzer/storage.py` — OS advisory lock beside `state.db` (`tick.lock`, non-blocking `fcntl.flock`)
-- `influenzer/tick.py` — always-on / `--once` holds the lock for the process; overlap prints cisza and exits
-- `influenzer/tick_all.py` — one-shot mutator takes the same lock; overlap is cisza, no look
-- `influenzer/hom_pass.py` / `influenzer/cli.py` — manual CMO look takes the same lock
-- `tests/test_tick_loop.py`, `tests/test_hom_pass.py`, `tests/test_persistence.py`
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python -m unittest tests.test_tick_loop tests.test_persistence tests.test_hom_pass tests.test_hom_watch`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
