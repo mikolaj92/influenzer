@@ -18,6 +18,8 @@ Angle comes from the canonical source, not a copy. Helping upstream is
 silence here, not our launch.
 An empty repo is not a website. No tree or no README is silence. This is
 not README-without-a-GIF: here there is not even a card.
+A template repo is not a product. isTemplate, or generate-from-template
+without an own ship, is silence. Show HN from boilerplate is silence.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from typing import Any
 from github_pack import pack_survey
 from github_survey import GhRunner, invalid_repo_reason, survey_public_repo
 from github_survey.survey import look_declared_gh, look_short_gh
-from influenzer.playbook import looks_like_empty_repo, looks_like_fork
+from influenzer.playbook import looks_like_empty_repo, looks_like_fork, looks_like_template
 
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
 from influenzer.domain import utc_now
@@ -84,6 +86,26 @@ def repo_is_empty(gh: GhRunner | None, repo_slug: str) -> bool:
     return isinstance(data, dict) and bool(data.get("isEmpty"))
 
 
+def repo_is_template(gh: GhRunner | None, repo_slug: str) -> bool:
+    """True when gh says isTemplate. A template is not a product."""
+    slug = (repo_slug or "").strip()
+    if not slug or invalid_repo_reason(slug):
+        return False
+    runner = look_only_gh(gh, slug)
+    try:
+        call = runner(["repo", "view", slug, "--json", "isTemplate"])
+    except (OSError, TypeError, ValueError):
+        return False
+    raw = getattr(call, "stdout", "") or ""
+    if not isinstance(raw, str) or not raw.strip():
+        return False
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    return isinstance(data, dict) and bool(data.get("isTemplate"))
+
+
 def _payload_is_fork(payload: dict[str, Any]) -> bool:
     if bool(payload.get("isFork")):
         return True
@@ -120,6 +142,26 @@ def _payload_is_empty_repo(payload: dict[str, Any]) -> bool:
     return looks_like_empty_repo("\n".join(bits))
 
 
+def _payload_is_template(payload: dict[str, Any]) -> bool:
+    if bool(payload.get("isTemplate")):
+        return True
+    if payload.get("reason") == "template_not_a_product":
+        return True
+    survey = payload.get("survey")
+    if not isinstance(survey, dict):
+        return False
+    meta = survey.get("meta")
+    bits: list[str] = []
+    if isinstance(meta, dict):
+        if bool(meta.get("isTemplate")) or bool(meta.get("is_template")):
+            return True
+        if meta.get("templateRepository") or meta.get("template_repository"):
+            return True
+        bits.append(str(meta.get("description") or ""))
+    bits.append(str(survey.get("readme_text") or ""))
+    return looks_like_template("\n".join(bits))
+
+
 def scan_github(
     repo: StateRepository,
     *,
@@ -140,16 +182,20 @@ def scan_github(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if repo_is_empty(runner, slug):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if repo_is_template(runner, slug):
+        return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
     try:
         surveyed = survey_public_repo(slug, gh=runner, now=now)
         if _payload_is_fork(surveyed):
             return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
         if _payload_is_empty_repo(surveyed):
             return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+        if _payload_is_template(surveyed):
+            return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
         packed = pack_survey(surveyed)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     return admit_pack(repo, packed, project_id=project_id, now=now or utc_now())
 
 
-__all__ = ["SOURCE", "look_only_gh", "repo_is_empty", "repo_is_fork", "scan_github"]
+__all__ = ["SOURCE", "look_only_gh", "repo_is_empty", "repo_is_fork", "repo_is_template", "scan_github"]
