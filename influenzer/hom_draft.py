@@ -45,6 +45,7 @@ from influenzer.playbook import (
     is_news_host_url,
     is_ranking_host_url,
     is_store_host_url,
+    is_social_arena,
     is_video_host_url,
     looks_like_contest,
     looks_like_dunk,
@@ -69,6 +70,7 @@ from influenzer.playbook import (
     looks_like_superlative,
     looks_like_dead_link,
     looks_like_dead_release_asset,
+    looks_like_issues_disabled,
     looks_like_login_gate,
     looks_like_roadmap,
     looks_like_waitlist,
@@ -479,6 +481,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
         or looks_like_source_available_as_oss(bits.blob)
+        or (is_social_arena(score.arena) and looks_like_issues_disabled(bits.blob))
     ):
         return None
     if unquotable_reason(triples):
@@ -502,6 +505,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_world_commentary(body)
         or looks_like_hire_fundraise(body)
         or looks_like_source_available_as_oss(body)
+        or (is_social_arena(score.arena) and looks_like_issues_disabled(body))
     ):
         return None
     if looks_like_open_source_without_license(body):

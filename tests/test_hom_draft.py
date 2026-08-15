@@ -1088,6 +1088,80 @@ class HomDraftCostumeTests(unittest.TestCase):
                 self.assertNotIn("martwy link", dumped.lower())
                 self.assertNotIn("Show HN:", dumped)
 
+    def test_issues_disabled_is_undressable_on_hn_even_when_score_says_draft(self) -> None:
+        closed = (
+            "issues disabled",
+            "hasIssuesEnabled: false",
+            "repo z wyłączonymi issues",
+            "no issue tracker",
+        )
+        for text in closed:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("issues disabled", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
+
+    def test_issues_disabled_can_still_dress_github_readme(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.GITHUB,
+            facts=(
+                Fact(text="issues disabled", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertEqual(decision.draft.arena, ArenaId.GITHUB)
+        self.assertFalse(decision.draft.body.startswith("Show HN:"))
+        self.assertIn("## Quickstart", decision.draft.body)
+        self.assertIn(SHIP_PR, decision.draft.body)
+
+    def test_product_copy_without_issues_disabled_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="no issues with the install"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("no issues with the install", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("issues disabled", decision.draft.body.lower())
+
     def test_product_copy_without_dead_link_can_still_dress(self) -> None:
         brief = _ship_brief(
             preferred_arena=ArenaId.HN,
