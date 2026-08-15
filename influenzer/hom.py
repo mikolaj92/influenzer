@@ -57,6 +57,7 @@ from influenzer.playbook import (
     looks_like_store_pitch,
     looks_like_launch_pitch,
     looks_like_superlative,
+    looks_like_dead_link,
     looks_like_dead_release_asset,
     looks_like_login_gate,
     looks_like_roadmap,
@@ -474,6 +475,10 @@ def score_brief(brief: Brief) -> Score:
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "login_gate_not_tryable")
         return _changelog(brief, "login_gate_not_tryable")
+    if looks_like_dead_link(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "dead_link_not_tryable")
+        return _changelog(brief, "dead_link_not_tryable")
     if looks_like_dead_release_asset(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "dead_release_asset")

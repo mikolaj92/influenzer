@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -441,6 +441,22 @@ SHORTENER_TALK_RE = re.compile(
     r"\bbit\.ly\b|"
     r"\btinyurl\.com\b|"
     r"\bt\.co\b"
+    r")"
+)
+# A 404/410 artifact is not tryable. HEAD/GET status, not a URL scheme
+# (#76/#77 are host+https). A probe would be bounded like gh (#79);
+# recorded timeout is the same silence. Do not promise Show HN or a
+# ship claim on a corpse. Do not click the corpse. Pair of login wall
+# (401/403) and listed release asset (download 404). Bare HEAD 404 /
+# GET 410 / 404/410 is this gate.
+DEAD_LINK_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:head|get)(?:\s*/\s*get)?\s+(?:returned\s+)?(?:404|410)\b"
+    r"|\b(?:head|get)(?:\s*/\s*get)?\s+timeout\b"
+    r"|\b(?:404|410)\s*/\s*(?:410|404)\b"
+    r"|\b(?:404|410)\s+(?:not\s+found|gone)\b"
+    r"|\bdead\s+link\b"
+    r"|\bmartw[yiae]\s+link\b"
     r")"
 )
 # A listed release asset that 404s/410s is not a ship. The file is on
@@ -1099,6 +1115,13 @@ def looks_like_login_gate(text: str) -> bool:
     return bool(LOGIN_GATE_RE.search(text))
 
 
+def looks_like_dead_link(text: str) -> bool:
+    """True for a generic HEAD/GET 404/410 corpse. A stranger cannot click a dead link."""
+    if not text or not text.strip():
+        return False
+    return bool(DEAD_LINK_RE.search(text))
+
+
 def looks_like_dead_release_asset(text: str) -> bool:
     """True for a listed release asset whose download is 404/410. A missing file is not a ship."""
     if not text or not text.strip():
@@ -1651,6 +1674,7 @@ __all__ = [
     "LICENSE_FILE_NAME_RE",
     "LICENSE_FILE_RE",
     "LISTICLE_TITLE_RE",
+    "DEAD_LINK_RE",
     "DEAD_RELEASE_ASSET_RE",
     "LOGIN_GATE_RE",
     "METRIC_TOKEN_RE",
@@ -1729,6 +1753,7 @@ __all__ = [
     "looks_like_superlative",
     "looks_like_store_pitch",
     "looks_like_launch_pitch",
+    "looks_like_dead_link",
     "looks_like_dead_release_asset",
     "looks_like_login_gate",
     "looks_like_roadmap",
