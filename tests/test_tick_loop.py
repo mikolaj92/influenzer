@@ -143,15 +143,25 @@ class TickLoopTests(unittest.TestCase):
             tryable=True,
         )
         self.repo.save_brief(brief)
-        code = tick_main(
-            ["--config", str(self.home / "config.json"), "--once", "--live"],
-            inspect_host=lambda: LAPTOP,
-        )
+        stdout = io.StringIO()
+        with patch("sys.stdout", stdout):
+            code = tick_main(
+                ["--config", str(self.home / "config.json"), "--once", "--live"],
+                inspect_host=lambda: LAPTOP,
+            )
         self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["status"], "scored")
+        self.assertNotIn("body", payload)
+        self.assertNotIn("operator", payload)
+        self.assertNotIn("Show HN:", stdout.getvalue())
         stored = self.repo.get_brief("app-1", "loop-1")
         assert stored is not None
         self.assertEqual(stored.status, "processed")
-        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "loop-1"))
+        draft = self.repo.get_operator_draft("app-1", "loop-1")
+        self.assertIsNotNone(draft)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertFalse((self.home / "runtime.db").exists())
 
     def test_cli_tick_loop_subcommand_once_is_dry_and_does_not_open_runtime_db(self) -> None:
@@ -209,6 +219,8 @@ class TickLoopTests(unittest.TestCase):
         self.assertIn("Mac mini", tick_src)
         self.assertIn("--pass-if-due", tick_src)
         self.assertIn("score-only", tick_src)
+        self.assertIn("cisza", tick_src)
+        self.assertIn("never angle copy", tick_src)
         self.assertEqual(DEFAULT_INTERVAL_SECONDS, 300)
         package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
         command = package["correlation_paths"][0]["effectors"][0]["adapter"]["command"]

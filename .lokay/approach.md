@@ -1,37 +1,31 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=97 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=98 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #97 — Look/pass nie publikuje nawet przy live_enabled
+Issue: #98 — Always-on nie sączy treści kąta do logów
 
 ## Goal
 
-Look/pass/angle nie publikują nawet gdy ktoś włączy live_enabled. Ściana dry-run: adapterów nie ma na tej ścieżce. Live to osobny, jawny grant+intent, nie „przy okazji poniedziałku”.
+Always-on nie sączy treści kąta do logów. Body tylko przez jawne `angle` / pass stdout. Pętla pisze status (cisza/admitted/scored), nie copy. Mniej wycieku, mniej recapu w journald.
 
 ## Files likely touched
 
-- `influenzer/effector.py` — look/pass/angle names stay dry-run even if a caller sets dry_run=False / live_enabled
-- `influenzer/scheduler.py` — `score_only=True` drops due plans and never dispatches adapters
-- `influenzer/hom_pass.py` — look/pass scores via `tick(..., score_only=True)`
-- `influenzer/hom_outbox.py` — angle stays a read; no adapters
-- `tests/test_envelope.py` — effector lock
-- `tests/test_operator.py` — score-only tick ignores live + due plans
-- `tests/test_hom_pass.py` — live_enabled look does not resolve adapters
+- `influenzer/tick.py` — always-on stdout is status only
+- `influenzer/hom_watch.py` — `loop_status` maps envelopes to cisza/admitted/scored
+- `tests/test_tick_loop.py`, `tests/test_hom_watch.py` — lock the journald contract
 
 ## Test plan
 
-- `uv run python -m unittest tests.test_envelope tests.test_operator tests.test_hom_pass tests.test_hom_outbox`
+- `uv run python -m unittest tests.test_tick_loop tests.test_hom_watch tests.test_hom_pass tests.test_hom_outbox`
 
 ## Non-goals
 
-- Do not add a new costume / ads path
-- Do not make look/pass/angle a live publisher when grant+intent exist
-- Do not change the explicit scheduler live path (`tick` without `score_only`)
+- (none stated)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- Lock is on the effector / score-only tick, not a new costume.
+- No explicit file paths in issue; infer from repo inspection.

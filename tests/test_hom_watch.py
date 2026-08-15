@@ -19,7 +19,7 @@ from influenzer.cli import setup_parser
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.hom_watch import get_watch, interval_tick, set_watch, show_watch
+from influenzer.hom_watch import get_watch, interval_tick, loop_status, set_watch, show_watch
 from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
@@ -126,6 +126,25 @@ class HomWatchTests(unittest.TestCase):
         self.assertFalse(out["operator"]["published"])
         self.assertFalse((self.home / "runtime.db").exists())
 
+    def test_loop_status_is_cisza_admitted_or_scored_never_copy(self) -> None:
+        cisza = loop_status({"status": "noop", "reason": "no due work", "operator": {"processed": 0}})
+        self.assertEqual(cisza, {"status": "cisza", "mutated": False, "published": False})
+        scored = loop_status({"status": "ok", "operator": {"processed": 1, "outcomes": [{"body": "Show HN: leak"}]}})
+        self.assertEqual(scored["status"], "scored")
+        self.assertNotIn("body", scored)
+        self.assertNotIn("angle", scored)
+        admitted = loop_status(
+            {
+                "status": "ok",
+                "scan": {"status": "admitted", "brief_id": "scan-v0-1-0"},
+                "tick": {"scored": 1},
+                "angle": {"status": "ok", "body": "Show HN: leak"},
+            }
+        )
+        self.assertEqual(admitted["status"], "admitted")
+        self.assertEqual(set(admitted), {"status", "mutated", "published"})
+        self.assertNotIn("Show HN:", json.dumps(admitted))
+
     def test_watch_due_ship_is_at_most_one_brief_then_one_angle(self) -> None:
         set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
         out, fake = self._tick()
@@ -141,6 +160,10 @@ class HomWatchTests(unittest.TestCase):
         self.assertFalse(out["angle"]["empty"])
         self.assertTrue(out["angle"]["body"].startswith("Show HN:"))
         self.assertNotIn("Costume:", out["angle"]["body"])
+        logged = loop_status(out)
+        self.assertEqual(logged["status"], "admitted")
+        self.assertNotIn("body", logged)
+        self.assertNotIn("Show HN:", json.dumps(logged))
         self.assertTrue(fake.calls)
         self.assertFalse(out["published"])
         self.assertFalse(out["mutated"])
@@ -380,7 +403,10 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["status"], "cisza")
         self.assertNotIn("scan", payload)
+        self.assertNotIn("angle", payload)
+        self.assertNotIn("body", payload)
         self.assertEqual(fake.calls, [])
         with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
             self.assertEqual(repo.list_briefs("app-1"), [])
@@ -420,7 +446,10 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         payload = json.loads(buf.getvalue())
-        self.assertEqual(payload["scan"]["status"], "admitted")
+        self.assertEqual(payload["status"], "admitted")
+        self.assertNotIn("scan", payload)
+        self.assertNotIn("angle", payload)
+        self.assertNotIn("body", json.dumps(payload))
         self.assertTrue(fake.calls)
         self.assertFalse(payload["published"])
         self.assertFalse((self.home / "runtime.db").exists())
@@ -465,11 +494,18 @@ class HomWatchCLIFAlaTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         payload = json.loads(buf.getvalue())
-        self.assertEqual(payload["scan"]["status"], "admitted")
-        self.assertEqual(payload["tick"]["scored"], 1)
-        self.assertNotIn("Costume:", payload["angle"]["body"])
+        self.assertEqual(payload["status"], "admitted")
+        self.assertEqual(set(payload), {"status", "mutated", "published"})
+        self.assertNotIn("angle", payload)
+        self.assertNotIn("body", json.dumps(payload))
+        self.assertNotIn("Show HN:", buf.getvalue())
         self.assertFalse(payload["published"])
         self.assertTrue(fake.calls)
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            self.assertEqual(len(repo.list_briefs("app-1")), 1)
+            draft = repo.get_operator_draft("app-1", "scan-v0-1-0")
+            assert draft is not None
+            self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertFalse((self.home / "runtime.db").exists())
         self.assertFalse(json.loads(self.config.read_text(encoding="utf-8"))["scheduler"]["live_enabled"])
 
@@ -487,6 +523,7 @@ class HomWatchBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not call gh", blob)
         self.assertIn("Does not know Heimdall", blob)
         self.assertIn("Does not run pass every interval", blob)
+        self.assertIn("Does not recap angle copy on the always-on loop", blob)
         self.assertIn("Does not open runtime.db", blob)
         self.assertIn("Does not run the project", blob)
         self.assertIn("Launching on watch is silence", blob)
