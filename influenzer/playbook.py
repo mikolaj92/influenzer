@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -397,6 +397,50 @@ LOGIN_GATE_RE = re.compile(
     r"|\bza\s+logowaniem\b"
     r"|\bwymaga\s+logowania\b"
     r"|\bbramk[aąę]\s+logowania\b"
+    r")"
+)
+# A redirect hop is the chain, not the first URL. Host + https (#76/#77),
+# not a 404 corpse (#92). A few hops stay tryable only when every host is
+# on the list. A shortener or other origin is silence, not click-and-run.
+MAX_ARTIFACT_REDIRECT_HOPS = 3
+TRYABLE_ARTIFACT_HOSTS: frozenset[str] = frozenset({"github.com"})
+SHORTENER_HOSTS: frozenset[str] = frozenset(
+    {
+        "bit.ly",
+        "tinyurl.com",
+        "t.co",
+        "goo.gl",
+        "ow.ly",
+        "is.gd",
+        "buff.ly",
+        "rebrand.ly",
+        "cutt.ly",
+        "rb.gy",
+        "shorturl.at",
+        "tiny.cc",
+    }
+)
+REDIRECT_CHAIN_RE = re.compile(
+    r"(?i)(?:"
+    r"\bredirect(?:s|ed|ing)?\b|"
+    r"\bhop(?:s)?\s+to\b|"
+    r"\blocation\s*:|"
+    r"\b(?:301|302|303|307|308)\b|"
+    r"\bskracacz\b|"
+    r"\bshortener\b|"
+    r"\binny\s+origin\b|"
+    r"\boff[- ]allowlist\b"
+    r")"
+)
+_ARROW_SPLIT_RE = re.compile(r"\s*(?:->|→|=>|»)\s*")
+SHORTENER_TALK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bskracacz\b|"
+    r"\bshortener\b|"
+    r"\binny\s+origin\b|"
+    r"\bbit\.ly\b|"
+    r"\btinyurl\.com\b|"
+    r"\bt\.co\b"
     r")"
 )
 # A listed release asset that 404s/410s is not a ship. The file is on
