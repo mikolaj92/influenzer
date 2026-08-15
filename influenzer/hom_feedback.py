@@ -19,6 +19,8 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A fact is a short excerpt + comment/issue URL. The rest stays on GitHub.
 A whole thread in state.db is silence, not storage. Retention, not timeout.
+README/comments/JSON over the hard byte limit is an empty look, not a feast.
+50MB in state.db is silence. The loop lives.
 A fork is not a website. isFork is silence, even when the owner is ours.
 Helping upstream is silence here, not our launch.
 An empty repo is not a website. No tree or no README is silence. This is
@@ -36,7 +38,7 @@ from github_feedback import collect_feedback
 from github_feedback import feedback as github_feedback_mod
 from github_feedback.feedback import WHOLE_THREAD, whole_thread_reason
 from github_survey import GhRunner, invalid_repo_reason
-from github_survey.survey import look_declared_gh
+from github_survey.survey import look_bytes_over_limit, look_declared_gh, state_bytes_over_limit
 
 from influenzer.brief_admit import already_told, open_story_reason
 from influenzer.brief_scan import repo_is_empty, repo_is_fork
@@ -88,6 +90,8 @@ def admit_feedback(
     now: str | None = None,
 ) -> dict[str, Any]:
     slug = str(payload.get("repo") or "")
+    if look_bytes_over_limit(payload) or state_bytes_over_limit(payload):
+        return host_silence("empty_feedback", project_id=project_id, repo_slug=slug)
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
     if bool(payload.get("isFork")):

@@ -15,6 +15,7 @@ from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
 from github_feedback.feedback import MAX_STORED_FACT_CHARS, WHOLE_THREAD
+from github_survey.survey import MAX_GH_LOOK_BYTES
 from influenzer.hom_feedback import SOURCE, admit_feedback, collect_and_admit, main as feedback_main
 from influenzer.playbook import ArenaId, StoryKind
 from influenzer.scheduler import tick
@@ -274,6 +275,56 @@ class HomFeedbackComposeTests(unittest.TestCase):
         dumped = json.dumps([dict(row) for row in self.repo.events("app-1")], default=str)
         self.assertNotIn(long_body, dumped)
         self.assertNotIn(second, dumped)
+
+    def test_oversized_comments_are_empty_look_and_write_no_brief(self) -> None:
+        pad = "How do I install this when uv is missing? " + ("x" * (MAX_GH_LOOK_BYTES + 1))
+        script = feedback_question_script()
+        script["issue_comments"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    {
+                        "id": 101,
+                        "html_url": ISSUE_COMMENT,
+                        "body": pad,
+                        "user": {"login": "alice", "type": "User"},
+                        "created_at": "2026-08-12T12:00:00Z",
+                    }
+                ]
+            ),
+        )
+        out = self._run(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_fifty_meg_feedback_payload_is_silence_not_stored(self) -> None:
+        packed = {
+            "status": "ok",
+            "ok": True,
+            "repo": REPO,
+            "brief_id": "fb-101",
+            "source": SOURCE,
+            "story_kind": "hard_issue",
+            "claims_ship": False,
+            "tryable": False,
+            "facts": [
+                {
+                    "kind": "issue_comment",
+                    "text": "@alice: How do I install this when uv is missing?",
+                    "artifact_url": ISSUE_COMMENT,
+                }
+            ],
+        }
+        with patch("influenzer.hom_feedback.state_bytes_over_limit", return_value=True):
+            out = admit_feedback(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_whole_thread_pack_is_silence_and_writes_no_brief(self) -> None:
         packed = {

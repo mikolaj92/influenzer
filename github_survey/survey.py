@@ -9,6 +9,8 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
+README/comments/JSON over the hard byte limit is an empty look, not a feast.
+50MB in state.db is silence. The loop lives.
 """
 
 from __future__ import annotations
@@ -40,6 +42,9 @@ from github_survey.gh import (
 
 LOOKBACK_DAYS = 7
 MAX_PAGES = 2
+MAX_GH_LOOK_BYTES = 1 * 1024 * 1024
+MAX_STATE_BYTES = 50 * 1024 * 1024
+LOOK_OVER_LIMIT = "look_over_limit"
 _GH_PAGE_SIZE = 100
 _PAGED_KINDS = frozenset({"prs", "releases", "tags", "issue_comments", "pull_comments"})
 _GIT_HEADS = frozenset({"git", "git-clone", "git-worktree"})
@@ -319,8 +324,41 @@ def look_declared_gh(repo_slug: str, gh: GhRunner | None = None) -> GhRunner:
     return _declared
 
 
+def payload_byte_size(blob: object) -> int:
+    """UTF-8 byte length of a gh blob or JSON payload. Unserializable is over."""
+    if blob is None:
+        return 0
+    if isinstance(blob, (bytes, bytearray)):
+        return len(blob)
+    if isinstance(blob, str):
+        return len(blob.encode("utf-8"))
+    try:
+        return len(json.dumps(blob, ensure_ascii=False).encode("utf-8"))
+    except (TypeError, ValueError, OverflowError):
+        return MAX_STATE_BYTES + 1
+
+
+def look_bytes_over_limit(blob: object, *, limit: int | None = None) -> bool:
+    """True when README/comments/JSON exceeds the hard look-byte cap."""
+    cap = MAX_GH_LOOK_BYTES if limit is None else limit
+    return payload_byte_size(blob) > cap
+
+
+def state_bytes_over_limit(blob: object) -> bool:
+    """True when a payload would put 50MB in state.db. Do not swallow."""
+    return payload_byte_size(blob) > MAX_STATE_BYTES
+
+
+def look_payload_reason(call: GhCall) -> str | None:
+    """Empty look when a gh payload is over the hard byte limit."""
+    if call.stderr == LOOK_OVER_LIMIT or look_bytes_over_limit(call.stdout) or look_bytes_over_limit(call.stderr):
+        return "empty_survey"
+    return None
+
+
 def look_short_gh(gh: GhRunner | None = None) -> GhRunner:
-    """Look is short. After MAX_PAGES, stop. Whole-history is silence."""
+    """Look is short. After MAX_PAGES, stop. Whole-history is silence.
+    README/comments/JSON over the hard byte limit is an empty look."""
     runner = look_api_only_gh(gh)
     pages: dict[str, int] = {}
 
@@ -335,7 +373,10 @@ def look_short_gh(gh: GhRunner | None = None) -> GhRunner:
             if used > MAX_PAGES or ordinal > MAX_PAGES:
                 return GhCall(returncode=0, stdout="[]", stderr="")
             pages[bucket] = used
-        return runner(argv)
+        call = runner(argv)
+        if look_payload_reason(call):
+            return GhCall(returncode=0, stdout="", stderr=LOOK_OVER_LIMIT)
+        return call
 
     return _short
 
@@ -439,7 +480,10 @@ def template_repo_silence(meta: dict[str, Any], *, prs: Sequence[Any], releases:
 
 
 def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict[str, Any] | None, str | None]:
-    meta, reason = required_json(gh(["repo", "view", repo_slug, "--json", REPO_JSON_FIELDS]))
+    repo_call = gh(["repo", "view", repo_slug, "--json", REPO_JSON_FIELDS])
+    if look_payload_reason(repo_call):
+        return None, "empty_survey"
+    meta, reason = required_json(repo_call)
     if reason:
         return None, reason
     if not isinstance(meta, dict):
@@ -449,37 +493,48 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
     if _truthy_meta(meta, "isTemplate", "is_template"):
         return None, "template_not_a_product"
 
-    prs_raw, reason = required_json(
-        gh(["pr", "list", "--repo", repo_slug, "--state", "merged", "--limit", "20", "--json", PR_JSON_FIELDS])
-    )
+    prs_call = gh(["pr", "list", "--repo", repo_slug, "--state", "merged", "--limit", "20", "--json", PR_JSON_FIELDS])
+    if look_payload_reason(prs_call):
+        return None, "empty_survey"
+    prs_raw, reason = required_json(prs_call)
     if reason:
         return None, reason
     if not isinstance(prs_raw, list):
         return None, "empty_survey"
 
-    rel_raw, reason = required_json(
-        gh(
-            [
-                "release",
-                "list",
-                "--repo",
-                repo_slug,
-                "--limit",
-                "10",
-                "--exclude-drafts",
-                "--exclude-pre-releases",
-                "--json",
-                RELEASE_JSON_FIELDS,
-            ]
-        )
+    rel_call = gh(
+        [
+            "release",
+            "list",
+            "--repo",
+            repo_slug,
+            "--limit",
+            "10",
+            "--exclude-drafts",
+            "--exclude-pre-releases",
+            "--json",
+            RELEASE_JSON_FIELDS,
+        ]
     )
+    if look_payload_reason(rel_call):
+        return None, "empty_survey"
+    rel_raw, reason = required_json(rel_call)
     if reason:
         return None, reason
     if not isinstance(rel_raw, list):
         return None, "empty_survey"
 
-    tags_raw = optional_json(gh(["api", f"repos/{repo_slug}/tags?per_page=20"]), [])
-    readme_raw = optional_json(gh(["api", f"repos/{repo_slug}/readme"]), {})
+    tags_call = gh(["api", f"repos/{repo_slug}/tags?per_page=20"])
+    if look_payload_reason(tags_call):
+        return None, "empty_survey"
+    tags_raw = optional_json(tags_call, [])
+    readme_call = gh(["api", f"repos/{repo_slug}/readme"])
+    if look_payload_reason(readme_call):
+        return None, "empty_survey"
+    readme_raw = optional_json(readme_call, {})
+    readme_text = decode_readme(readme_raw)
+    if look_bytes_over_limit(readme_text):
+        return None, "empty_survey"
     prs = [item for item in prs_raw if isinstance(item, dict)]
     releases = [item for item in rel_raw if isinstance(item, dict)]
     tags = [item for item in tags_raw if isinstance(item, dict)] if isinstance(tags_raw, list) else []
@@ -492,14 +547,17 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         if not str(item.get("tagName") or "").strip():
             continue
         recent_releases.append(item)
-    return {
+    survey = {
         "meta": meta,
         "prs": [item for item in prs if in_window(str(item.get("mergedAt") or ""), now=now)],
         "releases": recent_releases,
         "tags": tags,
-        "readme_text": decode_readme(readme_raw),
+        "readme_text": readme_text,
         "readme_url": str((readme_raw or {}).get("html_url") or "") if isinstance(readme_raw, dict) else "",
-    }, None
+    }
+    if look_bytes_over_limit(survey) or state_bytes_over_limit(survey):
+        return None, "empty_survey"
+    return survey, None
 
 
 def survey_public_repo(
@@ -528,13 +586,16 @@ def survey_public_repo(
     if blocked:
         return _silence(blocked, repo=slug)
     stamp = now or clock.isoformat().replace("+00:00", "Z")
-    return {
+    payload = {
         "status": "ok",
         "ok": True,
         "repo": slug,
         "now": stamp,
         "survey": survey,
     }
+    if look_bytes_over_limit(payload) or state_bytes_over_limit(payload):
+        return _silence("empty_survey", repo=slug)
+    return payload
 
 
 def _emit(payload: dict[str, Any]) -> int:

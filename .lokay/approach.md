@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=79 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=78 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #79 — gh nie może zawiesić pętli
+Issue: #78 — Za duży payload z gh to cisza, nie ucztowanie
 
 ## Goal
 
-gh nie może zawiesić pętli. Timeout twardszy i krótszy niż interval ticka. Po czasie: cisza, proces nie zostaje, następny tick idzie. To nie auth-fail (#68) — to hang.
+Za duży payload z gh to cisza, nie ucztowanie. README/komentarze/JSON ponad twardy limit bajtów → empty look, pętla żyje. Żadnego 50MB w state.db.
 
 ## Files likely touched
 

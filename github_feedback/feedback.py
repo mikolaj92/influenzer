@@ -7,6 +7,8 @@ Look stops after N pages. Whole-repo history in one look is silence.
 A fact is a short excerpt + comment/issue URL. One excerpt per thread.
 The rest stays on GitHub. A whole thread in state.db is silence, not storage.
 This is retention, not a timeout.
+README/comments/JSON over the hard byte limit is an empty look, not a feast.
+50MB in state.db is silence. The loop lives.
 """
 
 from __future__ import annotations
@@ -27,7 +29,15 @@ from github_survey.gh import (
     required_json,
     run_gh,
 )
-from github_survey.survey import LOOKBACK_DAYS, in_window, look_short_gh, parse_now
+from github_survey.survey import (
+    LOOKBACK_DAYS,
+    in_window,
+    look_bytes_over_limit,
+    look_payload_reason,
+    look_short_gh,
+    parse_now,
+    state_bytes_over_limit,
+)
 
 SOURCE = "github-feedback"
 MAX_FACTS = 8
@@ -268,10 +278,10 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
     )
     if reason:
         return None, "empty_feedback" if reason == "empty_survey" else reason
-    pulls_raw = optional_json(
-        gh(["api", f"repos/{repo_slug}/pulls/comments?per_page=100&since={since}"]),
-        [],
-    )
+    pulls_call = gh(["api", f"repos/{repo_slug}/pulls/comments?per_page=100&since={since}"])
+    if look_payload_reason(pulls_call):
+        return None, "empty_feedback"
+    pulls_raw = optional_json(pulls_call, [])
     comments: list[tuple[str, dict[str, Any]]] = []
     for item in _items(issues_raw):
         if in_window(str(item.get("created_at") or ""), now=now):
@@ -280,7 +290,10 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
         if in_window(str(item.get("created_at") or ""), now=now):
             comments.append(("pull_comment", item))
     comments.sort(key=lambda pair: str(pair[1].get("created_at") or ""))
-    return {"comments": comments}, None
+    collected = {"comments": comments}
+    if look_bytes_over_limit(collected) or state_bytes_over_limit(collected):
+        return None, "empty_feedback"
+    return collected, None
 
 
 def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
@@ -341,6 +354,8 @@ def collect_feedback(
     packed = pack_comments(slug, collected)
     if packed.get("status") == "ok":
         packed["now"] = now or clock.isoformat().replace("+00:00", "Z")
+    if look_bytes_over_limit(packed) or state_bytes_over_limit(packed):
+        return _silence("empty_feedback", repo=slug)
     return packed
 
 
