@@ -13,6 +13,8 @@ Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
 Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
+Inbound does not expand the watch. A foreign repo link in an issue stays
+text, not a new survey. Look stays on the declared repo.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from typing import Any
 
 from github_feedback import collect_feedback
 from github_survey import GhRunner, invalid_repo_reason
+from github_survey.survey import look_declared_gh
 
 from influenzer.brief_admit import already_told, open_story_reason
 from influenzer.config import load_config
@@ -147,7 +150,8 @@ def collect_and_admit(
     if repo.list_operator_drafts(pid):
         return host_silence("open_draft", project_id=pid, repo_slug=slug)
     try:
-        packed = collect_feedback(slug, gh=gh, now=now)
+        runner = look_declared_gh(slug, gh) if gh is not None else None
+        packed = collect_feedback(slug, gh=runner, now=now)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return host_silence("empty_feedback", project_id=pid, repo_slug=slug)
     return admit_feedback(repo, packed, project_id=pid, now=now or utc_now())

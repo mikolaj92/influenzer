@@ -19,7 +19,7 @@ from github_survey.gh import (
     loads_json,
     required_json,
 )
-from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_short_gh
+from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_argv_leaves_declared_repo, look_declared_gh, look_short_gh
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -430,3 +430,69 @@ class LookPageCeilingTests(unittest.TestCase):
         self.assertLessEqual(kinds.count("releases"), MAX_PAGES)
         self.assertLessEqual(kinds.count("tags"), MAX_PAGES)
         self.assertFalse(any(look_argv_is_unbounded_pages(list(argv)) for argv in fake.calls))
+        self.assertFalse(any(look_argv_leaves_declared_repo(list(argv), REPO) for argv in fake.calls))
+
+
+class LookStaysOnDeclaredRepoTests(unittest.TestCase):
+    def test_foreign_slug_leaves_declared_repo(self) -> None:
+        self.assertTrue(look_argv_leaves_declared_repo(["repo", "view", "other/tool"], REPO))
+        self.assertTrue(
+            look_argv_leaves_declared_repo(
+                ["pr", "list", "--repo", "other/tool", "--state", "merged"], REPO
+            )
+        )
+        self.assertTrue(look_argv_leaves_declared_repo(["api", "repos/other/tool/readme"], REPO))
+        self.assertTrue(look_argv_leaves_declared_repo("gh repo view other/tool", REPO))
+        self.assertFalse(look_argv_leaves_declared_repo(["repo", "view", REPO], REPO))
+        self.assertFalse(
+            look_argv_leaves_declared_repo(
+                ["pr", "list", "--repo", REPO, "--state", "merged"], REPO
+            )
+        )
+        self.assertFalse(look_argv_leaves_declared_repo(["api", f"repos/{REPO}/readme"], REPO))
+        self.assertFalse(
+            look_argv_leaves_declared_repo(["api", f"repos/{REPO}/tags?per_page=20"], REPO)
+        )
+
+    def test_foreign_repo_link_is_silence_not_a_survey(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise AssertionError("look must not survey a foreign repo from inbound text")
+
+        runner = look_declared_gh(REPO, boom)
+        view = runner(["repo", "view", "other/tool"])
+        listed = runner(["pr", "list", "--repo", "other/tool", "--state", "merged"])
+        api = runner(["api", "repos/other/tool/readme"])
+        self.assertEqual(view.returncode, 0)
+        self.assertEqual(view.stdout, "")
+        self.assertEqual(listed.returncode, 0)
+        self.assertEqual(listed.stdout, "")
+        self.assertEqual(api.returncode, 0)
+        self.assertEqual(api.stdout, "")
+
+    def test_inbound_foreign_link_in_issue_stays_text_not_a_survey(self) -> None:
+        inbound = ship_script()
+        inbound["prs"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    {
+                        "number": 12,
+                        "title": "feat: local HoM operator scores briefs",
+                        "url": "https://github.com/mikolaj92/demo/pull/12",
+                        "mergedAt": "2026-08-12T12:00:00Z",
+                        "body": "See also https://github.com/other/tool — not our watch.",
+                    }
+                ]
+            ),
+        )
+        fake = ScriptedGh(inbound)
+        with patch("subprocess.run", side_effect=AssertionError("survey must not call subprocess")):
+            out = survey_public_repo(REPO, gh=fake, now=NOW)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["repo"], REPO)
+        self.assertTrue(fake.calls)
+        self.assertFalse(any(look_argv_leaves_declared_repo(list(argv), REPO) for argv in fake.calls))
+        self.assertEqual(
+            out["survey"]["prs"][0]["body"],
+            "See also https://github.com/other/tool — not our watch.",
+        )
