@@ -9,6 +9,8 @@ Does not publish. Does not enable live social. Does not call gh
 (github_survey owns gh). Does not know Heimdall. Does not know my-auth.
 Does not run pass every interval. Does not open runtime.db.
 Does not embed a Fala host. Watch set is host CLI only.
+Does not recap angle copy on the always-on loop. Journald gets status
+(cisza/admitted/scored). Body stays on explicit angle / pass stdout.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
 Does not run the project. Launching on watch is silence.
@@ -22,7 +24,7 @@ text, not a new survey. Look stays on the declared repo.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from github_survey import invalid_repo_reason
 
@@ -33,6 +35,8 @@ from influenzer.hom_pass import run_pass
 from influenzer.scan_due import scan_due_reason
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository, StorageError
+
+_LOOP_STATUSES = frozenset({"cisza", "admitted", "scored"})
 
 
 @dataclass(frozen=True)
@@ -87,6 +91,37 @@ def show_watch(repo: StateRepository) -> dict[str, Any]:
     )
 
 
+def loop_status(envelope: Mapping[str, Any]) -> dict[str, Any]:
+    """Always-on log line: cisza / admitted / scored. Never angle copy.
+
+    Body stays on explicit ``angle`` / pass stdout. Journald recap is status.
+    """
+    if envelope.get("status") == "failed":
+        return {
+            "status": "failed",
+            "reason": str(envelope.get("reason") or "failed"),
+            "mutated": False,
+            "published": False,
+        }
+    scan = envelope.get("scan")
+    if isinstance(scan, Mapping) and scan.get("status") == "admitted":
+        status = "admitted"
+    else:
+        tick_out = envelope.get("tick")
+        operator = envelope.get("operator")
+        scored = 0
+        if isinstance(tick_out, Mapping):
+            raw = tick_out.get("scored") or 0
+            scored = int(raw) if isinstance(raw, int) else 0
+        if scored == 0 and isinstance(operator, Mapping):
+            raw = operator.get("processed") or 0
+            scored = int(raw) if isinstance(raw, int) else 0
+        status = "scored" if scored else "cisza"
+    if status not in _LOOP_STATUSES:
+        status = "cisza"
+    return {"status": status, "mutated": False, "published": False}
+
+
 def interval_tick(
     repo: StateRepository,
     cfg: Config,
@@ -96,7 +131,11 @@ def interval_tick(
     gh: Any = None,
     now: str | None = None,
 ) -> dict[str, Any]:
-    """Score pending briefs. If allow_hom_pass and a due watch, run hom_pass once."""
+    """Score pending briefs. If allow_hom_pass and a due watch, run hom_pass once.
+
+    Returns the full envelope for callers that need it. Always-on stdout uses
+    :func:`loop_status` so journald never recaps angle copy.
+    """
     clock = now or utc_now()
     if allow_hom_pass:
         watch = get_watch(repo)
@@ -145,6 +184,7 @@ __all__ = [
     "Watch",
     "get_watch",
     "interval_tick",
+    "loop_status",
     "run_watched_tick",
     "set_watch",
     "show_watch",
