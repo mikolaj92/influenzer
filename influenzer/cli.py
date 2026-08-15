@@ -33,7 +33,13 @@ from influenzer.domain import (
 )
 from influenzer.hom import Brief, Fact, HomError, brief_from_mapping
 from influenzer.playbook import ArenaId, StoryKind
-from influenzer.storage import CrossProjectError, StateRepository, StorageError
+from influenzer.storage import (
+    CrossProjectError,
+    StateRepository,
+    StorageError,
+    overlap_silence,
+    try_acquire_tick_lock,
+)
 
 
 def setup_parser(parser: argparse.ArgumentParser) -> None:
@@ -788,14 +794,21 @@ def handle_cli(args: argparse.Namespace) -> int:
         from influenzer.hom_pass import run_pass
 
         cfg = load_config(args.config)
-        with _repo(args) as repo:
-            out = run_pass(
-                repo,
-                cfg,
-                project_id=args.project_id,
-                repo_slug=args.repo,
-                window_days=int(getattr(args, "window_days", 7)),
-            )
+        lock = try_acquire_tick_lock(cfg.state_db)
+        if lock is None:
+            print(json.dumps(overlap_silence(), sort_keys=True))
+            return 0
+        try:
+            with _repo(args) as repo:
+                out = run_pass(
+                    repo,
+                    cfg,
+                    project_id=args.project_id,
+                    repo_slug=args.repo,
+                    window_days=int(getattr(args, "window_days", 7)),
+                )
+        finally:
+            lock.close()
         print(json.dumps(out, sort_keys=True))
         return 0
 

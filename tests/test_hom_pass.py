@@ -20,7 +20,7 @@ from influenzer.hom import Brief, Fact
 from influenzer.hom_pass import main as pass_main
 from influenzer.hom_pass import run_pass
 from influenzer.playbook import StoryKind
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, try_acquire_tick_lock
 from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, merge_log_script, noise_script, ship_script
 
 
@@ -453,6 +453,38 @@ class HomPassCLIFAlaTests(unittest.TestCase):
         self.assertEqual(again["angle"]["status"], "ok")
         with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
             self.assertEqual(len(repo.list_briefs("app-1")), 1)
+
+    def test_second_pass_instance_is_cisza_without_look(self) -> None:
+        fake = ScriptedGh(ship_script())
+        held = try_acquire_tick_lock(self.home / "state.db")
+        self.assertIsNotNone(held)
+        assert held is not None
+        try:
+            buf = io.StringIO()
+            with (
+                patch("github_survey.survey.run_gh", fake),
+                patch("subprocess.run", side_effect=AssertionError("locked pass must not call subprocess")),
+                patch("sys.stdout", buf),
+            ):
+                code = cli_main(
+                    [
+                        "--config",
+                        str(self.config),
+                        "pass",
+                        "--project-id",
+                        "app-1",
+                        "--repo",
+                        REPO,
+                    ]
+                )
+            self.assertEqual(code, 0)
+            payload = json.loads(buf.getvalue())
+            self.assertEqual(payload, {"status": "cisza", "mutated": False, "published": False})
+            self.assertEqual(fake.calls, [])
+            with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+                self.assertEqual(repo.list_briefs("app-1"), [])
+        finally:
+            held.close()
 
     def test_fala_result_does_not_open_runtime_db(self) -> None:
         from influenzer.fala_result import write_fala_result

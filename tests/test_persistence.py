@@ -14,6 +14,8 @@ from influenzer.storage import (
     UnboundSqlError,
     reject_unbound_sql,
     sql_has_inbound_literal,
+    tick_lock_path,
+    try_acquire_tick_lock,
 )
 
 
@@ -211,6 +213,25 @@ class PersistenceTests(unittest.TestCase):
                 repo.conn.execute(f"SELECT * FROM briefs WHERE facts_json LIKE '%{excerpt}%'")
             with self.assertRaises(UnboundSqlError):
                 repo.conn.execute(f"SELECT * FROM receipts WHERE payload_json='{gh_json}'")
+
+
+class TickLockTests(unittest.TestCase):
+    def test_second_acquire_is_silence_until_release(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state.db"
+            first = try_acquire_tick_lock(state)
+            self.assertIsNotNone(first)
+            assert first is not None
+            lock = tick_lock_path(state)
+            self.assertEqual(lock, (Path(tmp) / "tick.lock").resolve())
+            self.assertTrue(lock.is_file())
+            self.assertEqual(lock.stat().st_mode & 0o777, 0o600)
+            self.assertIsNone(try_acquire_tick_lock(state))
+            first.close()
+            second = try_acquire_tick_lock(state)
+            self.assertIsNotNone(second)
+            assert second is not None
+            second.close()
 
 
 if __name__ == "__main__":

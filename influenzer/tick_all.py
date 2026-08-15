@@ -2,6 +2,7 @@
 
 Does not survey GitHub. Does not call gh. Does not admit briefs.
 Does not open runtime.db. Never auto-publishes.
+One loop per state.db. A second tick instance is cisza, not a second look.
 """
 
 from __future__ import annotations
@@ -12,15 +13,24 @@ import json
 from influenzer.config import load_config
 from influenzer.fala_result import write_fala_result
 from influenzer.scheduler import tick
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, overlap_silence, try_acquire_tick_lock
 
 
 def run_tick(*, config_path: str | None = None, cli_live: bool = False) -> dict:
-    """One dry-run-default mutator pass against state.db. Does not open runtime.db."""
+    """One dry-run-default mutator pass against state.db. Does not open runtime.db.
+
+    A second tick on this state.db is cisza: no second look.
+    """
     cfg = load_config(config_path)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        return tick(repo, cfg, due=(), cli_live=bool(cli_live))
+    lock = try_acquire_tick_lock(cfg.state_db)
+    if lock is None:
+        return overlap_silence()
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            return tick(repo, cfg, due=(), cli_live=bool(cli_live))
+    finally:
+        lock.close()
 
 
 def main(argv: list[str] | None = None) -> int:

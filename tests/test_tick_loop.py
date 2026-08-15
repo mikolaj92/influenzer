@@ -18,7 +18,7 @@ from influenzer.host import (
     inspect_power,
     require_always_on_host,
 )
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, try_acquire_tick_lock
 from influenzer.tick import (
     DEFAULT_INTERVAL_SECONDS,
     guarded_tick,
@@ -133,6 +133,80 @@ class TickLoopTests(unittest.TestCase):
                 sleep=lambda _n: None,
             )
 
+    def test_second_tick_instance_is_cisza_without_second_look(self) -> None:
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="loop-lock",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(brief)
+        held = try_acquire_tick_lock(self.home / "state.db")
+        self.assertIsNotNone(held)
+        assert held is not None
+        try:
+            stdout = io.StringIO()
+            with patch("sys.stdout", stdout):
+                code = tick_main(
+                    ["--config", str(self.home / "config.json"), "--once"],
+                    inspect_host=lambda: LAPTOP,
+                )
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload, {"status": "cisza", "mutated": False, "published": False})
+            again = run_tick(config_path=str(self.home / "config.json"))
+            self.assertEqual(again, {"status": "cisza", "mutated": False, "published": False})
+        finally:
+            held.close()
+        stored = self.repo.get_brief("app-1", "loop-lock")
+        assert stored is not None
+        self.assertEqual(stored.status, "pending")
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "loop-lock"))
+        released = run_tick(config_path=str(self.home / "config.json"))
+        self.assertEqual(released["status"], "ok")
+        stored = self.repo.get_brief("app-1", "loop-lock")
+        assert stored is not None
+        self.assertEqual(stored.status, "processed")
+
+    def test_other_state_db_can_tick_while_this_house_is_locked(self) -> None:
+        held = try_acquire_tick_lock(self.home / "state.db")
+        self.assertIsNotNone(held)
+        assert held is not None
+        other = tempfile.TemporaryDirectory()
+        try:
+            other_home = Path(other.name)
+            write_config(other_home / "config.json", Config(home=other_home))
+            with StateRepository(other_home / "state.db", artifact_root=other_home / "artifacts") as other_repo:
+                _project(other_repo, "app-other")
+                other_repo.save_brief(
+                    Brief.create(
+                        project_id="app-other",
+                        brief_id="other-1",
+                        facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+                        story_kind="major",
+                        claims_ship=True,
+                        tryable=True,
+                    )
+                )
+            stdout = io.StringIO()
+            with patch("sys.stdout", stdout):
+                code = tick_main(
+                    ["--config", str(other_home / "config.json"), "--once"],
+                    inspect_host=lambda: LAPTOP,
+                )
+            self.assertEqual(code, 0)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(payload["status"], "scored")
+            with StateRepository(other_home / "state.db", artifact_root=other_home / "artifacts") as other_repo:
+                stored = other_repo.get_brief("app-other", "other-1")
+                assert stored is not None
+                self.assertEqual(stored.status, "processed")
+        finally:
+            held.close()
+            other.cleanup()
+
     def test_cli_once_scores_pending_brief_like_tick_all(self) -> None:
         brief = Brief.create(
             project_id="app-1",
@@ -221,6 +295,8 @@ class TickLoopTests(unittest.TestCase):
         self.assertIn("score-only", tick_src)
         self.assertIn("cisza", tick_src)
         self.assertIn("never angle copy", tick_src)
+        self.assertIn("One loop per state.db", tick_src)
+        self.assertIn("advisory lock", tick_src)
         self.assertEqual(DEFAULT_INTERVAL_SECONDS, 300)
         package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
         command = package["correlation_paths"][0]["effectors"][0]["adapter"]["command"]

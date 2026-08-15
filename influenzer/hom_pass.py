@@ -7,6 +7,9 @@ or outbox.
 `--project-id` and `--repo` are required; this block does not invent a
 repo inventory.
 
+One loop per state.db. A second pass while another tick holds the house
+is cisza: no second look. Advisory lock, not two CMOs in one home.
+
 Does not publish. Does not enable live social. Does not call gh
 (github_survey owns gh). Does not know Heimdall. Does not know my-auth.
 Does not invoke hold or pass. Does not run every tick interval.
@@ -35,7 +38,7 @@ from influenzer.fala_result import write_fala_result
 from influenzer.hom_outbox import emit_angle
 from influenzer.scan_due import DEFAULT_WINDOW_DAYS, scan_github_if_due
 from influenzer.scheduler import tick
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, overlap_silence, try_acquire_tick_lock
 
 
 def _scan_effect(scan: dict[str, Any]) -> dict[str, Any]:
@@ -116,18 +119,27 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = run_pass(
-            repo,
-            cfg,
-            project_id=args.project_id,
-            repo_slug=args.repo,
-            now=args.now,
-            window_days=args.window_days,
-        )
-    print(json.dumps(out, sort_keys=True))
-    write_fala_result(out, reaction_kind="hom.pass")
-    return 0
+    lock = try_acquire_tick_lock(cfg.state_db)
+    if lock is None:
+        out = overlap_silence()
+        print(json.dumps(out, sort_keys=True))
+        write_fala_result(out, reaction_kind="hom.pass")
+        return 0
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = run_pass(
+                repo,
+                cfg,
+                project_id=args.project_id,
+                repo_slug=args.repo,
+                now=args.now,
+                window_days=args.window_days,
+            )
+        print(json.dumps(out, sort_keys=True))
+        write_fala_result(out, reaction_kind="hom.pass")
+        return 0
+    finally:
+        lock.close()
 
 
 if __name__ == "__main__":
