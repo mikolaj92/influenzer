@@ -33,6 +33,7 @@ from influenzer.playbook import (
     is_news_host_url,
     is_ranking_host_url,
     is_store_host_url,
+    is_tryable_artifact_url,
     is_video_host_url,
     invented_metric_reason,
     looks_like_bot_author,
@@ -133,6 +134,26 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_ship_artifact("https://github.com/mikolaj92"))
         self.assertFalse(is_ship_artifact("https://github.com/orgs/github"))
         self.assertFalse(is_ship_artifact("https://github.com/settings/profile"))
+
+    def test_tryable_url_is_https_on_allowlisted_host_only(self) -> None:
+        self.assertTrue(is_tryable_artifact_url(SHIP_REPO))
+        self.assertTrue(is_tryable_artifact_url(SHIP_PR))
+        self.assertTrue(is_tryable_artifact_url("https://www.github.com/mikolaj92/influenzer"))
+        almost = (
+            "http://github.com/mikolaj92/influenzer",
+            "http://github.com/mikolaj92/influenzer/pull/12",
+            "javascript:alert(1)",
+            "data:text/html,<script>alert(1)</script>",
+            "file:///etc/passwd",
+            "https://example.com/demo",
+            "https://bit.ly/try-this",
+            "HTTPS://github.com.evil.com/mikolaj92/influenzer",
+            "https://user:pass@github.com/mikolaj92/influenzer",
+        )
+        for url in almost:
+            with self.subTest(url=url):
+                self.assertFalse(is_tryable_artifact_url(url))
+                self.assertFalse(is_ship_artifact(url))
 
     def test_video_host_is_youtube_vimeo_loom_not_a_repo(self) -> None:
         films = (
@@ -2799,6 +2820,32 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "hn_not_tryable")
+
+    def test_http_javascript_data_or_file_url_is_not_tryable(self) -> None:
+        almost = (
+            "http://github.com/mikolaj92/influenzer",
+            "http://github.com/mikolaj92/influenzer/pull/12",
+            "javascript:alert(1)",
+            "data:text/html,<h1>demo</h1>",
+            "file:///tmp/demo.html",
+            "https://example.com/demo",
+        )
+        for url in almost:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="a stranger can almost click this", artifact_url=url),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "hn_not_tryable")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
 
     def test_youtube_vimeo_or_loom_as_only_url_is_not_show_hn(self) -> None:
         films = (

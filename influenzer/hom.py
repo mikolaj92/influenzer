@@ -31,11 +31,11 @@ from influenzer.playbook import (
     is_blog_host_url,
     is_launch_host_url,
     is_merge_log_texts,
-    is_news_host_url,
     is_ranking_host_url,
     is_ship_artifact_url,
     is_social_arena,
     is_store_host_url,
+    is_tryable_artifact_url,
     is_video_host_url,
     looks_like_bot_bump_week,
     looks_like_commit_noise,
@@ -302,20 +302,12 @@ def _facts_blob(brief: Brief) -> str:
 
 
 def _has_clickable_url(brief: Brief) -> bool:
-    """A tryable demo URL. A film, store, blog, or launch board is not click-and-run."""
+    """A tryable demo URL. Scheme+host are the gate: https on an allowlisted host."""
     for fact in brief.facts:
         url = (fact.artifact_url or "").strip()
         if is_ship_artifact(url):
             return True
-        if (
-            url.startswith("https://")
-            and not is_video_host_url(url)
-            and not is_store_host_url(url)
-            and not is_blog_host_url(url)
-            and not is_launch_host_url(url)
-            and not is_ranking_host_url(url)
-            and not is_news_host_url(url)
-        ):
+        if is_tryable_artifact_url(url) and not is_ranking_host_url(url):
             return True
     return False
 

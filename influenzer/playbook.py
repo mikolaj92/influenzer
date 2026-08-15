@@ -1181,23 +1181,46 @@ def is_ship_artifact_url(url: str | None) -> bool:
     return bool(SHIP_ARTIFACT_RE.fullmatch(url.strip()))
 
 
+def _normalized_host(host: str | None) -> str | None:
+    value = (host or "").strip().rstrip(".").lower()
+    if value.startswith("www."):
+        value = value[4:]
+    return value or None
+
+
+def _host_allowed(host: str | None, names: frozenset[str]) -> bool:
+    value = _normalized_host(host)
+    if not value:
+        return False
+    return any(value == name or value.endswith("." + name) for name in names)
+
+
+def is_tryable_artifact_url(url: str | None) -> bool:
+    """True only for https on an already-allowlisted host.
+
+    http://, javascript:, data:, and file: are silence, not almost-clickable.
+    """
+    if not url or not isinstance(url, str):
+        return False
+    parsed = urlparse(url.strip())
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    return _host_allowed(parsed.hostname, TRYABLE_ARTIFACT_HOSTS)
+
+
 def _http_host(url: str | None) -> str | None:
     if not url:
         return None
     parsed = urlparse(url.strip())
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return None
-    host = (parsed.hostname or "").lower()
-    if host.startswith("www."):
-        host = host[4:]
-    return host or None
+    return _normalized_host(parsed.hostname)
 
 
 def _host_in(url: str | None, names: frozenset[str]) -> bool:
-    host = _http_host(url)
-    if not host:
-        return False
-    return any(host == name or host.endswith("." + name) for name in names)
+    return _host_allowed(_http_host(url), names)
 
 
 def is_video_host_url(url: str | None) -> bool:
@@ -2048,6 +2071,7 @@ __all__ = [
     "STORE_HOSTS",
     "STORE_PITCH_RE",
     "SUPERLATIVE_RE",
+    "TRYABLE_ARTIFACT_HOSTS",
     "VIDEO_HOSTS",
     "WORLD_COMMENTARY_RE",
     "StoryKind",
@@ -2071,6 +2095,7 @@ __all__ = [
     "is_ship_artifact_url",
     "is_social_arena",
     "is_store_host_url",
+    "is_tryable_artifact_url",
     "invented_metric_reason",
     "is_video_host_url",
     "looks_like_bot_author",
