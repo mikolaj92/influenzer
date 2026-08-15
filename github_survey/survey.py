@@ -7,6 +7,8 @@ Tryable is a README+URL heuristic. Code in look is untrusted.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
+A template repo is not a product. isTemplate, or generate-from-template
+without an own ship, is silence. Show HN from boilerplate is silence.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import argparse
 import base64
 import json
 import os
+import re
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,6 +44,20 @@ _GH_PAGE_SIZE = 100
 _PAGED_KINDS = frozenset({"prs", "releases", "tags", "issue_comments", "pull_comments"})
 _GIT_HEADS = frozenset({"git", "git-clone", "git-worktree"})
 _CLONE_OR_WORKTREE = frozenset({"clone", "worktree"})
+_SHIP_PR_TITLE_RE = re.compile(
+    r"(?i)(?:^feat(?:ure)?(?:\([^)]*\))?:\s|"
+    r"\b(?:ship(?:ped)?|launch(?:ed)?|released?)\b|"
+    r"^add(?:ed)?\s)"
+)
+_TEMPLATE_PR_TITLE_RE = re.compile(
+    r"(?i)\b(?:"
+    r"generat(?:e|ed)\s+from(?:\s+a)?\s+template"
+    r"|generate-from-template"
+    r"|initial\s+commit\s+from(?:\s+a)?\s+template"
+    r"|created\s+from(?:\s+a)?\s+template"
+    r"|apply(?:ing)?\s+(?:the\s+)?template"
+    r")\b"
+)
 _PROJECT_LAUNCH_HEADS = frozenset(
     {
         "python",
@@ -370,6 +387,57 @@ def _silence(reason: str, *, repo: str) -> dict[str, Any]:
     return {"status": "noop", "ok": True, "reason": reason, "repo": repo}
 
 
+def _truthy_meta(meta: dict[str, Any], *keys: str) -> bool:
+    for key in keys:
+        value = meta.get(key)
+        if isinstance(value, bool):
+            if value:
+                return True
+            continue
+        if isinstance(value, str) and value.strip().casefold() in {"true", "1", "yes"}:
+            return True
+        if isinstance(value, dict) and value:
+            return True
+        if isinstance(value, str) and value.strip() and key.casefold() != "istemplate":
+            return True
+    return False
+
+
+def _looks_like_template_pr(item: dict[str, Any]) -> bool:
+    blob = " ".join(
+        str(item.get(key) or "")
+        for key in ("title", "body")
+    )
+    return bool(_TEMPLATE_PR_TITLE_RE.search(blob))
+
+
+def _looks_like_own_ship_pr(item: dict[str, Any]) -> bool:
+    title = str(item.get("title") or "")
+    if _looks_like_template_pr(item):
+        return False
+    return bool(_SHIP_PR_TITLE_RE.search(title))
+
+
+def template_repo_silence(meta: dict[str, Any], *, prs: Sequence[Any], releases: Sequence[Any]) -> str | None:
+    """A template, or generate-from-template without an own ship, is silence."""
+    if _truthy_meta(meta, "isTemplate", "is_template"):
+        return "template_not_a_product"
+    generated = _truthy_meta(
+        meta,
+        "templateRepository",
+        "template_repository",
+        "parentRepository",
+        "generatedFrom",
+        "generated_from",
+    )
+    if not generated:
+        return None
+    own_prs = [item for item in prs if isinstance(item, dict) and _looks_like_own_ship_pr(item)]
+    if releases or own_prs:
+        return None
+    return "template_not_a_product"
+
+
 def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict[str, Any] | None, str | None]:
     meta, reason = required_json(gh(["repo", "view", repo_slug, "--json", REPO_JSON_FIELDS]))
     if reason:
@@ -378,6 +446,8 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, "empty_survey"
     if bool(meta.get("isPrivate")):
         return None, "private_repo"
+    if _truthy_meta(meta, "isTemplate", "is_template"):
+        return None, "template_not_a_product"
 
     prs_raw, reason = required_json(
         gh(["pr", "list", "--repo", repo_slug, "--state", "merged", "--limit", "20", "--json", PR_JSON_FIELDS])
@@ -454,6 +524,9 @@ def survey_public_repo(
     assert survey is not None
     if not survey["releases"] and not survey["prs"] and not survey["tags"]:
         return _silence("empty_survey", repo=slug)
+    blocked = template_repo_silence(survey["meta"], prs=survey["prs"], releases=survey["releases"])
+    if blocked:
+        return _silence(blocked, repo=slug)
     stamp = now or clock.isoformat().replace("+00:00", "Z")
     return {
         "status": "ok",

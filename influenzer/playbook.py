@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -521,6 +521,33 @@ EMPTY_REPO_RE = re.compile(
     r"|\bnie\s+ma\s+nawet\s+kartk"
     r"|\bdiskUsage\"?\s*[:=]\s*\"?0\b"
     r"|\bdisk_usage\"?\s*[:=]\s*\"?0\b"
+    r")"
+)
+# A template repo is not a product. isTemplate, or generate-from-template
+# without an own ship, is silence. Show HN from boilerplate is silence.
+# Pair of #40 (Show HN without tryable) and #46 (waitlist is not a ship).
+# A product that happens to mention a PR/issue template stays; the
+# GitHub template / cookiecutter starter does not.
+TEMPLATE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bisTemplate\"?\s*[:=]\s*\"?true\b"
+    r"|\bis_template\"?\s*[:=]\s*\"?true\b"
+    r"|\btemplateRepository\"?\s*[:=]"
+    r"|\btemplate_repository\"?\s*[:=]"
+    r"|\bthis\s+(?:repo(?:sitory)?|project)\s+is\s+a\s+template\b"
+    r"|\bgithub\s+template\s+repo(?:sitory)?\b"
+    r"|\bgenerat(?:e|ed)\s+from(?:\s+a)?\s+template\b"
+    r"|\bgenerate-from-template\b"
+    r"|\bcreated\s+from(?:\s+a)?\s+template\b"
+    r"|\binitial\s+commit\s+from(?:\s+a)?\s+template\b"
+    r"|\buse\s+this\s+template\b"
+    r"|\bboilerplate\s+(?:repo(?:sitory)?|project|app|code)\b"
+    r"|\bthis\s+is\s+(?:just\s+)?boilerplate\b"
+    r"|\bfrom\s+cookiecutter\b"
+    r"|\bcookiecutter\s+template\b"
+    r"|\brepo-szablon\b"
+    r"|\bszablon\s+to\s+nie\s+produkt\b"
+    r"|\bto\s+jest\s+szablon\b"
     r")"
 )
 # A default server splash is not a product. Welcome to nginx / Apache
@@ -1331,6 +1358,13 @@ def looks_like_empty_repo(text: str) -> bool:
     return bool(EMPTY_REPO_RE.search(text))
 
 
+def looks_like_template(text: str) -> bool:
+    """True for isTemplate / generate-from-template / boilerplate. A template is not a product."""
+    if not text or not text.strip():
+        return False
+    return bool(TEMPLATE_RE.search(text))
+
+
 def looks_like_server_splash(text: str) -> bool:
     """True for Welcome to nginx / Apache default / Caddy placeholder. A splash is not a product."""
     if not text or not text.strip():
@@ -1896,6 +1930,7 @@ __all__ = [
     "ISSUES_DISABLED_RE",
     "FORK_RE",
     "EMPTY_REPO_RE",
+    "TEMPLATE_RE",
     "LOGIN_GATE_RE",
     "SERVER_SPLASH_RE",
     "METRIC_TOKEN_RE",
@@ -1983,6 +2018,7 @@ __all__ = [
     "looks_like_issues_disabled",
     "looks_like_fork",
     "looks_like_empty_repo",
+    "looks_like_template",
     "looks_like_login_gate",
     "looks_like_server_splash",
     "looks_like_roadmap",
