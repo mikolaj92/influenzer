@@ -1,21 +1,22 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=95 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=96 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #95 — Zegar wstecz nie odpala drugiego looku
+Issue: #96 — Pad zapisu Fala nie cofa score/draft
 
 ## Goal
 
-Zegar wstecz nie odpala drugiego looku. Jeśli now < last_scan (NTP, ręczny cofnięty czas) — cisza, nie „znowu poniedziałek”. Look jest monotoniczny.
+Pad zapisu Fala (reaction dir) nie cofa score/draft w state.db i nie zabija pętli. Domena wygrywa. Journal jest obserwacją, nie właścicielem historii.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/fala_result.py` — reaction-dir write is observation; OSError does not raise
+- `tests/test_hom_operator.py` — pad keeps score/draft and tick-all stays up
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python -m unittest tests.test_hom_operator.TickBriefPathTests.test_fala_write_pad_keeps_score_draft_and_does_not_kill_tick_all tests.test_hom_operator.TickBriefPathTests.test_tick_all_writes_fala_subprocess_result_without_opening_runtime_db`
 
 ## Non-goals
 

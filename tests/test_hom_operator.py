@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from influenzer.cli import main
 from influenzer.config import Config, write_config
@@ -2614,6 +2616,42 @@ class TickBriefPathTests(unittest.TestCase):
         self.assertEqual(data["reactions"][0]["kind"], "hom.decision")
         self.assertFalse((self.home / "runtime.db").exists())
         self.assertIsNone(write_fala_result(payload, env={}))
+
+    def test_fala_write_pad_keeps_score_draft_and_does_not_kill_tick_all(self) -> None:
+        from influenzer.fala_result import write_fala_result
+
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="fala-pad-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(brief)
+        pad = self.home / "fala-out"
+        pad.write_text("not a directory", encoding="utf-8")
+        payload = {"status": "ok", "mutated": False, "operator": {"published": False, "processed": 1}}
+        self.assertIsNone(write_fala_result(payload, env={"FALA_EFFECTOR_OUTPUT_DIR": str(pad)}))
+        self.assertEqual(pad.read_text(encoding="utf-8"), "not a directory")
+        stdout = io.StringIO()
+        with (
+            patch.dict(os.environ, {"FALA_EFFECTOR_OUTPUT_DIR": str(pad)}),
+            redirect_stdout(stdout),
+        ):
+            code = tick_all_main(["--config", str(self.home / "config.json")])
+        self.assertEqual(code, 0)
+        stored = self.repo.get_brief("app-1", "fala-pad-1")
+        assert stored is not None
+        self.assertEqual(stored.status, "processed")
+        self.assertIsNotNone(self.repo.get_operator_score("app-1", "fala-pad-1"))
+        draft = self.repo.get_operator_draft("app-1", "fala-pad-1")
+        self.assertIsNotNone(draft)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
+        self.assertTrue(pad.is_file())
+        self.assertEqual(pad.read_text(encoding="utf-8"), "not a directory")
+        self.assertFalse((self.home / "runtime.db").exists())
 
 
 class FalaPackageAndCatalogTests(unittest.TestCase):
