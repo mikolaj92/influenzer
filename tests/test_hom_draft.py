@@ -1298,6 +1298,56 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("Welcome to nginx", decision.draft.body)
         self.assertNotIn("Caddy placeholder", decision.draft.body)
 
+    def test_bot_bump_week_is_undressable_even_when_score_says_draft(self) -> None:
+        bumps = (
+            "Merged PR #3: chore(deps): bump lodash from 4.17.20 to 4.17.21 by dependabot[bot]",
+            "Released v1.2.3",
+            "tydzień samych bump",
+        )
+        for text in bumps:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(kind="release", text="Released v1.2.3", artifact_url=SHIP_RELEASE),
+                        Fact(
+                            kind="pull",
+                            text=text
+                            if text.startswith("Merged")
+                            else "Merged PR #9: bump actions/checkout from 4 to 5 by github-actions[bot]",
+                            artifact_url="https://github.com/mikolaj92/influenzer/pull/9",
+                        ),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("Show HN:", dumped)
+                self.assertNotIn("dependabot", dumped)
+
     def test_product_copy_without_empty_repo_can_still_dress(self) -> None:
         brief = _ship_brief(
             preferred_arena=ArenaId.HN,

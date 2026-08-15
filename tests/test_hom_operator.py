@@ -35,6 +35,8 @@ from influenzer.playbook import (
     is_store_host_url,
     is_video_host_url,
     invented_metric_reason,
+    looks_like_bot_author,
+    looks_like_bot_bump_week,
     looks_like_contest,
     looks_like_dunk,
     looks_like_foreign_wave,
@@ -65,6 +67,7 @@ from influenzer.playbook import (
     looks_like_store_pitch,
     looks_like_launch_pitch,
     looks_like_superlative,
+    looks_like_version_diff,
     metric_tokens,
     quote_without_sourced_excerpt,
     strip_person_mentions,
@@ -995,6 +998,72 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_server_splash(text))
 
+    def test_bot_bump_week_is_not_a_story(self) -> None:
+        bots = (
+            "Merged PR #3: chore(deps): bump lodash from 4.17.20 to 4.17.21 by dependabot[bot]",
+            "Merged PR #4: chore(deps): update dependency by renovate[bot]",
+            "Merged PR #5: bump actions/checkout from 4 to 5 by github-actions[bot]",
+            "dependabot",
+            "renovate[bot]",
+            "github-actions[bot]",
+            "author dependabot",
+        )
+        for text in bots:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_bot_author(text))
+        diffs = (
+            "bump lodash from 4.17.20 to 4.17.21",
+            "chore(deps): bump requests from 2.31.0 to 2.32.0",
+            "Released v1.2.3",
+            "Tag v0.4.0",
+            "version diff",
+            "diffy wersji",
+            "tydzień samych bump",
+        )
+        for text in diffs:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_version_diff(text))
+        self.assertTrue(
+            looks_like_bot_bump_week(
+                (
+                    "Merged PR #3: chore(deps): bump lodash from 4.17.20 to 4.17.21 by dependabot[bot]",
+                    "Merged PR #4: chore(deps): update lockfile by renovate[bot]",
+                    "README has an install/quickstart a stranger can run",
+                )
+            )
+        )
+        self.assertTrue(
+            looks_like_bot_bump_week(
+                (
+                    "Released v1.2.3",
+                    "Merged PR #9: bump actions/checkout from 4 to 5 by github-actions[bot]",
+                )
+            )
+        )
+        self.assertTrue(looks_like_bot_bump_week(("Released v1.2.3", "Tag v1.2.3")))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "a stranger can bump the local score",
+            "from 1 to 3 facts in the brief",
+            "Released the operator that scores briefs",
+            "Tag the draft after a human pass",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_bot_author(text))
+                self.assertFalse(looks_like_version_diff(text))
+        self.assertFalse(
+            looks_like_bot_bump_week(
+                (
+                    "Merged PR #12: feat: local HoM operator scores briefs",
+                    "Merged PR #3: chore(deps): bump lodash from 4.17.20 to 4.17.21 by dependabot[bot]",
+                )
+            )
+        )
+        self.assertFalse(looks_like_bot_bump_week(("dependabot",)))
+
     def test_dead_link_is_not_tryable(self) -> None:
         corpses = (
             "HEAD 404",
@@ -1411,6 +1480,77 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertEqual(score.reason, "commit_noise_changelog")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_bot_only_merges_are_changelog_not_a_launch(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(
+                    text="Merged PR #3: chore(deps): bump lodash from 4.17.20 to 4.17.21 by dependabot[bot]",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/3",
+                ),
+                Fact(
+                    text="Merged PR #4: chore(deps): update lockfile by renovate[bot]",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/4",
+                ),
+                Fact(text="README has an install/quickstart a stranger can run"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "bot_bump_week")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
+    def test_version_diff_release_is_changelog_not_a_launch(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(text="Released v1.2.3", artifact_url=SHIP_RELEASE),
+                Fact(
+                    text="Merged PR #9: bump actions/checkout from 4 to 5 by github-actions[bot]",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/9",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "bot_bump_week")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+
+    def test_version_tag_with_stale_readme_is_changelog_not_a_launch(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(kind="release", text="Released v1.2.3", artifact_url=SHIP_RELEASE),
+                Fact(
+                    kind="readme",
+                    text="README has an install/quickstart a stranger can run",
+                    artifact_url="https://github.com/mikolaj92/influenzer#readme",
+                ),
+                Fact(kind="signal", text="Local operator with a working install"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "bot_bump_week")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+
+    def test_human_feat_next_to_a_bot_bump_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(
+                    text="Merged PR #3: chore(deps): bump lodash from 4.17.20 to 4.17.21 by dependabot[bot]",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/3",
+                ),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_waitlist_ship_claim_is_killed(self) -> None:
         brief = self._brief(

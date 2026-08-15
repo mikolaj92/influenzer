@@ -37,6 +37,7 @@ from influenzer.playbook import (
     is_social_arena,
     is_store_host_url,
     is_video_host_url,
+    looks_like_bot_bump_week,
     looks_like_commit_noise,
     looks_like_contest,
     looks_like_dunk,
@@ -389,6 +390,20 @@ def _is_merge_log_brief(brief: Brief) -> bool:
     return is_merge_log_texts(_wearable_fact_texts(brief))
 
 
+def _is_bot_bump_week_brief(brief: Brief) -> bool:
+    wearable = [
+        fact
+        for fact in brief.facts
+        if fact.text.strip()
+        and fact.kind.strip().lower() != "artifact"
+        and fact.text.strip().casefold() != "ship artifact"
+    ]
+    return looks_like_bot_bump_week(
+        tuple(fact.text for fact in wearable),
+        kinds=tuple(fact.kind for fact in wearable),
+    )
+
+
 def _fact_triples(brief: Brief) -> tuple[tuple[str, str, str | None], ...]:
     return tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
 
@@ -476,6 +491,8 @@ def score_brief(brief: Brief) -> Score:
         return _changelog(brief, "patch_changelog_only")
     if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):
         return _changelog(brief, "commit_noise_changelog")
+    if _is_bot_bump_week_brief(brief):
+        return _changelog(brief, "bot_bump_week")
     if _is_merge_log_brief(brief):
         return _changelog(brief, "merge_log_changelog")
     if brief.claims_ship:

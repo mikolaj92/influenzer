@@ -47,6 +47,7 @@ from influenzer.playbook import (
     is_store_host_url,
     is_social_arena,
     is_video_host_url,
+    looks_like_bot_bump_week,
     looks_like_contest,
     looks_like_dunk,
     looks_like_foreign_wave,
@@ -250,6 +251,10 @@ def _merge_log_bits(bits: CopyBits) -> bool:
     return is_merge_log_texts((bits.one_liner, *bits.rest))
 
 
+def _bot_bump_week_bits(bits: CopyBits) -> bool:
+    return looks_like_bot_bump_week((bits.one_liner, *bits.rest))
+
+
 def _body_or_none(body: str) -> str | None:
     text = strip_person_mentions(body)
     if not text:
@@ -291,7 +296,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     title_src = bits.one_liner.strip()
     if title_src.lower().startswith("show hn:"):
         title_src = title_src.split(":", 1)[1].strip()
-    if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits):
+    if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits) or _bot_bump_week_bits(bits):
         return None
     if looks_like_listicle_title(title_src) or looks_like_shouty_title(title_src) or looks_like_emoji_title(title_src):
         return None
@@ -488,6 +493,11 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_fork(bits.blob)
         or looks_like_empty_repo(bits.blob)
         or looks_like_server_splash(bits.blob)
+        or looks_like_bot_bump_week(
+            tuple(fact.text for fact in brief.facts),
+            kinds=tuple(fact.kind for fact in brief.facts),
+        )
+        or _bot_bump_week_bits(bits)
     ):
         return None
     if unquotable_reason(triples):
