@@ -1,34 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=88 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=161 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #88 — Dwa watche na to samo repo to jeden look
+Issue: #161 — Domyślna strona serwera nie jest produktem
 
 ## Goal
 
-Dwa watche na to samo repo to jeden look. Nie dwa briefy i dwa kąty z jednego gita, nawet gdy project_id różne. Drugi watch milczy.
+Domyślna strona serwera nie jest produktem. Welcome to nginx, Apache default, Caddy placeholder = cisza.
 
 ## Files likely touched
 
-- `influenzer/scan_due.py` — look watermark is per git, not per project_id
-- `influenzer/brief_admit.py` — already_told is machine-wide for the same artifact URLs
-- `influenzer/storage.py` — list_briefs() can read every project
-- `influenzer/hom_watch.py` — same-repo second watch stays silent
-- tests for admit / scan-due / pass / watch
+- `influenzer/playbook.py` — splash detector + wave copy
+- `influenzer/hom.py` — score/gate kill
+- `influenzer/hom_draft.py` — dresser fail-closed
+- `tests/test_hom_operator.py` — detector + score tests
+- `tests/test_hom_draft.py` — dress tests
 
 ## Test plan
 
-- `tests/test_brief_admit.py` — second project, same git = already_told
-- `tests/test_scan_due.py` — other project's watermark is not due
-- `tests/test_hom_watch.py` — switching watch to another project on the same repo does not look again
-- `tests/test_hom_pass.py` — second project_id on the same repo is silence, no second angle
+- `python -m unittest tests.test_hom_operator tests.test_hom_draft`
 
 ## Non-goals
 
-- Machine-wide one-story lock across *different* repos (#44)
-- Process lock for a second tick instance (#80)
-- Multi-row watch inventory; v1 watch table stays singleton
+- Do not probe live hosts. Do not treat a parked domain (#157) or a broken site (#25) as this gate. A working nginx/Apache/Caddy config stays.
 
 ## Notes
 
