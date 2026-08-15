@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -677,6 +677,32 @@ COMMIT_NOISE_RE = re.compile(
 )
 # A window of merged PRs is changelog, not a clickable product.
 MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
+# A week of only bot bumps is not a story. dependabot / renovate /
+# github-actions in the look window = cisza społeczna. Changelog wolno.
+# Pair of no-noise (#64): chore/typo vs author is a bot. A human feat
+# next to a bump stays; a stack of only bots does not launch.
+BOT_AUTHOR_RE = re.compile(
+    r"(?i)(?:"
+    r"\bdependabot(?:\[bot\])?\b|"
+    r"\brenovate(?:\[bot\])?\b|"
+    r"\bgithub-actions(?:\[bot\])?\b|"
+    r"\b(?:from|by|author)\s+(?:dependabot|renovate|github-actions)(?:\[bot\])?\b"
+    r")"
+)
+# A version tag / bump-from-X-to-Y release is not a launch. Diffs of
+# versions are changelog. Do not Show HN a lockfile bump dressed as v1.2.3.
+VERSION_DIFF_RE = re.compile(
+    r"(?i)(?:"
+    r"\bbump(?:s|ed|ing)?\s+(?:\S+\s+)?from\s+\S+\s+to\s+\S+\b|"
+    r"\b(?:chore|build|ci)(?:\([^)]*\))?:\s*bump\b|"
+    r"\bbump(?:s|ed|ing)?\s+(?:version|versions|deps|dependencies|lockfile)\b|"
+    r"^released\s+v?\d+(?:\.\d+){1,3}\s*$|"
+    r"^tag\s+v?\d+(?:\.\d+){1,3}\s*$|"
+    r"\bversion\s+diff\b|"
+    r"\bdiff(?:s|y)?\s+(?:wersji|wersja|version)\b|"
+    r"\btydzie[nń]\s+samych\s+bump"
+    r")"
+)
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
@@ -1190,6 +1216,80 @@ def is_merge_log_texts(texts: tuple[str, ...] | list[str]) -> bool:
     if not merge:
         return False
     return looks_like_merged_pr_fact(meat[0]) or len(merge) == len(meat)
+
+
+def looks_like_bot_author(text: str) -> bool:
+    """True when a fact names dependabot / renovate / github-actions."""
+    if not text or not text.strip():
+        return False
+    return bool(BOT_AUTHOR_RE.search(text))
+
+
+def looks_like_version_diff(text: str) -> bool:
+    """True for bump-from-X-to-Y / Released v1.2.3. Version diffs are not a launch."""
+    if not text or not text.strip():
+        return False
+    return bool(VERSION_DIFF_RE.search(text))
+
+
+def _is_readme_install_fact(text: str) -> bool:
+    stripped = text.strip().casefold()
+    return stripped.startswith("readme has an install") or stripped.startswith("readme has a")
+
+
+def _is_human_merge(text: str) -> bool:
+    return looks_like_merged_pr_fact(text) and not looks_like_bot_author(text)
+
+
+def looks_like_bot_bump_week(
+    texts: tuple[str, ...] | list[str],
+    *,
+    kinds: tuple[str, ...] | list[str] | None = None,
+) -> bool:
+    """True when the look's merges are only bots, or the window is only version diffs.
+
+    A human feat next to a bump stays. A week of dependabot / renovate /
+    github-actions, or a version tag without a human merge, is changelog.
+    When release/pull/tag kinds exist, ignore README/description — a stale
+    one-liner is not a story next to a version diff.
+    """
+    meat = [item.strip() for item in texts if item and item.strip()]
+    if not meat:
+        return False
+    if kinds is not None and len(tuple(kinds)) == len(tuple(texts)):
+        structured: list[str] = []
+        for kind, text in zip(kinds, texts, strict=False):
+            label = str(kind or "").strip().lower()
+            line = str(text or "").strip()
+            if not line:
+                continue
+            if label in {"release", "tag", "pull"}:
+                structured.append(line)
+        if structured:
+            meat = structured
+    story = [item for item in meat if not _is_readme_install_fact(item)]
+    if not story:
+        return False
+    if any(_is_human_merge(item) for item in story):
+        return False
+    leftover = [
+        item
+        for item in story
+        if not (
+            looks_like_bot_author(item)
+            or looks_like_version_diff(item)
+            or looks_like_commit_noise(item)
+            or looks_like_merged_pr_fact(item)
+        )
+    ]
+    if leftover:
+        return False
+    # A dependabot mention in product copy is not a look window.
+    # Need a bot merge or a version tag / bump-from-X-to-Y.
+    return any(
+        (looks_like_merged_pr_fact(item) and looks_like_bot_author(item)) or looks_like_version_diff(item)
+        for item in story
+    )
 
 
 def looks_like_waitlist(text: str) -> bool:
@@ -1767,6 +1867,7 @@ __all__ = [
     "ArenaId",
     "ArenaPlay",
     "BLOG_HOSTS",
+    "BOT_AUTHOR_RE",
     "CANON_URL",
     "COMMIT_NOISE_RE",
     "DUNK_NAMED_RE",
@@ -1799,6 +1900,7 @@ __all__ = [
     "SERVER_SPLASH_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
+    "VERSION_DIFF_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
     "NEWS_HOSTS",
@@ -1840,6 +1942,8 @@ __all__ = [
     "is_store_host_url",
     "invented_metric_reason",
     "is_video_host_url",
+    "looks_like_bot_author",
+    "looks_like_bot_bump_week",
     "looks_like_commit_noise",
     "looks_like_dunk",
     "looks_like_foreign_wave",
@@ -1867,6 +1971,7 @@ __all__ = [
     "news_urls_only",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
+    "looks_like_version_diff",
     "looks_like_press_release",
     "looks_like_shouty_title",
     "looks_like_emoji_title",
