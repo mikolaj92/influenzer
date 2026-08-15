@@ -238,6 +238,39 @@ class OperatorTests(unittest.TestCase):
             ).fetchone()
         )
 
+    def test_score_only_tick_ignores_live_enabled_and_due_plans(self) -> None:
+        account, policy, grant, plan = self._scheduled_fixture(plan_id="plan-look", operation_key="op-look")
+        called = {"n": 0}
+
+        def handler(_req: AdapterRequest) -> dict:
+            called["n"] += 1
+            return {"status": "ok", "ok": True, "mutated": True}
+
+        live_cfg = Config(home=self.home, scheduler_live_enabled=True)
+        out = tick(
+            self.repo,
+            live_cfg,
+            due=[DueWork(plan=plan, account=account, policy=policy, grant=grant)],
+            cli_live=True,
+            now="2026-01-02T00:00:00Z",
+            handlers={"x": handler},
+            score_only=True,
+        )
+        self.assertEqual(called["n"], 0)
+        self.assertFalse(out["mutated"])
+        self.assertNotIn("outcomes", out)
+        self.assertEqual(
+            self.repo.conn.execute(
+                "SELECT status FROM publish_plans WHERE plan_id=?", ("plan-look",)
+            ).fetchone()["status"],
+            PlanStatus.SCHEDULED.value,
+        )
+        self.assertIsNone(
+            self.repo.conn.execute(
+                "SELECT 1 FROM publication_attempts WHERE plan_id=?", ("plan-look",)
+            ).fetchone()
+        )
+
     def test_scheduler_denies_without_grant_even_when_live_enabled(self) -> None:
         account, policy, _grant, plan = self._scheduled_fixture(plan_id="plan-1", operation_key="op-1")
         live_cfg = Config(home=self.home, scheduler_live_enabled=True)

@@ -81,7 +81,10 @@ def packet_for(draft: Draft) -> dict[str, Any]:
 
 
 def emit_angle(repo: StateRepository, *, project_id: str | None = None) -> dict[str, Any]:
-    """Read operator_drafts; return one packet or silence. No writes."""
+    """Read operator_drafts; return one packet or silence. No writes.
+
+    No adapters. ``scheduler.live_enabled`` cannot publish from angle.
+    """
     if project_id is not None and repo.get_project(project_id) is None:
         return _silence("project not found", project_id=project_id)
     chosen = choose_draft(repo.list_operator_drafts(project_id))

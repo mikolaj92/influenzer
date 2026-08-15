@@ -32,6 +32,13 @@ def echo(request: Mapping[str, Any]) -> dict[str, Any]:
     return envelope.ok(status="echo", echo=dict(request))
 
 
+# Look/pass/angle stay on this dry-run catalog. Live is grant+intent on the
+# scheduler path, not a flag that flips these names into publishers.
+_LOOK_PASS_ANGLE = frozenset(
+    {"score_brief", "look", "pass", "angle", "hom_pass", "hom_outbox"}
+)
+
+
 def score_brief(request: Mapping[str, Any]) -> dict[str, Any]:
     """Pure HoM score. Drafts are decisions, not live publishes."""
 
@@ -48,9 +55,25 @@ def score_brief(request: Mapping[str, Any]) -> dict[str, Any]:
     return envelope.result(status="ok", ok=True, mutated=False, **out)
 
 
-def _dry_run(request: Mapping[str, Any]) -> bool:
-    """Read dry-run with authored input taking precedence over config."""
+def _handler_name(request: Mapping[str, Any]) -> str | None:
+    name = request.get("handler")
+    if name is None:
+        name = request.get("name")
+    config = request.get("config")
+    if name is None and isinstance(config, Mapping):
+        name = config.get("handler")
+    return name if isinstance(name, str) else None
 
+
+def _dry_run(request: Mapping[str, Any]) -> bool:
+    """Read dry-run with authored input taking precedence over config.
+
+    Look/pass/angle cannot leave dry-run. ``live_enabled`` is not an override.
+    Live stays a separate grant+intent on the scheduler path.
+    """
+
+    if _handler_name(request) in _LOOK_PASS_ANGLE:
+        return True
     input_data = request.get("input")
     if isinstance(input_data, Mapping) and "dry_run" in input_data:
         value = input_data["dry_run"]
@@ -63,6 +86,7 @@ def _dry_run(request: Mapping[str, Any]) -> bool:
     if type(value) is not bool:
         raise TypeError("dry_run must be a boolean")
     return value
+
 
 def _secret_values(value: Any, *, key: str = "") -> set[str]:
     found: set[str] = set()
@@ -127,12 +151,7 @@ def run(request: Mapping[str, Any]) -> dict[str, Any]:
         return envelope.fail("invalid_request")
     secrets = _secret_values(request)
     try:
-        name = request.get("handler")
-        if name is None:
-            name = request.get("name")
-        if name is None and isinstance(request.get("config"), Mapping):
-            name = request["config"].get("handler")
-        handler = resolve(name)
+        handler = resolve(_handler_name(request))
         raw = handler(dict(request))
         result = normalize_result(raw, request)
     except Exception as exc:
