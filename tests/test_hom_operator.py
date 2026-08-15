@@ -48,6 +48,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
+    looks_like_dead_link,
     looks_like_dead_release_asset,
     looks_like_login_gate,
     looks_like_roadmap,
@@ -830,6 +831,41 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_login_gate(text))
 
+    def test_dead_link_is_not_tryable(self) -> None:
+        corpses = (
+            "HEAD 404",
+            "GET 410",
+            "HEAD/GET 404",
+            "404/410",
+            "404 not found",
+            "410 gone",
+            "dead link",
+            "martwy link",
+            "HEAD timeout",
+            "GET timeout",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dead_link(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "HTTP 200 on the demo",
+            "HEAD 401",
+            "GET 403",
+            "401/403",
+            "behind a login",
+            "asset on the list 404",
+            "release asset is 404",
+            "martwy plik",
+            "the timeout fires too soon",
+            "download the tarball from the release",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_dead_link(text))
+
     def test_dead_release_asset_is_not_a_ship(self) -> None:
         corpses = (
             "asset on the list 404",
@@ -1261,6 +1297,54 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="login form validates a password"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_dead_link_ship_claim_is_killed(self) -> None:
+        corpses = (
+            "HEAD 404",
+            "GET 410",
+            "dead link",
+            "martwy link",
+            "HEAD timeout",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "dead_link_not_tryable")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_dead_link_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="HEAD 404", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "dead_link_not_tryable")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_dead_link_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="HTTP 200 on the demo"),
             ),
         )
         score = score_brief(brief)

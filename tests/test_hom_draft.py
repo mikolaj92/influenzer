@@ -1041,6 +1041,70 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("behind a login", decision.draft.body.lower())
         self.assertNotIn("za logowaniem", decision.draft.body.lower())
 
+    def test_dead_link_is_undressable_even_when_score_says_draft(self) -> None:
+        corpses = (
+            "HEAD 404",
+            "GET 410",
+            "404/410",
+            "dead link",
+            "martwy link",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("HEAD 404", dumped)
+                self.assertNotIn("martwy link", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
+
+    def test_product_copy_without_dead_link_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="HTTP 200 on the demo"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("HTTP 200 on the demo", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("404", decision.draft.body)
+        self.assertNotIn("410", decision.draft.body)
+        self.assertNotIn("dead link", decision.draft.body.lower())
+        self.assertNotIn("martwy", decision.draft.body.lower())
+
     def test_dead_release_asset_is_undressable_even_when_score_says_draft(self) -> None:
         corpses = (
             "asset on the list 404",
