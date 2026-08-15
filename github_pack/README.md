@@ -7,7 +7,8 @@ Tryable is a README+URL heuristic. Look does not run the project.
 Launching on watch is silence. Code in look is untrusted.
 Patch/typo/chore is silence. A waitlist is not a ship. A window of
 merged PRs is changelog, not a tryable ship. A release without a
-README+URL is not tryable.
+README+URL is not tryable. An empty repo or a repo with no README is
+not a website; that is not “README without a GIF”.
 
 Does **not**: call `gh`, write SQLite, tick, publish, or know drafts,
 arenas, or `state.db`. `import github_pack` does not import Influenzer

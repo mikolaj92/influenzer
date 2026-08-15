@@ -61,6 +61,7 @@ from influenzer.playbook import (
     looks_like_dead_release_asset,
     looks_like_issues_disabled,
     looks_like_fork,
+    looks_like_empty_repo,
     looks_like_login_gate,
     looks_like_roadmap,
     looks_like_waitlist,
@@ -401,6 +402,7 @@ def _choose_arena(brief: Brief) -> ArenaId:
         and _has_clickable_url(brief)
         and not looks_like_issues_disabled(_facts_blob(brief))
         and not looks_like_fork(_facts_blob(brief))
+        and not looks_like_empty_repo(_facts_blob(brief))
     ):
         return ArenaId.HN
     return ArenaId.GITHUB
@@ -432,6 +434,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "issues_disabled_no_camp"
     if looks_like_fork(blob):
         return Verdict.KILL, "fork_not_a_site"
+    if looks_like_empty_repo(blob):
+        return Verdict.KILL, "empty_repo_not_a_site"
     if arena is ArenaId.HN and looks_like_listicle_title(title):
         return Verdict.KILL, "hn_not_a_listicle"
     if arena in {ArenaId.HN, ArenaId.GITHUB} and looks_like_shouty_title(title):
@@ -492,6 +496,8 @@ def score_brief(brief: Brief) -> Score:
             return _kill(brief, "issues_disabled_no_camp")
     if looks_like_fork(blob):
         return _kill(brief, "fork_not_a_site")
+    if looks_like_empty_repo(blob):
+        return _kill(brief, "empty_repo_not_a_site")
     if looks_like_dead_release_asset(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "dead_release_asset")

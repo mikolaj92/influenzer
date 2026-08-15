@@ -155,6 +155,48 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
+    def test_empty_repo_look_is_silence_even_with_a_ship_window(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(empty=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_repo_not_a_site")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_missing_readme_look_is_silence_not_readme_without_gif(self) -> None:
+        out = self._scan(ship_script(readme=GhCall(0, "{}")))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_repo_not_a_site")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_empty_repo_pack_is_silence(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": "isEmpty: true"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_repo_not_a_site")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
     def test_fork_pack_is_silence(self) -> None:
         out = admit_pack(
             self.repo,
