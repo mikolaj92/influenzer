@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from github_feedback import collect_feedback, is_feedback_signal, is_noise_comment
 from github_survey import GhCall, classify_gh_argv
+from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_short_gh
 
 from tests.gh_scripts import (
     ISSUE_COMMENT,
@@ -132,6 +133,28 @@ class CollectFeedbackTests(unittest.TestCase):
         self.assertEqual(out["reason"], "empty_feedback")
         self.assertTrue(out["ok"])
         self.assertIsNone(out["brief_id"])
+
+    def test_feedback_stops_after_max_pages(self) -> None:
+        fake = ScriptedGh(feedback_question_script())
+        with patch("subprocess.run", side_effect=AssertionError("feedback must not call subprocess")):
+            out = collect_feedback(REPO, gh=fake, now=NOW)
+        self.assertEqual(out["status"], "ok")
+        kinds = [classify_gh_argv(list(argv)) for argv in fake.calls]
+        self.assertLessEqual(kinds.count("issue_comments"), MAX_PAGES)
+        self.assertLessEqual(kinds.count("pull_comments"), MAX_PAGES)
+        self.assertFalse(any(look_argv_is_unbounded_pages(list(argv)) for argv in fake.calls))
+
+    def test_whole_history_comments_are_silence_not_a_spawn(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise AssertionError("feedback must not walk every GitHub page")
+
+        runner = look_short_gh(boom)
+        paginate = runner(["api", "--paginate", f"repos/{REPO}/issues/comments"])
+        huge = runner(["api", f"repos/{REPO}/issues/comments?per_page=100", "--paginate"])
+        self.assertEqual(paginate.returncode, 0)
+        self.assertEqual(paginate.stdout, "")
+        self.assertEqual(huge.returncode, 0)
+        self.assertEqual(huge.stdout, "")
 
 
 class FeedbackBlockBoundaryTests(unittest.TestCase):

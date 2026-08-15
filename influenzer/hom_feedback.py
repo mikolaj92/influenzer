@@ -12,6 +12,7 @@ Does not embed a Fala host.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
 Survey/feedback only through gh api. Reply and code are not this path.
+Look stops after N pages. Whole-repo history in one look is silence.
 """
 
 from __future__ import annotations
