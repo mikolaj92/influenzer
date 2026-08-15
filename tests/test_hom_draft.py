@@ -1303,17 +1303,18 @@ class HomDraftCostumeTests(unittest.TestCase):
             "Merged PR #8: docs: fix badge",
             "typo in README",
             "chore: tidy lockfile",
+            "Released docs: fix badge",
         )
         for text in chores:
             with self.subTest(text=text):
+                release = text if text.startswith("Released") else "docs: fix badge"
+                pull = text if text.startswith("Merged") else "Merged PR #9: typo in README"
                 brief = _ship_brief(
                     facts=(
-                        Fact(kind="release", text="docs: fix badge", artifact_url=SHIP_RELEASE),
+                        Fact(kind="release", text=release, artifact_url=SHIP_RELEASE),
                         Fact(
                             kind="pull",
-                            text=text
-                            if text.startswith("Merged")
-                            else "Merged PR #9: typo in README",
+                            text=pull,
                             artifact_url="https://github.com/mikolaj92/influenzer/pull/9",
                         ),
                     )

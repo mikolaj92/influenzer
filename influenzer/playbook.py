@@ -683,6 +683,7 @@ DOCS_TYPO_CHORE_RE = re.compile(
     r"(?i)(?:"
     r"^\s*(?:docs|style|test|refactor|build|chore|typo|lint|ci|wip|patch)"
     r"(?:\([^)]*\))?\s*[:=-]|"
+    r"^\s*(?:docs|style|test|refactor|build|chore|typo|lint|ci|wip|patch)\s*$|"
     r"^\s*(?:fix(?:es)?\s+)?(?:a\s+)?typo\b|"
     r"^\s*(?:chore|typo|lint|ci|wip)\b|"
     r"^\s*bump\s+(?:version|deps)\b|"
@@ -691,9 +692,14 @@ DOCS_TYPO_CHORE_RE = re.compile(
     r"\btypo\b|"
     r"\bdocs?[- /]+(?:only|typo|chore)\b|"
     r"\b(?:samo|only)\s+(?:docs|typo|chore)\b|"
-    r"\bpoprawk[aię]\s+tekst"
+    r"\bpoprawk[aię]\s+tekst|"
+    r"\bdocument(?:ation|s)?\s+(?:update|fix|typo|chore|only|badge)s?\b|"
+    r"\b(?:update|fix)(?:s|d)?\s+(?:the\s+)?(?:docs?|documentation|readme)\b"
     r")"
 )
+# github_pack prefixes a release/tag name. Peel that wrapper so a human
+# docs-only release is still changelog, not Show HN.
+_RELEASED_OR_TAG_PREFIX_RE = re.compile(r"(?i)^(?:released|tag)\s+")
 # A window of merged PRs is changelog, not a clickable product.
 MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
@@ -1206,6 +1212,9 @@ def looks_like_docs_typo_chore(text: str) -> bool:
     if looks_like_merged_pr_fact(stripped):
         title = stripped.split(":", 1)[1] if ":" in stripped else stripped
         return looks_like_docs_typo_chore(title)
+    peeled = _RELEASED_OR_TAG_PREFIX_RE.sub("", stripped, count=1).strip()
+    if peeled and peeled != stripped:
+        return looks_like_docs_typo_chore(peeled)
     return bool(DOCS_TYPO_CHORE_RE.search(stripped))
 
 
