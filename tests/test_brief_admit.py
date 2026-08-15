@@ -146,6 +146,25 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "already_told")
 
+    def test_same_repo_on_another_project_is_already_told(self) -> None:
+        first = self._scan(ship_script())
+        self.assertEqual(first["status"], "ok")
+        _project(self.repo, "app-2")
+        fake = ScriptedGh(ship_script())
+        with patch("subprocess.run", side_effect=AssertionError("scan must not call subprocess")):
+            out = scan_github(
+                self.repo,
+                project_id="app-2",
+                repo_slug=REPO,
+                gh=fake,
+                now=NOW,
+            )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "already_told")
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-1-0"))
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertEqual(self.repo.list_briefs("app-2"), [])
+
     def test_fork_look_is_silence_even_when_owner_is_ours(self) -> None:
         out = self._scan(ship_script(repo=GhCall(0, repo_json(fork=True))))
         self.assertEqual(out["status"], "noop")

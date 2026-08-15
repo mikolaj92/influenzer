@@ -177,6 +177,22 @@ class HomWatchTests(unittest.TestCase):
         self.assertEqual(fake2.calls, [])
         self.assertFalse(again.get("published", False))
 
+    def test_second_watch_on_same_repo_is_one_look(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        first, fake1 = self._tick()
+        self.assertEqual(first["scan"]["status"], "admitted")
+        self.assertTrue(fake1.calls)
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        _project(self.repo, "app-2")
+        set_watch(self.repo, project_id="app-2", repo_slug=REPO, now=NOW)
+        again, fake2 = self._tick()
+        self.assertNotIn("scan", again)
+        self.assertEqual(fake2.calls, [])
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-1-0"))
+        self.assertEqual(self.repo.list_briefs("app-2"), [])
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertFalse(again.get("published", False))
+
     def test_watch_open_story_scores_only_without_gh(self) -> None:
         set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
         self.repo.save_brief(

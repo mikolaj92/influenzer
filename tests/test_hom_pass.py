@@ -140,6 +140,34 @@ class HomPassTests(unittest.TestCase):
         self.assertEqual(again["angle"]["status"], "ok")
         self.assertNotIn("Costume:", again["angle"]["body"])
 
+    def test_other_project_same_repo_is_one_look(self) -> None:
+        first, fake1 = self._pass(ship_script())
+        self.assertEqual(first["scan"]["status"], "admitted")
+        self.assertTrue(fake1.calls)
+        _project(self.repo, "app-2")
+        fake2 = ScriptedGh(ship_script())
+        with (
+            patch("subprocess.run", side_effect=AssertionError("hom-pass must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("hom-pass must not fetch")),
+        ):
+            out = run_pass(
+                self.repo,
+                self.cfg,
+                project_id="app-2",
+                repo_slug=REPO,
+                gh=fake2,
+                now=NOW,
+            )
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], "not due")
+        self.assertEqual(fake2.calls, [])
+        self.assertEqual(out["tick"]["scored"], 0)
+        self.assertTrue(out["angle"].get("empty") or out["angle"]["status"] == "noop")
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-1-0"))
+        self.assertEqual(self.repo.list_briefs("app-2"), [])
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertFalse(out["published"])
+
     def test_open_story_skips_scan_and_still_ticks_and_angles(self) -> None:
         self.repo.save_brief(
             Brief.create(

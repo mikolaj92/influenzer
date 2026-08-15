@@ -19,6 +19,8 @@ Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
+Two watches on the same repo are one look. A second brief or angle from the
+same git is silence, even with another project_id.
 """
 
 from __future__ import annotations

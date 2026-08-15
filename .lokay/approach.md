@@ -1,32 +1,38 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=96 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=88 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #96 — Pad zapisu Fala nie cofa score/draft
+Issue: #88 — Dwa watche na to samo repo to jeden look
 
 ## Goal
 
-Pad zapisu Fala (reaction dir) nie cofa score/draft w state.db i nie zabija pętli. Domena wygrywa. Journal jest obserwacją, nie właścicielem historii.
+Dwa watche na to samo repo to jeden look. Nie dwa briefy i dwa kąty z jednego gita, nawet gdy project_id różne. Drugi watch milczy.
 
 ## Files likely touched
 
-- `influenzer/fala_result.py` — swallow OSError on reaction-dir write
-- `tests/test_hom_operator.py` — pad keeps score/draft; organ exits 0
+- `influenzer/scan_due.py` — look watermark is per git, not per project_id
+- `influenzer/brief_admit.py` — already_told is machine-wide for the same artifact URLs
+- `influenzer/storage.py` — list_briefs() can read every project
+- `influenzer/hom_watch.py` — same-repo second watch stays silent
+- tests for admit / scan-due / pass / watch
 
 ## Test plan
 
-- `tests/test_hom_operator.py::TickBriefPathTests.test_tick_all_writes_fala_subprocess_result_without_opening_runtime_db`
-- `tests/test_hom_operator.py::TickBriefPathTests.test_fala_reaction_dir_pad_keeps_score_draft_and_does_not_kill_tick`
+- `tests/test_brief_admit.py` — second project, same git = already_told
+- `tests/test_scan_due.py` — other project's watermark is not due
+- `tests/test_hom_watch.py` — switching watch to another project on the same repo does not look again
+- `tests/test_hom_pass.py` — second project_id on the same repo is silence, no second angle
 
 ## Non-goals
 
-- Do not wipe or recreate state.db (#94).
-- Do not make the journal the owner of score/draft history.
-- Do not stop the organ / interval loop on a reaction-dir pad.
+- Machine-wide one-story lock across *different* repos (#44)
+- Process lock for a second tick instance (#80)
+- Multi-row watch inventory; v1 watch table stays singleton
 
 ## Notes
 
-- Persist in `state.db` already happens before `write_fala_result`. The hole was the journal write raising and killing the organ after domain had already committed.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.

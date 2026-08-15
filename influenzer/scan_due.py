@@ -19,6 +19,9 @@ Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A clock that goes backward is silence, not a second look. Look is monotonic.
+Two watches on the same repo are one look. A second brief or angle from the
+same git is silence, even with another project_id. That is the machine lock,
+not a second survey.
 """
 
 from __future__ import annotations
@@ -80,10 +83,15 @@ def brief_mentions_repo(brief: Brief, repo_slug: str) -> bool:
 
 
 def last_scan_at(repo: StateRepository, project_id: str, repo_slug: str) -> str | None:
-    """Newest successful scan event or github-scan brief for this project+repo."""
+    """Newest successful scan event or github-scan brief for this repo.
+
+    Watermark is per git, not per project. ``project_id`` is the caller;
+    another project on the same repo does not get a second look.
+    """
+    _ = project_id
     wanted = _norm_repo(repo_slug)
     found: list[str] = []
-    for row in repo.events(project_id):
+    for row in repo.events():
         if row["event_type"] != "github.scanned":
             continue
         try:
@@ -97,7 +105,7 @@ def last_scan_at(repo: StateRepository, project_id: str, repo_slug: str) -> str 
         ts = payload.get("scanned_at") or row["created_at"]
         if isinstance(ts, str) and ts.strip():
             found.append(ts)
-    for brief in repo.list_briefs(project_id):
+    for brief in repo.list_briefs():
         if brief.source != SOURCE:
             continue
         if not brief_mentions_repo(brief, repo_slug):

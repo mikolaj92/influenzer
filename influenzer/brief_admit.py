@@ -1,7 +1,8 @@
 """Admit 0 or 1 pending brief into state.db.
 
 One story at a time: a pending brief or unprocessed social draft is silence;
-the same ship artifact is not retold.
+the same ship artifact is not retold. Two watches on the same repo are one
+look: a second brief from the same git is silence, even with another project_id.
 
 Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
@@ -55,7 +56,7 @@ def already_told(repo: StateRepository, project_id: str, urls: Sequence[str], br
     wanted = {url for url in urls if url}
     if not wanted:
         return False
-    for brief in repo.list_briefs(project_id):
+    for brief in repo.list_briefs():
         for fact in brief.facts:
             if fact.artifact_url and fact.artifact_url in wanted:
                 return True
