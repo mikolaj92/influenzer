@@ -40,6 +40,28 @@ class EnvelopeTests(unittest.TestCase):
         self.assertEqual(result["reason"], "effector_boundary_failed")
         self.assertFalse(result["mutated"])
 
+    def test_look_pass_angle_stay_dry_run_even_when_live_enabled(self) -> None:
+        """Look/pass/angle cannot leave dry-run. live_enabled is not an override."""
+
+        def planned(_request):
+            return {"status": "ok", "ok": True, "mutated": False, "published": False}
+
+        for name in ("score_brief", "look", "pass", "angle", "hom_pass", "hom_outbox"):
+            with self.subTest(handler=name):
+                with patch.object(effector, "resolve", return_value=planned):
+                    result = effector.run(
+                        {
+                            "handler": name,
+                            "input": {"dry_run": False, "live_enabled": True},
+                            "config": {"dry_run": False, "scheduler_live_enabled": True},
+                            "dry_run": False,
+                        }
+                    )
+                self.assertTrue(result["ok"], result)
+                self.assertTrue(result["dry_run"])
+                self.assertFalse(result["mutated"])
+                self.assertFalse(result.get("published", False))
+
     def test_secret_keys_and_credential_references_are_redacted(self) -> None:
         secret = "sentinel-secret"
         with patch.object(

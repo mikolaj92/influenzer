@@ -65,7 +65,11 @@ def run_pass(
     now: str | None = None,
     window_days: int = DEFAULT_WINDOW_DAYS,
 ) -> dict[str, Any]:
-    """Scan if due, score pending briefs, emit one angle. Dry-run. No live."""
+    """Scan if due, score pending briefs, emit one angle. Dry-run. No live.
+
+    ``scheduler.live_enabled`` cannot put adapters on this path. Live stays a
+    separate grant+intent, not a Monday look side effect.
+    """
     clock = now or utc_now()
     slug = repo_slug.strip()
     scan = scan_github_if_due(
@@ -76,7 +80,7 @@ def run_pass(
         now=clock,
         window_days=window_days,
     )
-    tick_out = tick(repo, cfg, due=(), cli_live=False, now=clock)
+    tick_out = tick(repo, cfg, due=(), cli_live=False, now=clock, score_only=True)
     angle = emit_angle(repo, project_id=project_id)
     scan_effect = _scan_effect(scan)
     tick_summary = _tick_summary(tick_out)

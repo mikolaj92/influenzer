@@ -88,10 +88,20 @@ def tick(
     posts_today: int = 0,
     now: str | None = None,
     handlers: dict[str, Handler] | None = None,
+    score_only: bool = False,
 ) -> dict[str, Any]:
-    """Process pending briefs, then due plans. Live mutation requires durable scheduler.live_enabled + grant."""
+    """Process pending briefs, then due plans. Live mutation requires durable scheduler.live_enabled + grant.
+
+    Look/pass/angle call this with ``score_only=True``: no adapters, even when
+    ``scheduler.live_enabled`` and due plans exist. Live is a separate
+    grant+intent path, not a Monday look side effect.
+    """
     clock = now or utc_now()
-    live = resolve_live_intent(scheduler=True, cli_live=cli_live, config=config)
+    if score_only:
+        live = False
+        due = ()
+    else:
+        live = resolve_live_intent(scheduler=True, cli_live=cli_live, config=config)
     operator = run_operator_tick(repo, now=clock)
     if not due:
         extra = {

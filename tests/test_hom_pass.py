@@ -199,6 +199,111 @@ class HomPassTests(unittest.TestCase):
         self.assertTrue(second["angle"]["empty"])
         self.assertFalse(second["published"])
 
+    def test_live_enabled_does_not_put_adapters_on_look(self) -> None:
+        from influenzer.content import create_revision, persist_revision
+        from influenzer.domain import (
+            AccountStatus,
+            ContentStatus,
+            PlatformAccount,
+            PolicyActivationGrant,
+            PolicyVersion,
+            PublishPlan,
+            PlanStatus,
+        )
+
+        live_cfg = Config(home=self.home, scheduler_live_enabled=True)
+        account = PlatformAccount(
+            project_id="app-1",
+            account_id="x-look",
+            platform="x",
+            handle="@app",
+            host=None,
+            credential_ref="env:X_TOKEN",
+            status=AccountStatus.CONNECTED,
+        )
+        self.repo.save_account(account)
+        policy = PolicyVersion(
+            project_id="app-1",
+            policy_version_id="pol-look",
+            account_ids=(account.account_id,),
+            actions=("publish",),
+            content_kinds=("post",),
+            max_posts_per_day=5,
+            require_disclosures=False,
+        ).with_hash()
+        self.repo.save_policy(policy)
+        self.repo.save_grant(
+            PolicyActivationGrant(
+                project_id="app-1",
+                grant_id="grant-look",
+                policy_version_id=policy.policy_version_id,
+                policy_hash=policy.policy_hash,
+                platform_account_id=account.account_id,
+                actions=("publish",),
+                actor="tester",
+                created_at="2026-01-01T00:00:00Z",
+                expires_at=None,
+            )
+        )
+        rev = create_revision(
+            project_id="app-1",
+            content_id="c-look",
+            revision_id="r-look",
+            body="hello live",
+            status=ContentStatus.READY,
+        )
+        persist_revision(self.repo, rev)
+        self.repo.save_plan(
+            PublishPlan(
+                project_id="app-1",
+                plan_id="plan-look",
+                content_revision_id=rev.revision_id,
+                content_hash=rev.content_hash,
+                platform_account_id=account.account_id,
+                platform="x",
+                body="hello live",
+                status=PlanStatus.SCHEDULED,
+                scheduled_at=None,
+                created_at="2026-01-01T00:00:00Z",
+                operation_key="op-look",
+            )
+        )
+
+        with (
+            patch(
+                "influenzer.scheduler.get_adapter",
+                side_effect=AssertionError("look/pass must not resolve adapters"),
+            ),
+            patch(
+                "influenzer.scheduler.run_adapter",
+                side_effect=AssertionError("look/pass must not call adapters"),
+            ),
+        ):
+            out, _fake = self._pass(ship_script())
+            live_out = run_pass(
+                self.repo,
+                live_cfg,
+                project_id="app-1",
+                repo_slug=REPO,
+                gh=ScriptedGh(ship_script()),
+                now=NOW,
+            )
+        self.assertFalse(out["published"])
+        self.assertFalse(out["mutated"])
+        self.assertFalse(live_out["published"])
+        self.assertFalse(live_out["mutated"])
+        self.assertEqual(
+            self.repo.conn.execute(
+                "SELECT status FROM publish_plans WHERE plan_id=?", ("plan-look",)
+            ).fetchone()["status"],
+            PlanStatus.SCHEDULED.value,
+        )
+        self.assertIsNone(
+            self.repo.conn.execute(
+                "SELECT 1 FROM publication_attempts WHERE plan_id=?", ("plan-look",)
+            ).fetchone()
+        )
+
 
 class HomPassCLIFAlaTests(unittest.TestCase):
     def setUp(self) -> None:
