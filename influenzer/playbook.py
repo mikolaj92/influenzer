@@ -129,7 +129,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip.",
-            "Sit on the repo during the spike (issues, Discussions).",
+            "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
             "Score installs and life after the spike, not a dead star count.",
         ),
         canon_path="github.md",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -457,6 +457,24 @@ DEAD_LINK_RE = re.compile(
     r"|\b(?:404|410)\s+(?:not\s+found|gone)\b"
     r"|\bdead\s+link\b"
     r"|\bmartw[yiae]\s+link\b"
+    r")"
+)
+# Issues disabled is not a camp. Show HN and the social angle sit on the
+# repo during the spike. No issues tracker = no camp = silence. README
+# and changelog may still move. Pair of waitlist: no inbox vs no demo.
+# "issues" as a product noun stays; a closed tracker does not.
+ISSUES_DISABLED_RE = re.compile(
+    r"(?i)(?:"
+    r"\bhasIssuesEnabled\"?\s*[:=]\s*\"?false\b"
+    r"|\bhas_issues\"?\s*[:=]\s*\"?false\b"
+    r"|\bissues\"?\s*[:=]\s*\"?(?:false|off|disabled|wy[lł][aą]czone)\b"
+    r"|\b(?:issues?|issue\s+tracker)\s+(?:are\s+|is\s+)?(?:disabled|turned\s+off|switched\s+off|off)\b"
+    r"|\b(?:disabled|turned\s+off|switched\s+off)\s+(?:the\s+)?(?:issues?|issue\s+tracker)\b"
+    r"|\bno\s+issue\s+tracker\b"
+    r"|\bwithout\s+(?:an?\s+)?issue\s+tracker\b"
+    r"|\brepo\s+(?:z\s+)?wy[lł][aą]czon(?:ymi|e|ych)\s+issues\b"
+    r"|\bwy[lł][aą]czon(?:e|ymi|ych)\s+issues\b"
+    r"|\bissues\s+wy[lł][aą]czon(?:e|ymi|ych)\b"
     r")"
 )
 # A listed release asset that 404s/410s is not a ship. The file is on
@@ -1122,6 +1140,13 @@ def looks_like_dead_link(text: str) -> bool:
     return bool(DEAD_LINK_RE.search(text))
 
 
+def looks_like_issues_disabled(text: str) -> bool:
+    """True when the issue tracker is off. No camp, no Show HN, no social angle."""
+    if not text or not text.strip():
+        return False
+    return bool(ISSUES_DISABLED_RE.search(text))
+
+
 def looks_like_dead_release_asset(text: str) -> bool:
     """True for a listed release asset whose download is 404/410. A missing file is not a ship."""
     if not text or not text.strip():
@@ -1676,6 +1701,7 @@ __all__ = [
     "LISTICLE_TITLE_RE",
     "DEAD_LINK_RE",
     "DEAD_RELEASE_ASSET_RE",
+    "ISSUES_DISABLED_RE",
     "LOGIN_GATE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
@@ -1755,6 +1781,7 @@ __all__ = [
     "looks_like_launch_pitch",
     "looks_like_dead_link",
     "looks_like_dead_release_asset",
+    "looks_like_issues_disabled",
     "looks_like_login_gate",
     "looks_like_roadmap",
     "looks_like_waitlist",
