@@ -15,6 +15,8 @@ Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
+A fact is a short excerpt + comment/issue URL. The rest stays on GitHub.
+A whole thread in state.db is silence, not storage. Retention, not timeout.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import sys
 from typing import Any
 
 from github_feedback import collect_feedback
+from github_feedback.feedback import WHOLE_THREAD, whole_thread_reason
 from github_survey import GhRunner, invalid_repo_reason
 from github_survey.survey import look_declared_gh
 
@@ -84,6 +87,8 @@ def admit_feedback(
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     if repo.list_operator_drafts(project_id):
         return host_silence("open_draft", project_id=project_id, repo_slug=slug)
+    if whole_thread_reason(payload):
+        return host_silence(WHOLE_THREAD, project_id=project_id, repo_slug=slug)
     facts_raw = payload.get("facts")
     if not isinstance(facts_raw, list) or not facts_raw:
         return host_silence("comment_noise", project_id=project_id, repo_slug=slug)
