@@ -21,7 +21,13 @@ from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
-from influenzer.playbook import StoryKind, is_social_arena, looks_like_empty_repo, looks_like_fork
+from influenzer.playbook import (
+    StoryKind,
+    is_social_arena,
+    looks_like_empty_repo,
+    looks_like_fork,
+    looks_like_pending_ci,
+)
 from influenzer.storage import StateRepository, StorageError
 
 SOURCE = "github-scan"
@@ -98,6 +104,8 @@ def admit_pack(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if bool(payload.get("isEmpty")) or looks_like_empty_repo(fact_blob):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if looks_like_pending_ci(fact_blob):
+        return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
     try:
         brief = brief_from_mapping(
             {

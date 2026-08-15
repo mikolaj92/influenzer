@@ -240,6 +240,48 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertEqual(out["reason"], "fork_not_a_site")
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
+    def test_pending_ci_pack_is_silence_not_a_ship(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": "CI is pending"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "pending_ci_unknown")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_pending_ci_look_is_silence_so_next_monday_can_look(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(description="CI is pending"))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "pending_ci_unknown")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_failed_ci_look_is_not_this_pending_gate(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(description="CI failed"))))
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["brief_id"], "scan-v0-1-0")
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+
     def test_pack_without_tryable_flag_is_silence(self) -> None:
         out = admit_pack(
             self.repo,
