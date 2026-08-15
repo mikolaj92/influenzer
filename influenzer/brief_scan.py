@@ -30,7 +30,12 @@ from typing import Any
 from github_pack import pack_survey
 from github_survey import GhRunner, invalid_repo_reason, survey_public_repo
 from github_survey.survey import look_declared_gh, look_short_gh
-from influenzer.playbook import looks_like_empty_repo, looks_like_fork, looks_like_template
+from influenzer.playbook import (
+    looks_like_empty_repo,
+    looks_like_fork,
+    looks_like_pending_ci,
+    looks_like_template,
+)
 
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
 from influenzer.domain import utc_now
@@ -142,6 +147,36 @@ def _payload_is_empty_repo(payload: dict[str, Any]) -> bool:
     return looks_like_empty_repo("\n".join(bits))
 
 
+def _payload_has_pending_ci(payload: dict[str, Any]) -> bool:
+    """Pending / yellow CI is unknown. Not a ship, not a fail, not a stored brief."""
+    bits: list[str] = []
+    if looks_like_pending_ci(str(payload.get("reason") or "")):
+        return True
+    survey = payload.get("survey")
+    if isinstance(survey, dict):
+        bits.append(str(survey.get("readme_text") or ""))
+        meta = survey.get("meta")
+        if isinstance(meta, dict):
+            bits.append(str(meta.get("description") or ""))
+        for key in ("prs", "releases", "tags"):
+            items = survey.get(key) or []
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                bits.append(str(item.get("title") or ""))
+                bits.append(str(item.get("body") or ""))
+                bits.append(str(item.get("name") or ""))
+                bits.append(str(item.get("tagName") or ""))
+    facts = payload.get("facts")
+    if isinstance(facts, list):
+        for item in facts:
+            if isinstance(item, dict):
+                bits.append(str(item.get("text") or ""))
+    return looks_like_pending_ci("\n".join(bits))
+
+
 def _payload_is_template(payload: dict[str, Any]) -> bool:
     if bool(payload.get("isTemplate")):
         return True
@@ -192,6 +227,8 @@ def scan_github(
             return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
         if _payload_is_template(surveyed):
             return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
+        if _payload_has_pending_ci(surveyed):
+            return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
         packed = pack_survey(surveyed)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
