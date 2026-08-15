@@ -1,8 +1,6 @@
 {
   "paths": [
-    "github_survey/survey.py",
     "influenzer",
-    "influenzer/adapters/spike_scores.json",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -39,13 +37,13 @@
     "influenzer/scheduler.py",
     "influenzer/security.py",
     "influenzer/storage.py",
-    "influenzer/tick.py"
+    "influenzer/tick.py",
+    "influenzer/tick_all.py",
+    "influenzer/adapters"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "survey",
-    "score",
     "influenzer"
   ],
   "notes": [
@@ -53,7 +51,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__81-czerwone-ci-na-default-branch-to-fa-szyw-d9be8da1",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__80-jedna-p-tla-na-jeden-state.db-882594fb",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

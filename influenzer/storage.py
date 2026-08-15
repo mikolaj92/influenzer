@@ -1,6 +1,7 @@
 """Host-owned SQLite persistence and content-addressed artifacts."""
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -9,7 +10,7 @@ import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterator, Mapping, TextIO
 
 from .domain import (
     BrandProfile, Campaign, CampaignKind, CampaignStatus, ContentRevision, ContentStatus,
@@ -39,6 +40,76 @@ class StateUnusable(StorageError):
 
     Do not wipe. Do not replace it with an empty CMO. Recovery is a human.
     """
+
+
+TICK_LOCK_NAME = "tick.lock"
+
+
+def tick_lock_path(state_db: str | os.PathLike[str]) -> Path:
+    """Advisory lock lives beside state.db. One loop per house."""
+    return Path(state_db).expanduser().resolve().with_name(TICK_LOCK_NAME)
+
+
+class TickLock:
+    """OS advisory lock for one tick process on one state.db.
+
+    Non-blocking. Held for the process lifetime (or until close). A second
+    instance must not look. This is not a SQLite busy wait.
+    """
+
+    def __init__(self, path: str | os.PathLike[str], handle: TextIO):
+        self.path = Path(path)
+        self._handle: TextIO | None = handle
+
+    def close(self) -> None:
+        handle = self._handle
+        self._handle = None
+        if handle is None:
+            return
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        try:
+            handle.close()
+        except OSError:
+            pass
+
+    def __enter__(self) -> "TickLock":
+        return self
+
+    def __exit__(self, *_: Any) -> None:
+        self.close()
+
+
+def try_acquire_tick_lock(state_db: str | os.PathLike[str]) -> TickLock | None:
+    """Exclusive non-blocking flock beside state.db, or None if already held.
+
+    Missing parent is created. A lock file that cannot be opened is silence,
+    same as overlap: do not look. The handle stays open so the kernel holds
+    the lock until this process exits or close() runs.
+    """
+    path = tick_lock_path(state_db)
+    handle = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+        handle = os.fdopen(fd, "a+", encoding="utf-8")
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.chmod(path, 0o600)
+    except (OSError, BlockingIOError):
+        if handle is not None:
+            try:
+                handle.close()
+            except OSError:
+                pass
+        return None
+    return TickLock(path, handle)
+
+
+def overlap_silence() -> dict[str, Any]:
+    """Second tick on the same state.db: cisza, no look."""
+    return {"status": "cisza", "mutated": False, "published": False}
 
 
 class CrossProjectError(StorageError):
@@ -930,7 +1001,12 @@ __all__ = [
     "SQLiteRepository",
     "StateRepository",
     "StorageError",
+    "TICK_LOCK_NAME",
+    "TickLock",
     "UnboundSqlError",
+    "overlap_silence",
     "reject_unbound_sql",
     "sql_has_inbound_literal",
+    "tick_lock_path",
+    "try_acquire_tick_lock",
 ]

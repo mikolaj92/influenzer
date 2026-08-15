@@ -8,6 +8,9 @@ mutator as influenzer-tick-all) unless `--pass-if-due`.
 Stdout is status only: cisza / admitted / scored. Angle body stays on
 explicit `angle` / pass. Journald recap of copy is a leak.
 
+One loop per state.db. A second tick instance (manual + always-on) takes
+the advisory lock and exits cisza: no second look. Not two CMOs in one house.
+
 Does not publish. Does not enable live social. Not a laptop LaunchAgent.
 Not a hosted service. A human starts this process on the always-on box;
 the repo does not SSH or deploy. Fala may conduct the score-only one-shot
@@ -23,8 +26,10 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from influenzer.config import load_config
 from influenzer.hom_watch import loop_status, run_watched_tick
 from influenzer.host import HostPower, HostUnsuitable, require_always_on_host
+from influenzer.storage import overlap_silence, try_acquire_tick_lock
 
 DEFAULT_INTERVAL_SECONDS = 300
 
@@ -92,6 +97,7 @@ def main(
             "briefs into drafts or kills. Interval loop may run hom_pass when a "
             "declared watch is due. --once is score-only unless --pass-if-due. "
             "Stdout is cisza/admitted/scored, never angle copy. Dry-run default. "
+            "One loop per state.db; a second instance exits cisza. "
             "Not a laptop LaunchAgent. No live social publish. Battery laptops "
             "fail closed for the interval loop."
         ),
@@ -143,6 +149,12 @@ def main(
         )
         return 2
 
+    cfg = load_config(args.config)
+    lock = try_acquire_tick_lock(cfg.state_db)
+    if lock is None:
+        print(json.dumps(overlap_silence(), sort_keys=True))
+        return 0
+
     def tick_once() -> dict[str, Any]:
         return run_watched_tick(
             config_path=args.config,
@@ -167,6 +179,8 @@ def main(
     except ValueError as exc:
         print(json.dumps({"status": "failed", "reason": str(exc)}, sort_keys=True))
         return 2
+    finally:
+        lock.close()
     return 0
 
 
