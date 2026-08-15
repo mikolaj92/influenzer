@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
+from urllib.parse import urlparse
 
 _PATCH_ONLY_RE = re.compile(
     r"(?i)^\s*(?:docs|style|test|refactor|build)(?:\([^)]*\))?:\s|"
@@ -36,6 +37,9 @@ _SHIP_ARTIFACT_RE = re.compile(
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
 )
 _MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
+_TRYABLE_ARTIFACT_HOSTS = frozenset({"github.com"})
+_UTM_QUERY_RE = re.compile(r"(?i)(?:^|[&])(?:utm_[a-z]+|fbclid|gclid|mc_cid|mc_eid)=")
+_CLICK_HERE_RE = re.compile(r"(?i)(?:click[-_ ]here|kliknij[-_ ]tu(?:taj)?)")
 
 
 def looks_like_patch_only(text: str) -> bool:
@@ -80,8 +84,36 @@ def readme_installable(text: str) -> bool:
     return bool(_INSTALL_RE.search(text))
 
 
+def _normalized_host(host: str | None) -> str | None:
+    value = (host or "").strip().rstrip(".").lower()
+    if value.startswith("www."):
+        value = value[4:]
+    return value or None
+
+
+def is_trusted_artifact_url(url: str | None) -> bool:
+    """True only for https on github.com (or a host we add to the allowlist).
+
+    Another origin, a shortener, a UTM-farm, or “kliknij tu” is silence.
+    """
+    if not url or not isinstance(url, str):
+        return False
+    raw = url.strip()
+    parsed = urlparse(raw)
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    host = _normalized_host(parsed.hostname)
+    if not host or not any(host == name or host.endswith("." + name) for name in _TRYABLE_ARTIFACT_HOSTS):
+        return False
+    if _UTM_QUERY_RE.search(parsed.query) or _CLICK_HERE_RE.search(raw):
+        return False
+    return True
+
+
 def _https_url(value: object) -> bool:
-    return isinstance(value, str) and value.startswith("https://")
+    return is_trusted_artifact_url(value if isinstance(value, str) else None)
 
 
 def readme_tryable_url(survey: Mapping[str, Any]) -> str | None:

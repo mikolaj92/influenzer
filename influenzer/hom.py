@@ -64,6 +64,9 @@ from influenzer.playbook import (
     looks_like_fork,
     looks_like_empty_repo,
     looks_like_login_gate,
+    looks_like_shortener,
+    looks_like_utm_farm,
+    looks_like_click_here,
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_pending_ci,
@@ -515,6 +518,18 @@ def score_brief(brief: Brief) -> Score:
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "login_gate_not_tryable")
         return _changelog(brief, "login_gate_not_tryable")
+    if looks_like_shortener(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "shortener_not_tryable")
+        return _changelog(brief, "shortener_not_tryable")
+    if looks_like_utm_farm(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "utm_farm_not_tryable")
+        return _changelog(brief, "utm_farm_not_tryable")
+    if looks_like_click_here(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "click_here_not_tryable")
+        return _changelog(brief, "click_here_not_tryable")
     if looks_like_dead_link(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "dead_link_not_tryable")
