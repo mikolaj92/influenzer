@@ -19,6 +19,8 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A fact is a short excerpt + comment/issue URL. The rest stays on GitHub.
 A whole thread in state.db is silence, not storage. Retention, not timeout.
+A fork is not a website. isFork is silence, even when the owner is ours.
+Helping upstream is silence here, not our launch.
 """
 
 from __future__ import annotations
@@ -29,17 +31,19 @@ import sys
 from typing import Any
 
 from github_feedback import collect_feedback
+from github_feedback import feedback as github_feedback_mod
 from github_feedback.feedback import WHOLE_THREAD, whole_thread_reason
 from github_survey import GhRunner, invalid_repo_reason
 from github_survey.survey import look_declared_gh
 
 from influenzer.brief_admit import already_told, open_story_reason
+from influenzer.brief_scan import repo_is_fork
 from influenzer.config import load_config
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping
-from influenzer.playbook import StoryKind
+from influenzer.playbook import StoryKind, looks_like_fork
 from influenzer.storage import StateRepository, StorageError
 
 SOURCE = "github-feedback"
@@ -84,6 +88,8 @@ def admit_feedback(
     slug = str(payload.get("repo") or "")
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
+    if bool(payload.get("isFork")):
+        return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
@@ -94,6 +100,10 @@ def admit_feedback(
     facts_raw = payload.get("facts")
     if not isinstance(facts_raw, list) or not facts_raw:
         return host_silence("comment_noise", project_id=project_id, repo_slug=slug)
+    if looks_like_fork(
+        "\n".join(str(item.get("text") or "") for item in facts_raw if isinstance(item, dict))
+    ):
+        return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     brief_id = str(payload.get("brief_id") or "")
     artifact_urls = tuple(
         str(item.get("artifact_url"))
@@ -156,6 +166,9 @@ def collect_and_admit(
         return host_silence(blocked, project_id=pid, repo_slug=slug)
     if repo.list_operator_drafts(pid):
         return host_silence("open_draft", project_id=pid, repo_slug=slug)
+    inner = gh if gh is not None else github_feedback_mod.run_gh
+    if repo_is_fork(inner, slug):
+        return host_silence("fork_not_a_site", project_id=pid, repo_slug=slug)
     try:
         runner = look_declared_gh(slug, gh) if gh is not None else None
         packed = collect_feedback(slug, gh=runner, now=now)

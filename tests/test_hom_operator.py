@@ -51,6 +51,7 @@ from influenzer.playbook import (
     looks_like_dead_link,
     looks_like_dead_release_asset,
     looks_like_issues_disabled,
+    looks_like_fork,
     looks_like_login_gate,
     looks_like_roadmap,
     looks_like_source_available_as_oss,
@@ -871,6 +872,40 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_issues_disabled(text))
 
+    def test_fork_is_not_a_website(self) -> None:
+        copies = (
+            "isFork: true",
+            "is_fork: true",
+            "fork: true",
+            "this repo is a fork",
+            "this repository is a fork",
+            "forked from other/tool",
+            "forked this repo",
+            "a fork of github.com/other/tool",
+            "upstream is github.com/other/tool",
+            "parentRepository: other/tool",
+            "parent: other/tool",
+            "to jest fork",
+            "fork nie jest witryna",
+            "kopia repo",
+        )
+        for text in copies:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_fork(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "isFork: false",
+            "is_fork: false",
+            "fork the process on each tick",
+            "we do not fork the worker",
+            "HTTP 200 on the demo",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_fork(text))
+
     def test_dead_link_is_not_tryable(self) -> None:
         corpses = (
             "HEAD 404",
@@ -1381,6 +1416,41 @@ class ScoreBriefTests(unittest.TestCase):
         assert draft is not None
         self.assertFalse(draft.body.startswith("Show HN:"))
         self.assertIn("## Quickstart", draft.body)
+
+    def test_fork_is_killed_even_when_owner_is_ours(self) -> None:
+        copies = (
+            "isFork: true",
+            "this repo is a fork",
+            "forked from other/tool",
+            "to jest fork",
+        )
+        for text in copies:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.GITHUB,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "fork_not_a_site")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_fork_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="we do not fork the worker"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_product_copy_without_issues_disabled_can_still_draft(self) -> None:
         brief = self._brief(

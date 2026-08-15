@@ -14,7 +14,8 @@ from influenzer.hom import Brief, Fact
 from influenzer.playbook import ArenaId, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
-from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, noise_script, ship_script, ScriptedGh
+from github_survey import GhCall
+from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, noise_script, repo_json, ship_script, ScriptedGh
 
 
 def _project(repo: StateRepository, project_id: str = "app-1") -> None:
@@ -144,6 +145,39 @@ class AdmitAndComposeTests(unittest.TestCase):
         out = self._scan(ship_script())
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "already_told")
+
+    def test_fork_look_is_silence_even_when_owner_is_ours(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(fork=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "fork_not_a_site")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_fork_pack_is_silence(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": "isFork: true"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "fork_not_a_site")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_pack_without_tryable_flag_is_silence(self) -> None:
         out = admit_pack(
