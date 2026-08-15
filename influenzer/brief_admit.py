@@ -5,6 +5,8 @@ the same ship artifact is not retold.
 
 Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
+Does not run the project. Launching on watch is silence.
+Tryable is a README+URL heuristic. Code in look is untrusted.
 """
 
 from __future__ import annotations
@@ -87,6 +89,9 @@ def admit_pack(
     created_at = now or payload.get("now") or utc_now()
     if not isinstance(created_at, str):
         created_at = utc_now()
+    tryable = bool(payload.get("tryable"))
+    if not tryable:
+        return host_silence("not_tryable", project_id=project_id, repo_slug=slug)
     try:
         brief = brief_from_mapping(
             {

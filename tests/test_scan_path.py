@@ -69,4 +69,6 @@ class ScanPathOwnershipTests(unittest.TestCase):
         due = (root / "influenzer" / "scan_due.py").read_text(encoding="utf-8")
         self.assertIn("Does not call gh", due)
         self.assertIn("Does not run every tick interval", due)
+        self.assertIn("Does not run the project", due)
+        self.assertIn("Tryable is a README+URL heuristic", due)
         self.assertNotIn("scan_due", tick)

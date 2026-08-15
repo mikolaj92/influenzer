@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from influenzer.brief_admit import SOURCE
+from influenzer.brief_admit import SOURCE, admit_pack
 from influenzer.brief_scan import scan_github
 from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
@@ -144,6 +144,22 @@ class AdmitAndComposeTests(unittest.TestCase):
         out = self._scan(ship_script())
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "already_told")
+
+    def test_pack_without_tryable_flag_is_silence(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "facts": [{"kind": "release", "text": "Released v0.1.0", "artifact_url": SHIP_RELEASE}],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "not_tryable")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_tick_scores_scanned_brief_without_publishing(self) -> None:
         self.assertEqual(self._scan(ship_script())["status"], "ok")
