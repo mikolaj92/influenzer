@@ -5,12 +5,14 @@ the same ship artifact is not retold.
 
 Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
+Does not launch or run the project. Tryable is a README+URL heuristic.
+Foreign and our code in look is untrusted.
 """
 
 from __future__ import annotations
 
 import argparse
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from influenzer.config import load_config
@@ -45,6 +47,22 @@ def open_story_reason(repo: StateRepository, project_id: str) -> str | None:
         if is_social_arena(draft.arena):
             return "social_draft"
     return None
+
+
+def tryable_from_readme_url(facts: Sequence[Any]) -> bool:
+    """Tryable is README+URL. Look does not run the project to decide."""
+    for item in facts:
+        if isinstance(item, Mapping):
+            kind = str(item.get("kind") or "")
+            text = str(item.get("text") or "")
+            url = item.get("artifact_url")
+        else:
+            kind = str(getattr(item, "kind", "") or "")
+            text = str(getattr(item, "text", "") or "")
+            url = getattr(item, "artifact_url", None)
+        if (kind == "readme" or "README" in text) and isinstance(url, str) and url.startswith("https://"):
+            return True
+    return False
 
 
 def already_told(repo: StateRepository, project_id: str, urls: Sequence[str], brief_id: str) -> bool:
@@ -87,6 +105,7 @@ def admit_pack(
     created_at = now or payload.get("now") or utc_now()
     if not isinstance(created_at, str):
         created_at = utc_now()
+    tryable = tryable_from_readme_url(facts_raw)
     try:
         brief = brief_from_mapping(
             {
@@ -95,7 +114,7 @@ def admit_pack(
                 "facts": facts_raw,
                 "story_kind": StoryKind.MAJOR.value,
                 "claims_ship": True,
-                "tryable": True,
+                "tryable": tryable,
                 "source": SOURCE,
                 "created_at": created_at,
             }
@@ -117,7 +136,7 @@ def admit_pack(
         source=brief.source,
         fact_count=len(brief.facts),
         claims_ship=True,
-        tryable=True,
+        tryable=tryable,
         pending=True,
     )
 

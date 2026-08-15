@@ -7,5 +7,6 @@ Public GitHub signals → JSON.
 window is a silent envelope, not a crash.
 
 Does **not**: briefs, drafts, `state.db`, scoring, publishing, arenas,
-tick, live social, or Host of Marketing copy. The host composes this
-block; `import github_survey` does not import Influenzer.
+tick, live social, or Host of Marketing copy. Does not launch or run the
+project. Tryable is a later README+URL heuristic, not a process we spawned.
+The host composes this block; `import github_survey` does not import Influenzer.

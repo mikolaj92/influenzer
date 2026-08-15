@@ -11,6 +11,8 @@ shape. Does not call gh (github_survey owns gh). Does not copy survey, pack,
 or admit. Does not grow github_survey. Does not run every tick interval.
 Does not open runtime.db. Does not embed a Fala host.
 Does not comment, label, close, or push. Look is GitHub GET only.
+Does not launch or run the project from watch. Tryable is a README+URL
+heuristic, not a process we spawned. Foreign and our code in look is untrusted.
 Reply and code are not this path.
 """
 

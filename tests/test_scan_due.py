@@ -428,6 +428,8 @@ class ScanDueBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not call gh", blob)
         self.assertIn("Does not run every tick interval", blob)
         self.assertIn("Does not open runtime.db", blob)
+        self.assertIn("Does not launch or run the project from watch", blob)
+        self.assertIn("Tryable is a README+URL", blob)
         self.assertNotIn("run_gh", blob)
         self.assertNotIn("pack_survey", blob)
         self.assertNotIn("survey_public_repo", blob)

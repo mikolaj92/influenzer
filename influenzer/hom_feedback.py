@@ -10,6 +10,8 @@ Does not auto-post replies. Does not scrape X or LinkedIn. Does not call hop.
 Does not enable Ads. Does not run every tick interval. Does not open runtime.db.
 Does not embed a Fala host.
 Does not comment, label, close, or push. Look is GitHub GET only.
+Does not launch or run the project from watch. Tryable is a README+URL
+heuristic, not a process we spawned. Foreign and our code in look is untrusted.
 Reply and code are not this path.
 """
 

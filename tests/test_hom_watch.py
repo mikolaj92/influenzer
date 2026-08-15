@@ -18,6 +18,7 @@ from influenzer.cli import setup_parser
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
+from influenzer.brief_scan import look_argv_is_launch, look_only_gh
 from influenzer.hom_watch import get_watch, interval_tick, set_watch, show_watch
 from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
@@ -230,6 +231,28 @@ class HomWatchTests(unittest.TestCase):
         self.assertEqual(bad["status"], "failed")
         missing = set_watch(self.repo, project_id="nope", repo_slug=REPO)
         self.assertEqual(missing["reason"], "project not found")
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_watch_look_does_not_launch_the_project(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        launched: list[object] = []
+
+        def inner(argv: object) -> object:
+            launched.append(argv)
+            raise AssertionError("watch look must not launch the project")
+
+        wrapped = look_only_gh(inner)
+        for argv in (["uv", "run", "demo"], ["npm", "start"], ["make", "dev"]):
+            self.assertTrue(look_argv_is_launch(argv))
+            call = wrapped(argv)
+            self.assertEqual(call.returncode, 0)
+            self.assertEqual(call.stdout, "")
+        self.assertEqual(launched, [])
+        out, fake = self._tick()
+        self.assertEqual(out["scan"]["status"], "admitted")
+        self.assertTrue(fake.calls)
+        self.assertFalse(any(look_argv_is_launch(list(call)) for call in fake.calls))
+        self.assertFalse(out["published"])
         self.assertFalse((self.home / "runtime.db").exists())
 
     def test_poisoned_watch_slug_is_silence_not_a_process(self) -> None:
@@ -448,6 +471,8 @@ class HomWatchBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not know Heimdall", blob)
         self.assertIn("Does not run pass every interval", blob)
         self.assertIn("Does not open runtime.db", blob)
+        self.assertIn("Does not launch or run the project from watch", blob)
+        self.assertIn("Tryable is a README+URL", blob)
         self.assertNotIn("run_gh", blob)
         self.assertNotIn("pack_survey", blob)
         self.assertNotIn("survey_public_repo", blob)

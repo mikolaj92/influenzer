@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from influenzer.brief_admit import SOURCE
-from influenzer.brief_scan import scan_github
+from influenzer.brief_admit import SOURCE, admit_pack, tryable_from_readme_url
+from influenzer.brief_scan import look_argv_is_launch, look_only_gh, scan_github
 from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
@@ -155,3 +155,73 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertEqual(score.verdict.value, "draft")
         cfg = load_config(str(self.home / "config.json"))
         self.assertFalse(cfg.scheduler_live_enabled)
+
+    def test_tryable_is_readme_plus_url_not_a_launch(self) -> None:
+        self.assertTrue(
+            tryable_from_readme_url(
+                [
+                    {
+                        "kind": "readme",
+                        "text": "README has an install/quickstart a stranger can run",
+                        "artifact_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                    }
+                ]
+            )
+        )
+        self.assertFalse(
+            tryable_from_readme_url(
+                [{"kind": "release", "text": "Released v0.1.0", "artifact_url": SHIP_RELEASE}]
+            )
+        )
+        self.assertFalse(
+            tryable_from_readme_url(
+                [{"kind": "readme", "text": "README has an install/quickstart a stranger can run"}]
+            )
+        )
+        packed = {
+            "status": "ok",
+            "ok": True,
+            "repo": REPO,
+            "brief_id": "scan-release-only",
+            "facts": [
+                {"kind": "release", "text": "Released v0.1.0", "artifact_url": SHIP_RELEASE},
+            ],
+        }
+        out = admit_pack(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "ok")
+        self.assertFalse(out["tryable"])
+        stored = self.repo.get_brief("app-1", "scan-release-only")
+        assert stored is not None
+        self.assertFalse(stored.tryable)
+
+    def test_look_does_not_launch_the_project(self) -> None:
+        launches = (
+            ["uv", "run", "influenzer-tick", "--once"],
+            ["npm", "start"],
+            ["python3", "-m", "http.server"],
+            ["make", "run"],
+            ["docker", "compose", "up"],
+            ["cargo", "run"],
+            "open https://github.com/mikolaj92/demo",
+            ["/usr/bin/env", "bash", "./dev.sh"],
+            object(),
+        )
+        for argv in launches:
+            with self.subTest(argv=argv):
+                self.assertTrue(look_argv_is_launch(argv))
+        self.assertFalse(look_argv_is_launch(["repo", "view", REPO]))
+        self.assertFalse(look_argv_is_launch(["gh", "repo", "view", REPO]))
+
+        seen: list[object] = []
+
+        def inner(argv: object) -> object:
+            seen.append(argv)
+            raise AssertionError("look must not spawn a project launch")
+
+        wrapped = look_only_gh(inner)
+        for argv in (["uv", "run", "demo"], ["npm", "start"], ["python3", "app.py"]):
+            call = wrapped(argv)
+            self.assertEqual(call.returncode, 0)
+            self.assertEqual(call.stdout, "")
+            self.assertEqual(call.stderr, "")
+        self.assertEqual(seen, [])

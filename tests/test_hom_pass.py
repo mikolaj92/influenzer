@@ -359,6 +359,8 @@ class HomPassBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not invoke hold or pass", blob)
         self.assertIn("Does not run every tick interval", blob)
         self.assertIn("Does not merge scan_due, tick, and outbox into one file", blob)
+        self.assertIn("Does not launch or run the project from watch", blob)
+        self.assertIn("Tryable is a README+URL", blob)
         self.assertIn("Does not open runtime.db", blob)
         self.assertNotIn("run_gh", blob)
         self.assertNotIn("pack_survey", blob)
