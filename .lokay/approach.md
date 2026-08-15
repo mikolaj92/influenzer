@@ -1,34 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=77 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=76 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #77 — Schemat URL jest częścią bramki: tylko https
+Issue: #76 — URL artefaktu tylko z zaufanego hosta
 
 ## Goal
 
-Schemat URL jest częścią bramki. `http://`, `javascript:`, `data:`, `file:` nie są tryable. Tylko `https` na already-allowlisted hoście (`TRYABLE_ARTIFACT_HOSTS`, dziś `github.com`). Inaczej cisza, nie „prawie klikalne”.
+URL artefaktu tylko z zaufanego hosta (github.com i to co sami allowlistujemy). Inny host nie jest tryable i nie jest Show HN. Żadnych skracaczy, UTM-farm, „kliknij tu”.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — HTTPS + allowlisted-host predicate
-- `influenzer/hom.py` — clickable/tryable gate uses that predicate
-- `influenzer/hom_draft.py` — Show HN dress refuses almost-clickable schemes
-- `tests/test_hom_operator.py`
-- `tests/test_hom_draft.py`
+- `github_pack/classify.py` — tryable README+URL must be https on github.com (or an explicit allowlist). Shortener / UTM-farm / “kliknij tu” is silence.
+- `github_pack/pack.py` — pack stays silent when the README/homepage URL is off-allowlist.
+- `influenzer/playbook.py` — score-side host/UTM/shortener/click-here predicates.
+- `influenzer/hom.py` / `influenzer/hom_draft.py` — not tryable, not Show HN.
+- `tests/test_github_pack.py`, `tests/test_hom_operator.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q`
+- `python -m unittest tests.test_github_pack tests.test_hom_operator`
 
 ## Non-goals
 
-- Host allowlist itself (#76)
-- Redirect hops (#93)
-- Dead-link status (#92)
+- (none stated)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.

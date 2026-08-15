@@ -76,6 +76,9 @@ from influenzer.playbook import (
     looks_like_fork,
     looks_like_empty_repo,
     looks_like_login_gate,
+    looks_like_shortener,
+    looks_like_utm_farm,
+    looks_like_click_here,
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_pending_ci,
@@ -232,6 +235,9 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_failed_ci(bits.blob)
         or looks_like_prerelease(bits.blob)
         or looks_like_login_gate(bits.blob)
+        or looks_like_shortener(bits.blob)
+        or looks_like_utm_farm(bits.blob)
+        or looks_like_click_here(bits.blob)
         or looks_like_dead_link(bits.blob)
         or looks_like_dead_release_asset(bits.blob)
         or looks_like_roadmap(bits.blob)

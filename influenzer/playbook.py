@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 
 CANON_URL = "https://github.com/mikolaj92/influenzer-playbook"
@@ -514,6 +514,39 @@ SHORTENER_TALK_RE = re.compile(
     r"\btinyurl\.com\b|"
     r"\bt\.co\b"
     r")"
+)
+# A tracking farm is not a tryable demo. utm_* / fbclid / gclid on the
+# artifact, or “kliknij tu” / click here as the pitch, is silence.
+# Pair of #76: host allowlist first, then no bait on that host.
+UTM_FARM_RE = re.compile(
+    r"(?i)(?:"
+    r"\butm_(?:source|medium|campaign|term|content|id)\b|"
+    r"\butm[- ]farm\b|"
+    r"\bfbclid\b|"
+    r"\bgclid\b|"
+    r"\bmc_cid\b|"
+    r"\bmc_eid\b"
+    r")"
+)
+CLICK_HERE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bclick[-_ ]here\b|"
+    r"\bkliknij[-_ ]tu(?:taj)?\b"
+    r")"
+)
+_UTM_QUERY_KEYS = frozenset(
+    {
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "utm_id",
+        "fbclid",
+        "gclid",
+        "mc_cid",
+        "mc_eid",
+    }
 )
 # A 404/410 artifact is not tryable. HEAD/GET status, not a URL scheme
 # (#76/#77 are host+https). A probe would be bounded like gh (#79);
@@ -1195,17 +1228,35 @@ def _host_allowed(host: str | None, names: frozenset[str]) -> bool:
     return any(value == name or value.endswith("." + name) for name in names)
 
 
+def _has_utm_farm_query(query: str) -> bool:
+    if not query:
+        return False
+    keys = {key.lower() for key in parse_qs(query, keep_blank_values=True)}
+    return any(key in _UTM_QUERY_KEYS or key.startswith("utm_") for key in keys)
+
+
+def is_shortener_url(url: str | None) -> bool:
+    """True for a known shortener host. A skracacz is not a tryable demo."""
+    return _host_in(url, SHORTENER_HOSTS)
+
+
 def is_tryable_artifact_url(url: str | None) -> bool:
     """True only for https on an already-allowlisted host.
 
     http://, javascript:, data:, and file: are silence, not almost-clickable.
+    A shortener, a UTM-farm, or “kliknij tu” is silence even on github.com.
     """
     if not url or not isinstance(url, str):
         return False
-    parsed = urlparse(url.strip())
+    raw = url.strip()
+    parsed = urlparse(raw)
     if parsed.scheme.lower() != "https" or not parsed.netloc:
         return False
     if parsed.username is not None or parsed.password is not None:
+        return False
+    if _host_allowed(parsed.hostname, SHORTENER_HOSTS):
+        return False
+    if _has_utm_farm_query(parsed.query) or CLICK_HERE_RE.search(raw):
         return False
     return _host_allowed(parsed.hostname, TRYABLE_ARTIFACT_HOSTS)
 
@@ -1444,6 +1495,31 @@ def looks_like_login_gate(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(LOGIN_GATE_RE.search(text))
+
+
+def looks_like_shortener(text: str) -> bool:
+    """True for a shortener host or skracacz talk. Not click-and-run."""
+    if not text or not text.strip():
+        return False
+    if SHORTENER_TALK_RE.search(text):
+        return True
+    return any(is_shortener_url(match.group(0)) for match in _URL_IN_TEXT_RE.finditer(text))
+
+
+def looks_like_utm_farm(text: str) -> bool:
+    """True for utm_* / click-id tracking on the artifact. A farm is not a demo."""
+    if not text or not text.strip():
+        return False
+    if UTM_FARM_RE.search(text):
+        return True
+    return any(_has_utm_farm_query(urlparse(match.group(0)).query) for match in _URL_IN_TEXT_RE.finditer(text))
+
+
+def looks_like_click_here(text: str) -> bool:
+    """True for click here / kliknij tu. A bait phrase is not a tryable URL."""
+    if not text or not text.strip():
+        return False
+    return bool(CLICK_HERE_RE.search(text))
 
 
 def looks_like_dead_link(text: str) -> bool:
@@ -2066,12 +2142,15 @@ __all__ = [
     "FAILED_CI_RE",
     "PRERELEASE_RE",
     "SHIP_ARTIFACT_RE",
+    "SHORTENER_HOSTS",
     "SOCIAL_ARENAS",
     "SOURCE_AVAILABLE_LICENSE_RE",
     "STORE_HOSTS",
     "STORE_PITCH_RE",
     "SUPERLATIVE_RE",
     "TRYABLE_ARTIFACT_HOSTS",
+    "UTM_FARM_RE",
+    "CLICK_HERE_RE",
     "VIDEO_HOSTS",
     "WORLD_COMMENTARY_RE",
     "StoryKind",
@@ -2093,6 +2172,7 @@ __all__ = [
     "is_public_issue_url",
     "is_ranking_host_url",
     "is_ship_artifact_url",
+    "is_shortener_url",
     "is_social_arena",
     "is_store_host_url",
     "is_tryable_artifact_url",
@@ -2141,6 +2221,9 @@ __all__ = [
     "looks_like_empty_repo",
     "looks_like_template",
     "looks_like_login_gate",
+    "looks_like_shortener",
+    "looks_like_utm_farm",
+    "looks_like_click_here",
     "looks_like_server_splash",
     "looks_like_roadmap",
     "looks_like_pending_ci",

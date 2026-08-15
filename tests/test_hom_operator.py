@@ -34,6 +34,7 @@ from influenzer.playbook import (
     is_ranking_host_url,
     is_store_host_url,
     is_tryable_artifact_url,
+    is_shortener_url,
     is_video_host_url,
     invented_metric_reason,
     looks_like_bot_author,
@@ -59,6 +60,9 @@ from influenzer.playbook import (
     looks_like_fork,
     looks_like_empty_repo,
     looks_like_login_gate,
+    looks_like_shortener,
+    looks_like_utm_farm,
+    looks_like_click_here,
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_pending_ci,
@@ -147,6 +151,8 @@ class PlaybookCopyTests(unittest.TestCase):
             "file:///etc/passwd",
             "https://example.com/demo",
             "https://bit.ly/try-this",
+            "https://github.com/mikolaj92/influenzer?utm_source=hn",
+            "https://github.com/mikolaj92/influenzer/click-here",
             "HTTPS://github.com.evil.com/mikolaj92/influenzer",
             "https://user:pass@github.com/mikolaj92/influenzer",
         )
@@ -154,6 +160,13 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertFalse(is_tryable_artifact_url(url))
                 self.assertFalse(is_ship_artifact(url))
+        self.assertTrue(is_shortener_url("https://bit.ly/try-this"))
+        self.assertTrue(looks_like_shortener("skracacz: https://t.co/abc"))
+        self.assertTrue(looks_like_utm_farm("https://github.com/mikolaj92/influenzer?utm_source=hn"))
+        self.assertTrue(looks_like_click_here("kliknij tu"))
+        self.assertFalse(looks_like_shortener("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_utm_farm("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_click_here("Local tick scores briefs and emits a draft"))
 
     def test_video_host_is_youtube_vimeo_loom_not_a_repo(self) -> None:
         films = (
@@ -1713,6 +1726,42 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_shortener_utm_or_click_here_is_not_tryable(self) -> None:
+        cases = (
+            ("https://bit.ly/try-this", "shortener: bit.ly", "shortener_not_tryable"),
+            (
+                "https://github.com/mikolaj92/influenzer?utm_source=hn",
+                "utm farm on the artifact",
+                "utm_farm_not_tryable",
+            ),
+            (SHIP_PR, "kliknij tu", "click_here_not_tryable"),
+        )
+        for url, text, reason in cases:
+            with self.subTest(reason=reason):
+                brief = self._brief(
+                    facts=(
+                        Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                        Fact(text=text, artifact_url=url),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, reason)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+        quiet = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="kliknij tu", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "click_here_not_tryable")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(quiet, score))
 
     def test_login_gate_ship_claim_is_killed(self) -> None:
         gated = (

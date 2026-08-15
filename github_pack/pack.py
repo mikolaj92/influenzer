@@ -18,6 +18,7 @@ from github_pack.classify import (
     facts_are_merge_log,
     headline_prs,
     is_ship_artifact,
+    is_trusted_artifact_url,
     is_tryable,
     looks_like_patch_only,
     looks_like_waitlist,
@@ -71,7 +72,7 @@ def facts_from_survey(repo_slug: str, survey: dict[str, Any]) -> list[dict[str, 
         add(kind="tag", text=f"Tag {name}")
 
     readme_url = readme_tryable_url(survey)
-    if readme_url:
+    if is_trusted_artifact_url(readme_url):
         add(
             kind="readme",
             text="README has an install/quickstart a stranger can run",
@@ -114,7 +115,7 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     if facts_are_merge_log(facts) and not survey.get("releases"):
         return _silence("not_tryable", repo=slug)
     claims_ship = any(is_ship_artifact(str(fact.get("artifact_url") or "") or None) for fact in facts)
-    tryable = is_tryable(survey, facts)
+    tryable = is_tryable(survey, facts) and is_trusted_artifact_url(readme_tryable_url(survey))
     if not (claims_ship and tryable):
         return _silence("not_tryable", repo=slug)
     return {

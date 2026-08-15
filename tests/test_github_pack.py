@@ -5,10 +5,16 @@ import unittest
 from unittest.mock import patch
 
 from github_pack import looks_like_patch_only, looks_like_ship_title, pack_survey
-from github_pack.classify import facts_are_merge_log, is_tryable, looks_like_merged_pr_fact
+from github_pack.classify import (
+    facts_are_merge_log,
+    is_trusted_artifact_url,
+    is_tryable,
+    looks_like_merged_pr_fact,
+    readme_tryable_url,
+)
 from github_survey import GhCall, survey_public_repo
 
-from tests.gh_scripts import NOW, REPO, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, SHIP_RELEASE, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
 
 
 class HeuristicTests(unittest.TestCase):
@@ -91,6 +97,76 @@ class PackSilenceTests(unittest.TestCase):
                 },
                 [{"text": "Released v0.1.0", "artifact_url": "https://github.com/mikolaj92/demo/releases/tag/v0.1.0"}],
             )
+        )
+
+    def test_readme_url_outside_trusted_host_is_not_tryable(self) -> None:
+        installable = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n"
+        untrusted = (
+            "https://example.com/demo",
+            "https://bit.ly/try-this",
+            "https://github.com/mikolaj92/demo?utm_source=hn",
+            "https://github.com/mikolaj92/demo/click-here",
+        )
+        for url in untrusted:
+            with self.subTest(url=url):
+                self.assertFalse(is_trusted_artifact_url(url))
+                self.assertIsNone(
+                    readme_tryable_url(
+                        {"readme_text": installable, "readme_url": url, "meta": {"homepageUrl": url}}
+                    )
+                )
+                self.assertFalse(
+                    is_tryable(
+                        {
+                            "releases": [{"tagName": "v0.1.0"}],
+                            "readme_text": installable,
+                            "readme_url": url,
+                            "meta": {"homepageUrl": url},
+                        },
+                        [{"text": "Released v0.1.0", "artifact_url": SHIP_RELEASE}],
+                    )
+                )
+                out = pack_survey(
+                    {
+                        "status": "ok",
+                        "ok": True,
+                        "repo": REPO,
+                        "now": NOW,
+                        "survey": {
+                            "meta": {"description": "Local operator with a working install", "homepageUrl": url},
+                            "prs": [
+                                {
+                                    "number": 12,
+                                    "title": "feat: local HoM operator scores briefs",
+                                    "url": "https://github.com/mikolaj92/demo/pull/12",
+                                }
+                            ],
+                            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0"}],
+                            "tags": [{"name": "v0.1.0"}],
+                            "readme_text": installable,
+                            "readme_url": url,
+                        },
+                    }
+                )
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], "not_tryable")
+                self.assertTrue(out["ok"])
+                self.assertIsNone(out["brief_id"])
+                self.assertNotIn("facts", out)
+
+    def test_github_readme_url_stays_tryable(self) -> None:
+        url = "https://github.com/mikolaj92/demo/blob/main/README.md"
+        self.assertTrue(is_trusted_artifact_url(url))
+        self.assertTrue(is_trusted_artifact_url("https://www.github.com/mikolaj92/demo"))
+        self.assertEqual(
+            readme_tryable_url(
+                {
+                    "readme_text": "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n",
+                    "readme_url": url,
+                    "meta": {"homepageUrl": "https://bit.ly/ignore-me"},
+                }
+            ),
+            url,
         )
 
     def test_waitlist_release_is_silence(self) -> None:
