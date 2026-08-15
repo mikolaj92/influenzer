@@ -27,6 +27,7 @@ from tests.gh_scripts import (
     SHIP_PR,
     feedback_noise_script,
     feedback_question_script,
+    repo_json,
 )
 
 
@@ -78,6 +79,15 @@ class HomFeedbackComposeTests(unittest.TestCase):
                 now=NOW,
                 **kwargs,
             )
+
+    def test_fork_look_is_silence_even_when_owner_is_ours(self) -> None:
+        out = self._run(feedback_question_script(repo=GhCall(0, repo_json(fork=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "fork_not_a_site")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_noise_is_silence_and_writes_no_brief(self) -> None:
         out = self._run(feedback_noise_script())

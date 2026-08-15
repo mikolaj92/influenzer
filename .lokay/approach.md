@@ -1,29 +1,25 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=91 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=90 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #91 — Repo z wyłączonymi issues nie dostaje social launchu
+Issue: #90 — Fork nie jest witryną
 
 ## Goal
 
-Repo z wyłączonymi issues nie dostaje social launchu. Nie ma gdzie usiąść w spike. README/changelog wolno. Show HN i kąt społeczny milczą — nie gramy areny bez obozu.
+Fork nie jest witryną. `isFork` → look milczy, nawet gdy owner nasz. Kąt idzie z kanonicznego źródła, nie z kopii. Pomoc upstream to cisza u nas, nie „nasz launch”.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — fail-closed detector for a closed issue tracker
-- `influenzer/hom.py` — score: no Show HN / social arena without a camp; README/changelog stay
-- `influenzer/hom_draft.py` — dress: social costumes stay silent; GitHub workshop may still draft
-- `tests/test_hom_operator.py` / `tests/test_hom_draft.py` — detector + score + dress
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python -m unittest tests.test_hom_operator tests.test_hom_draft`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Do not add a `gh` probe or expand survey fields.
-- Do not kill README / changelog / GitHub workshop drafts.
+- (none stated)
 
 ## Notes
 

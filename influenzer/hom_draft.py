@@ -71,6 +71,7 @@ from influenzer.playbook import (
     looks_like_dead_link,
     looks_like_dead_release_asset,
     looks_like_issues_disabled,
+    looks_like_fork,
     looks_like_login_gate,
     looks_like_roadmap,
     looks_like_waitlist,
@@ -482,6 +483,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_hire_fundraise(bits.blob)
         or looks_like_source_available_as_oss(bits.blob)
         or (is_social_arena(score.arena) and looks_like_issues_disabled(bits.blob))
+        or looks_like_fork(bits.blob)
     ):
         return None
     if unquotable_reason(triples):
@@ -506,6 +508,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_hire_fundraise(body)
         or looks_like_source_available_as_oss(body)
         or (is_social_arena(score.arena) and looks_like_issues_disabled(body))
+        or looks_like_fork(body)
     ):
         return None
     if looks_like_open_source_without_license(body):

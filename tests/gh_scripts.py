@@ -40,11 +40,17 @@ def b64_readme(text: str) -> str:
     )
 
 
-def repo_json(*, private: bool = False, description: str = "Local operator with a working install") -> str:
+def repo_json(
+    *,
+    private: bool = False,
+    fork: bool = False,
+    description: str = "Local operator with a working install",
+) -> str:
     return json.dumps(
         {
             "nameWithOwner": REPO,
             "isPrivate": private,
+            "isFork": fork,
             "url": f"https://github.com/{REPO}",
             "description": description,
             "homepageUrl": "",

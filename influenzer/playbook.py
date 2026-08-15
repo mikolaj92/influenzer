@@ -126,9 +126,9 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website.",
             "Broken install is a false launch. Do not buy stars.",
-            "Launch is one 24–48h stack, not a week of drip.",
+            "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
             "Score installs and life after the spike, not a dead star count.",
         ),
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -475,6 +475,29 @@ ISSUES_DISABLED_RE = re.compile(
     r"|\brepo\s+(?:z\s+)?wy[lł][aą]czon(?:ymi|e|ych)\s+issues\b"
     r"|\bwy[lł][aą]czon(?:e|ymi|ych)\s+issues\b"
     r"|\bissues\s+wy[lł][aą]czon(?:e|ymi|ych)\b"
+    r")"
+)
+# A fork is not a website. isFork, even when the owner is ours, is
+# silence. Angle from the canonical source, not a copy. Helping
+# upstream is silence here, not our launch. Pair of nasze-repo and
+# nie-klon. "fork" as a product noun stays; a GitHub copy does not.
+FORK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bisFork\"?\s*[:=]\s*\"?true\b"
+    r"|\bis_fork\"?\s*[:=]\s*\"?true\b"
+    r"|\bfork\"?\s*[:=]\s*\"?true\b"
+    r"|\bthis\s+(?:repo(?:sitory)?|project)\s+is\s+a\s+fork\b"
+    r"|\bfork\s+of\s+(?:https?://)?github\.com/\b"
+    r"|\bforked\s+from\b"
+    r"|\bforked\s+(?:this\s+)?(?:repo(?:sitory)?|project)\b"
+    r"|\ba\s+fork\s+of\b"
+    r"|\bupstream\s+(?:is|at)\s+(?:https?://)?github\.com/\b"
+    r"|\bparentRepo(?:sitory)?\"?\s*[:=]"
+    r"|\bparent\"?\s*[:=]\s*\"?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\b"
+    r"|\bnie\s+jest\s+witryn"
+    r"|\bfork\s+nie\s+jest\b"
+    r"|\bkopi[ae]\s+(?:repo|repozytorium|upstream)\b"
+    r"|\bto\s+jest\s+fork\b"
     r")"
 )
 # A listed release asset that 404s/410s is not a ship. The file is on
@@ -1147,6 +1170,13 @@ def looks_like_issues_disabled(text: str) -> bool:
     return bool(ISSUES_DISABLED_RE.search(text))
 
 
+def looks_like_fork(text: str) -> bool:
+    """True when the repo is a GitHub fork. A copy is not a website."""
+    if not text or not text.strip():
+        return False
+    return bool(FORK_RE.search(text))
+
+
 def looks_like_dead_release_asset(text: str) -> bool:
     """True for a listed release asset whose download is 404/410. A missing file is not a ship."""
     if not text or not text.strip():
@@ -1702,6 +1732,7 @@ __all__ = [
     "DEAD_LINK_RE",
     "DEAD_RELEASE_ASSET_RE",
     "ISSUES_DISABLED_RE",
+    "FORK_RE",
     "LOGIN_GATE_RE",
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
@@ -1782,6 +1813,7 @@ __all__ = [
     "looks_like_dead_link",
     "looks_like_dead_release_asset",
     "looks_like_issues_disabled",
+    "looks_like_fork",
     "looks_like_login_gate",
     "looks_like_roadmap",
     "looks_like_waitlist",
