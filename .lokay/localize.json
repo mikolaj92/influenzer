@@ -39,16 +39,11 @@
     "influenzer/storage.py",
     "influenzer/tick.py",
     "influenzer/tick_all.py",
-    "cisza/admitted/scored"
+    "influenzer/adapters"
   ],
   "source": "deterministic",
-  "seed_paths": [
-    "cisza/admitted/scored"
-  ],
+  "seed_paths": [],
   "matched_tokens": [
-    "cisza",
-    "admitted",
-    "scored",
     "influenzer"
   ],
   "notes": [
@@ -56,7 +51,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__98-always-on-nie-s-czy-tre-ci-k-ta-do-log-w-31507a5a",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__95-zegar-wstecz-nie-odpala-drugiego-looku-8301aaac",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

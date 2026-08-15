@@ -18,6 +18,7 @@ Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
+A clock that goes backward is silence, not a second look. Look is monotonic.
 """
 
 from __future__ import annotations
@@ -113,12 +114,21 @@ def last_scan_at(repo: StateRepository, project_id: str, repo_slug: str) -> str 
 
 
 def window_elapsed(last: str | None, now: str, *, window_days: int) -> bool:
-    """True when a look is due. Missing or unparseable last → due (fail closed)."""
-    if last is None or window_days < 1:
+    """True when a look is due.
+
+    Missing or unparseable last → due (first look). now < last, or an
+    unparseable now after a known last, is not due. A set-back clock
+    (NTP, manual) is skew, not another Monday. Look is monotonic.
+    """
+    if last is None:
         return True
     last_dt = parse_utc(last)
     now_dt = parse_utc(now)
-    if last_dt is None or now_dt is None:
+    if last_dt is None:
+        return True
+    if now_dt is None or now_dt < last_dt:
+        return False
+    if window_days < 1:
         return True
     return now_dt - last_dt >= timedelta(days=window_days)
 

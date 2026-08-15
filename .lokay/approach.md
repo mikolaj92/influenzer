@@ -1,23 +1,21 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=98 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=95 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #98 — Always-on nie sączy treści kąta do logów
+Issue: #95 — Zegar wstecz nie odpala drugiego looku
 
 ## Goal
 
-Always-on nie sączy treści kąta do logów. Body tylko przez jawne `angle` / pass stdout. Pętla pisze status (cisza/admitted/scored), nie copy. Mniej wycieku, mniej recapu w journald.
+Zegar wstecz nie odpala drugiego looku. Jeśli now < last_scan (NTP, ręczny cofnięty czas) — cisza, nie „znowu poniedziałek”. Look jest monotoniczny.
 
 ## Files likely touched
 
-- `influenzer/tick.py` — always-on stdout is status only
-- `influenzer/hom_watch.py` — `loop_status` maps envelopes to cisza/admitted/scored
-- `tests/test_tick_loop.py`, `tests/test_hom_watch.py` — lock the journald contract
+- (infer from repo inspection)
 
 ## Test plan
 
-- `uv run python -m unittest tests.test_tick_loop tests.test_hom_watch tests.test_hom_pass tests.test_hom_outbox`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
