@@ -8,6 +8,7 @@ Does not implement `gh` — that is github_survey's job.
 Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
 Survey/feedback only through gh api. Reply and code are not this path.
+Look stops after N pages. Whole-repo history in one look is silence.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from typing import Any
 
 from github_pack import pack_survey
 from github_survey import GhRunner, invalid_repo_reason, survey_public_repo
-from github_survey.survey import look_api_only_gh
+from github_survey.survey import look_short_gh
 
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
 from influenzer.domain import utc_now
@@ -25,8 +26,8 @@ from influenzer.storage import StateRepository
 
 
 def look_only_gh(gh: GhRunner | None) -> GhRunner:
-    """Look may only GET via gh api. clone/worktree is silence, not a spawn."""
-    return look_api_only_gh(gh)
+    """Look may only GET via gh api. After N pages, stop. Whole-history is silence."""
+    return look_short_gh(gh)
 
 
 def scan_github(

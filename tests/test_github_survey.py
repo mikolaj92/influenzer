@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -18,6 +19,7 @@ from github_survey.gh import (
     loads_json,
     required_json,
 )
+from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_short_gh
 
 from tests.gh_scripts import NOW, REPO, noise_script, repo_json, ship_script, ScriptedGh
 
@@ -375,3 +377,56 @@ class RunGhTests(unittest.TestCase):
         self.assertEqual(call.returncode, 0)
         self.assertEqual(call.stdout, "")
         self.assertEqual(call.stderr, "")
+
+
+class LookPageCeilingTests(unittest.TestCase):
+    def test_paginate_and_huge_limit_are_unbounded(self) -> None:
+        self.assertTrue(look_argv_is_unbounded_pages(["pr", "list", "--repo", REPO, "--paginate"]))
+        self.assertTrue(look_argv_is_unbounded_pages(["gh", "api", "--paginate", f"repos/{REPO}/tags"]))
+        self.assertTrue(look_argv_is_unbounded_pages(["pr", "list", "--repo", REPO, "--limit", "999"]))
+        self.assertTrue(look_argv_is_unbounded_pages("gh api --paginate repos/owner/name/issues"))
+        self.assertFalse(look_argv_is_unbounded_pages(["pr", "list", "--repo", REPO, "--limit", "20"]))
+        self.assertFalse(look_argv_is_unbounded_pages(["api", f"repos/{REPO}/tags?per_page=20"]))
+
+    def test_look_stops_after_max_pages(self) -> None:
+        seen: list[tuple[str, ...]] = []
+
+        def inner(argv: object) -> GhCall:
+            tokens = tuple(argv) if isinstance(argv, (list, tuple)) else (str(argv),)
+            seen.append(tokens)
+            return GhCall(0, json.dumps([{"n": len(seen)}]))
+
+        runner = look_short_gh(inner)
+        first = runner(["api", f"repos/{REPO}/tags?per_page=20"])
+        second = runner(["api", f"repos/{REPO}/tags?per_page=20"])
+        third = runner(["api", f"repos/{REPO}/tags?per_page=20"])
+        other = runner(["api", f"repos/{REPO}/issues/comments?per_page=100"])
+        self.assertEqual(MAX_PAGES, 2)
+        self.assertEqual(json.loads(first.stdout), [{"n": 1}])
+        self.assertEqual(json.loads(second.stdout), [{"n": 2}])
+        self.assertEqual(third.stdout, "[]")
+        self.assertEqual(json.loads(other.stdout), [{"n": 3}])
+        self.assertEqual(len(seen), MAX_PAGES + 1)
+
+    def test_whole_history_is_silence_not_a_spawn(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise AssertionError("look must not walk every GitHub page")
+
+        runner = look_short_gh(boom)
+        paginate = runner(["pr", "list", "--repo", REPO, "--state", "merged", "--paginate"])
+        huge = runner(["pr", "list", "--repo", REPO, "--limit", "999"])
+        self.assertEqual(paginate.returncode, 0)
+        self.assertEqual(paginate.stdout, "")
+        self.assertEqual(huge.returncode, 0)
+        self.assertEqual(huge.stdout, "")
+
+    def test_survey_does_not_eat_repo_history(self) -> None:
+        fake = ScriptedGh(ship_script())
+        with patch("subprocess.run", side_effect=AssertionError("survey must not call subprocess")):
+            out = survey_public_repo(REPO, gh=fake, now=NOW)
+        self.assertEqual(out["status"], "ok")
+        kinds = [classify_gh_argv(list(argv)) for argv in fake.calls]
+        self.assertLessEqual(kinds.count("prs"), MAX_PAGES)
+        self.assertLessEqual(kinds.count("releases"), MAX_PAGES)
+        self.assertLessEqual(kinds.count("tags"), MAX_PAGES)
+        self.assertFalse(any(look_argv_is_unbounded_pages(list(argv)) for argv in fake.calls))

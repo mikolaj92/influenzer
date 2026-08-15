@@ -2,6 +2,7 @@
 
 Survey is gh api only. git clone / worktree on the host is silence.
 Mini is not a checkout cache.
+Look stops after N pages. Whole-repo history in one look is silence.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from github_survey.gh import (
     GhCall,
     GhRunner,
     allowlisted_gh_argv,
+    classify_gh_argv,
     gh_argv,
     invalid_repo_reason,
     optional_json,
@@ -30,6 +32,9 @@ from github_survey.gh import (
 )
 
 LOOKBACK_DAYS = 7
+MAX_PAGES = 2
+_GH_PAGE_SIZE = 100
+_PAGED_KINDS = frozenset({"prs", "releases", "tags", "issue_comments", "pull_comments"})
 _GIT_HEADS = frozenset({"git", "git-clone", "git-worktree"})
 _CLONE_OR_WORKTREE = frozenset({"clone", "worktree"})
 
@@ -86,6 +91,107 @@ def look_api_only_gh(gh: GhRunner | None = None) -> GhRunner:
         return runner(argv)
 
     return _api_only
+
+
+def _look_api_query(tokens: Sequence[str]) -> dict[str, str]:
+    path = ""
+    for index, token in enumerate(tokens):
+        if token == "api" and index + 1 < len(tokens):
+            path = tokens[index + 1]
+            break
+        if token.startswith("repos/") and "?" in token:
+            path = token
+            break
+    if "?" not in path:
+        return {}
+    query: dict[str, str] = {}
+    for part in path.split("?", 1)[1].split("&"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        if key and key not in query:
+            query[key] = value
+    return query
+
+
+def _flag_value(tokens: Sequence[str], flag: str) -> str | None:
+    if flag not in tokens:
+        return None
+    index = tokens.index(flag)
+    if index + 1 >= len(tokens):
+        return ""
+    return tokens[index + 1]
+
+
+def _look_classify(argv: object) -> str:
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return "other"
+    if tokens and tokens[0] == "gh":
+        tokens = tokens[1:]
+    return classify_gh_argv(tokens)
+
+
+def _look_page_bucket(argv: object) -> str | None:
+    kind = _look_classify(argv)
+    if kind in _PAGED_KINDS:
+        return kind
+    return None
+
+
+def _look_argv_page_number(argv: object) -> int | None:
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return None
+    raw = _look_api_query(tokens).get("page")
+    if raw is None:
+        raw = _flag_value(tokens, "--page")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def look_argv_is_unbounded_pages(argv: object) -> bool:
+    """True when argv would walk every GitHub page / whole repo history."""
+    tokens = _look_argv_tokens(argv)
+    if tokens is None:
+        return True
+    lowered = [token.lower() for token in tokens]
+    if any(token == "--paginate" or token.startswith("--paginate=") for token in lowered):
+        return True
+    raw_limit = _flag_value(tokens, "--limit")
+    if raw_limit is not None:
+        try:
+            limit = int(raw_limit)
+        except ValueError:
+            return True
+        if limit < 1 or limit > MAX_PAGES * _GH_PAGE_SIZE:
+            return True
+    return False
+
+
+def look_short_gh(gh: GhRunner | None = None) -> GhRunner:
+    """Look is short. After MAX_PAGES, stop. Whole-history is silence."""
+    runner = look_api_only_gh(gh)
+    pages: dict[str, int] = {}
+
+    def _short(argv: Sequence[str]) -> GhCall:
+        if look_argv_is_unbounded_pages(argv):
+            return GhCall(returncode=0, stdout="", stderr="")
+        bucket = _look_page_bucket(argv)
+        if bucket is not None:
+            used = pages.get(bucket, 0) + 1
+            page = _look_argv_page_number(argv)
+            ordinal = page if page is not None else used
+            if used > MAX_PAGES or ordinal > MAX_PAGES:
+                return GhCall(returncode=0, stdout="[]", stderr="")
+            pages[bucket] = used
+        return runner(argv)
+
+    return _short
 
 
 def parse_github_time(value: str | None) -> datetime | None:
@@ -206,7 +312,7 @@ def survey_public_repo(
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return _silence("repo must be owner/name", repo=slug)
-    runner = look_api_only_gh(gh)
+    runner = look_short_gh(gh)
     clock = parse_now(now)
     try:
         survey, reason = collect_survey(slug, gh=runner, now=clock)
