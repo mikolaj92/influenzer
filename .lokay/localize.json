@@ -39,11 +39,15 @@
     "influenzer/storage.py",
     "influenzer/tick.py",
     "influenzer/tick_all.py",
-    "influenzer/adapters"
+    "docs/typo/chore"
   ],
   "source": "deterministic",
-  "seed_paths": [],
+  "seed_paths": [
+    "docs/typo/chore"
+  ],
   "matched_tokens": [
+    "typo",
+    "chore",
     "influenzer"
   ],
   "notes": [
@@ -51,7 +55,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__161-domy-lna-strona-serwera-nie-jest-produkt-4791a6e0",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__86-samo-docs-typo-chore-to-nie-ship-7877d6d0",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

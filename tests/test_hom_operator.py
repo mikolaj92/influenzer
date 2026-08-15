@@ -35,6 +35,8 @@ from influenzer.playbook import (
     is_store_host_url,
     is_video_host_url,
     invented_metric_reason,
+    looks_like_docs_typo_chore,
+    looks_like_docs_typo_chore_window,
     looks_like_contest,
     looks_like_dunk,
     looks_like_foreign_wave,
@@ -995,6 +997,65 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_server_splash(text))
 
+    def test_docs_typo_chore_window_is_not_a_story(self) -> None:
+        noise = (
+            "docs: fix badge",
+            "docs(readme): fix badge",
+            "typo in README",
+            "fix a typo",
+            "chore: bump deps",
+            "chore(deps): tidy lockfile",
+            "style: format",
+            "test: fix flake",
+            "refactor: rename helper",
+            "build: pin toolchain",
+            "lint: ruff",
+            "ci: cache pip",
+            "wip: notes",
+            "samo docs",
+            "only chore",
+            "poprawka tekstu",
+            "Merged PR #8: docs: fix badge",
+        )
+        for text in noise:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_docs_typo_chore(text))
+        self.assertTrue(
+            looks_like_docs_typo_chore_window(
+                (
+                    "Merged PR #8: docs: fix badge",
+                    "Merged PR #9: typo in README",
+                    "Merged PR #10: chore: tidy lockfile",
+                    "README has an install/quickstart a stranger can run",
+                )
+            )
+        )
+        self.assertTrue(
+            looks_like_docs_typo_chore_window(
+                ("docs: fix badge", "typo in README", "chore: tidy lockfile")
+            )
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "a stranger can choreograph the local score",
+            "documentation of the operator tick",
+            "Merged PR #12: feat: local HoM operator scores briefs",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_docs_typo_chore(text))
+        self.assertFalse(
+            looks_like_docs_typo_chore_window(
+                (
+                    "Merged PR #12: feat: local HoM operator scores briefs",
+                    "Merged PR #8: docs: fix badge",
+                )
+            )
+        )
+        self.assertFalse(looks_like_docs_typo_chore_window(("documentation of the operator tick",)))
+
     def test_dead_link_is_not_tryable(self) -> None:
         corpses = (
             "HEAD 404",
@@ -1411,6 +1472,70 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertEqual(score.reason, "commit_noise_changelog")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_docs_typo_chore_window_is_changelog_not_a_launch(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(
+                    text="Merged PR #8: docs: fix badge",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/8",
+                ),
+                Fact(
+                    text="Merged PR #9: typo in README",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/9",
+                ),
+                Fact(
+                    text="Merged PR #10: chore: tidy lockfile",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/10",
+                ),
+                Fact(text="README has an install/quickstart a stranger can run"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "docs_typo_chore")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
+    def test_human_docs_only_release_is_changelog_not_a_launch(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(kind="release", text="docs: fix badge", artifact_url=SHIP_RELEASE),
+                Fact(
+                    kind="pull",
+                    text="Merged PR #8: typo in README",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/8",
+                ),
+                Fact(
+                    kind="readme",
+                    text="README has an install/quickstart a stranger can run",
+                    artifact_url="https://github.com/mikolaj92/influenzer#readme",
+                ),
+                Fact(kind="signal", text="Local operator with a working install"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "docs_typo_chore")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+
+    def test_human_feat_next_to_a_typo_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(
+                    text="Merged PR #8: docs: fix badge",
+                    artifact_url="https://github.com/mikolaj92/influenzer/pull/8",
+                ),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_waitlist_ship_claim_is_killed(self) -> None:
         brief = self._brief(

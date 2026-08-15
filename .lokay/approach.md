@@ -1,33 +1,36 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=161 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=86 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #161 — Domyślna strona serwera nie jest produktem
+Issue: #86 — Samo docs/typo/chore to nie ship
 
 ## Goal
 
-Domyślna strona serwera nie jest produktem. Welcome to nginx, Apache default, Caddy placeholder = cisza.
+A look window of only docs / typo / chore — even human-authored — is not a ship.
+Social look is silence. Changelog on GitHub is allowed. This is not bot-bumpy
+(#85); author does not matter. A human feat next to a typo still drafts.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — splash detector + wave copy
-- `influenzer/hom.py` — score/gate kill
-- `influenzer/hom_draft.py` — dresser fail-closed
-- `tests/test_hom_operator.py` — detector + score tests
-- `tests/test_hom_draft.py` — dress tests
+- `influenzer/playbook.py` — window detector + workshop/seminar wave copy
+- `influenzer/hom.py` — score as changelog_only (`docs_typo_chore`)
+- `influenzer/hom_draft.py` — fail-closed dress (no Show HN leak)
+- `tests/test_hom_operator.py` — window vs feat-next-to-typo
+- `tests/test_hom_draft.py` — undressable even if score says draft
 
 ## Test plan
 
-- `python -m unittest tests.test_hom_operator tests.test_hom_draft`
+- `python -m pytest tests/test_hom_operator.py tests/test_hom_draft.py -q --tb=short`
 
 ## Non-goals
 
-- Do not probe live hosts. Do not treat a parked domain (#157) or a broken site (#25) as this gate. A working nginx/Apache/Caddy config stays.
+- Bot-only bump weeks (#85)
+- Changing github_pack ingest (already drops isolated noise PRs)
+- Social publish / live adapters
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.

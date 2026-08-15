@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A default nginx / Apache / Caddy page is not a product. A look of only docs / typo / chore is not a story.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no docs-only look, no typo-only look, no chore-only look.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -675,6 +675,25 @@ _DUNK_SUBJECT_STOP = frozenset(
 COMMIT_NOISE_RE = re.compile(
     r"(?i)^\s*(?:chore|typo|lint|ci|wip|bump\s+(?:version|deps)|fix(?:es)?\s+tests|merge\s+branch)\b"
 )
+# A window of only docs / typo / chore is not a ship. Even a human
+# chore is not history. Changelog on GitHub is allowed; social look
+# is silence. Pair of no-noise (#64): one chore line vs the whole
+# look. This is not #85 (bot bumps): author does not matter.
+DOCS_TYPO_CHORE_RE = re.compile(
+    r"(?i)(?:"
+    r"^\s*(?:docs|style|test|refactor|build|chore|typo|lint|ci|wip|patch)"
+    r"(?:\([^)]*\))?\s*[:=-]|"
+    r"^\s*(?:fix(?:es)?\s+)?(?:a\s+)?typo\b|"
+    r"^\s*(?:chore|typo|lint|ci|wip)\b|"
+    r"^\s*bump\s+(?:version|deps)\b|"
+    r"^\s*fix(?:es)?\s+tests\b|"
+    r"^\s*merge\s+branch\b|"
+    r"\btypo\b|"
+    r"\bdocs?[- /]+(?:only|typo|chore)\b|"
+    r"\b(?:samo|only)\s+(?:docs|typo|chore)\b|"
+    r"\bpoprawk[aię]\s+tekst"
+    r")"
+)
 # A window of merged PRs is changelog, not a clickable product.
 MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
@@ -1177,6 +1196,19 @@ def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
 
+def looks_like_docs_typo_chore(text: str) -> bool:
+    """True for a docs / typo / chore / style / test line. Even a human one."""
+    if not text or not text.strip():
+        return False
+    stripped = text.strip()
+    if looks_like_commit_noise(stripped):
+        return True
+    if looks_like_merged_pr_fact(stripped):
+        title = stripped.split(":", 1)[1] if ":" in stripped else stripped
+        return looks_like_docs_typo_chore(title)
+    return bool(DOCS_TYPO_CHORE_RE.search(stripped))
+
+
 def looks_like_merged_pr_fact(text: str) -> bool:
     return bool(MERGED_PR_FACT_RE.match(text.strip()))
 
@@ -1190,6 +1222,46 @@ def is_merge_log_texts(texts: tuple[str, ...] | list[str]) -> bool:
     if not merge:
         return False
     return looks_like_merged_pr_fact(meat[0]) or len(merge) == len(meat)
+
+
+def _is_readme_install_fact(text: str) -> bool:
+    stripped = text.strip().casefold()
+    return stripped.startswith("readme has an install") or stripped.startswith("readme has a")
+
+
+def looks_like_docs_typo_chore_window(
+    texts: tuple[str, ...] | list[str],
+    *,
+    kinds: tuple[str, ...] | list[str] | None = None,
+) -> bool:
+    """True when the look window has nothing but docs / typo / chore.
+
+    A human feat next to a typo stays. A week of only text and chore,
+    even authored by a person, is changelog. This is not bot-bumpy (#85).
+    When release/pull/tag kinds exist, ignore README/description — a stale
+    one-liner is not a story next to a docs-only window.
+    """
+    meat = [item.strip() for item in texts if item and item.strip()]
+    if not meat:
+        return False
+    if kinds is not None and len(tuple(kinds)) == len(tuple(texts)):
+        structured: list[str] = []
+        for kind, text in zip(kinds, texts, strict=False):
+            label = str(kind or "").strip().lower()
+            line = str(text or "").strip()
+            if not line:
+                continue
+            if label in {"release", "tag", "pull"}:
+                structured.append(line)
+        if structured:
+            meat = structured
+    story = [item for item in meat if not _is_readme_install_fact(item)]
+    if not story:
+        return False
+    leftover = [item for item in story if not looks_like_docs_typo_chore(item)]
+    if leftover:
+        return False
+    return True
 
 
 def looks_like_waitlist(text: str) -> bool:
@@ -1769,6 +1841,7 @@ __all__ = [
     "BLOG_HOSTS",
     "CANON_URL",
     "COMMIT_NOISE_RE",
+    "DOCS_TYPO_CHORE_RE",
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "CONTEST_RE",
@@ -1841,6 +1914,8 @@ __all__ = [
     "invented_metric_reason",
     "is_video_host_url",
     "looks_like_commit_noise",
+    "looks_like_docs_typo_chore",
+    "looks_like_docs_typo_chore_window",
     "looks_like_dunk",
     "looks_like_foreign_wave",
     "looks_like_reply",

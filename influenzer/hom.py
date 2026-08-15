@@ -38,6 +38,7 @@ from influenzer.playbook import (
     is_store_host_url,
     is_video_host_url,
     looks_like_commit_noise,
+    looks_like_docs_typo_chore_window,
     looks_like_contest,
     looks_like_dunk,
     looks_like_foreign_wave,
@@ -389,6 +390,20 @@ def _is_merge_log_brief(brief: Brief) -> bool:
     return is_merge_log_texts(_wearable_fact_texts(brief))
 
 
+def _is_docs_typo_chore_brief(brief: Brief) -> bool:
+    wearable = [
+        fact
+        for fact in brief.facts
+        if fact.text.strip()
+        and fact.kind.strip().lower() != "artifact"
+        and fact.text.strip().casefold() != "ship artifact"
+    ]
+    return looks_like_docs_typo_chore_window(
+        tuple(fact.text for fact in wearable),
+        kinds=tuple(fact.kind for fact in wearable),
+    )
+
+
 def _fact_triples(brief: Brief) -> tuple[tuple[str, str, str | None], ...]:
     return tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
 
@@ -476,6 +491,8 @@ def score_brief(brief: Brief) -> Score:
         return _changelog(brief, "patch_changelog_only")
     if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):
         return _changelog(brief, "commit_noise_changelog")
+    if _is_docs_typo_chore_brief(brief):
+        return _changelog(brief, "docs_typo_chore")
     if _is_merge_log_brief(brief):
         return _changelog(brief, "merge_log_changelog")
     if brief.claims_ship:
