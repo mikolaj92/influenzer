@@ -22,7 +22,7 @@ Neighbor of #117 (AI-powered slogan without proof). This issue is the model in t
 
 ## Test plan
 
-- Detector: I asked ChatGPT / I asked the model / as an AI / Prompt: dump / zrzut rozmowy z modelem / chat.openai.com = silence
+- Detector: I asked ChatGPT / I asked the model / as an AI / Prompt: dump / zapytałem model / paste this prompt into ChatGPT / zrzut rozmowy z modelem / chat.openai.com = silence
 - Negative: AI-powered slogan, "prompt the operator", Claude Shannon, GPT tokenizer still draft
 - Dress refuses a model dump even when score is forced to DRAFT
 - Superlative (#117) still works independently
