@@ -40,6 +40,7 @@ from influenzer.playbook import (
     ArenaId,
     Verdict,
     arena_play,
+    court_reason,
     fair_loop_reason,
     has_cinema_package,
     has_fair_hook,
@@ -576,6 +577,10 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             facts=triples,
             blob=bits.blob,
         )
+        or (
+            score.arena is ArenaId.LINKEDIN
+            and court_reason(bits.blob, claims_ship=brief.claims_ship)
+        )
     ):
         return None
     if unquotable_reason(triples):
@@ -608,6 +613,10 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_private_repo(body)
         or looks_like_archived_repo(body)
         or looks_like_server_splash(body)
+        or (
+            score.arena is ArenaId.LINKEDIN
+            and court_reason(body, claims_ship=brief.claims_ship)
+        )
     ):
         return None
     if looks_like_open_source_without_license(body):

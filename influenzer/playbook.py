@@ -94,6 +94,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Dwell: win the ~210-char fold; body must be finishable. Overflow is silence, not a mid-word clip.",
             "First 60–90 min: reply with new substance (re-entry).",
             "Zero-click: insight in the post. No pitch in line one, no hashtag wall. Language from the profile (audience). A foreign-language court is silence.",
+            "Court is not a launch channel. claims_ship / Show HN energy is github/hn. Insight from the work (pillars), or silence. Also outside the launch window.",
         ),
         canon_path="linkedin.md",
     ),
@@ -336,6 +337,7 @@ def choose_arena(
     preferred_arena: ArenaId | str | None = None,
     stack_arena: ArenaId | str | None = None,
     tryable: bool = False,
+    claims_ship: bool = False,
     story_kind: StoryKind | str | None = None,
     clickable: bool = False,
     issues_disabled: bool = False,
@@ -347,12 +349,14 @@ def choose_arena(
 ) -> ArenaId:
     """One primary arena. A living github/hn stack keeps that costume.
 
-    We sit on github (feedback) and hn (camp). Preferred X / LinkedIn /
-    YouTube / shorts / Discord / Bluesky without a listener is not a first
-    costume — ship goes where we sit. GitHub is the website. HN only when
-    there is a clickable demo and no stack already chose the other costume.
-    Shopping while the window lives is not a new pick — the caller kills
-    an explicit change; this keeps the locked costume when preferred is empty.
+    We sit on github (feedback) and hn (camp). Preferred X / YouTube /
+    shorts / Discord / Bluesky without a listener is not a first costume
+    — ship goes where we sit. Court is insight from the work, never a
+    launch channel: preferred LinkedIn sits only when the brief does not
+    claim ship. GitHub is the website. HN only when there is a clickable
+    demo and no stack already chose the other costume. Shopping while the
+    window lives is not a new pick — the caller kills an explicit change;
+    this keeps the locked costume when preferred is empty.
     """
     locked = parse_stack_arena(stack_arena)
     if locked is not None:
@@ -360,6 +364,19 @@ def choose_arena(
     seated = parse_stack_arena(preferred_arena)
     if seated is not None:
         return seated
+    wanted = None
+    if preferred_arena is not None and preferred_arena != "":
+        try:
+            wanted = (
+                preferred_arena
+                if isinstance(preferred_arena, ArenaId)
+                else ArenaId(preferred_arena)
+            )
+        except ValueError:
+            wanted = None
+    # #58: court is not a launch channel. Ship stays on github/hn.
+    if wanted is ArenaId.LINKEDIN and not claims_ship:
+        return ArenaId.LINKEDIN
     kind = (
         story_kind
         if isinstance(story_kind, StoryKind) or story_kind is None
@@ -1417,6 +1434,7 @@ ARENA_GATES: dict[ArenaId, ArenaGate] = {
     ),
     ArenaId.LINKEDIN: ArenaGate(
         reason="court_not_ready",
+        forbid_ship_claim=True,
         min_facts=2,
         allowed_story_kinds=frozenset(
             {StoryKind.MAJOR, StoryKind.DECISION, StoryKind.FAILURE}
@@ -1820,6 +1838,59 @@ def looks_like_linkedin_fold_overflow(text: str) -> bool:
     if not insight:
         return True
     return len(insight) > LINKEDIN_FOLD
+
+
+# Court is not a launch channel. claims_ship / Show HN / "just shipped"
+# energy is github/hn. LinkedIn without insight from the work is silence.
+# Pair of #33 (fold without pitch) and #26 (launch window): here the
+# channel never carries launch, also outside the window.
+COURT_NOT_A_LAUNCH_REASON = "court_not_a_launch"
+COURT_LAUNCH_RE = re.compile(
+    r"(?i)(?:"
+    r"\bshow\s+hn\b|"
+    r"\b(?:we|i)\s+(?:just\s+)?(?:shipped|launched|released|announce|announcing|introducing)\b|"
+    r"\bjust\s+(?:shipped|launched|released)\b|"
+    r"\bwłaśnie\s+(?:wypuścili|wydali|uruchomili)|"
+    r"\bwypuściliśmy\b|"
+    r"\bwydaliśmy\b"
+    r")"
+)
+COURT_PITCH_RE = re.compile(
+    r"(?i)^\s*(?:(?:we|i)\s+)?(?:just\s+)?(?:shipped|launched|announcing|introducing)\b|"
+    r"^\s*(?:excited to|proud to|please to|try (?:it|this|ours?)\b|sign up|click here)"
+)
+
+
+def looks_like_court_launch(text: str) -> bool:
+    """True for Show HN / just-shipped energy. Court is not a launch channel."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(COURT_LAUNCH_RE.search(cleaned))
+
+
+def has_court_insight(text: str) -> bool:
+    """True when a non-pitch, non-URL line can win the court fold."""
+    for line in (text or "").splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        if _URL_IN_TEXT_RE.search(cleaned):
+            continue
+        if looks_like_court_launch(cleaned) or COURT_PITCH_RE.search(cleaned):
+            continue
+        if looks_like_linkedin_fold_overflow(cleaned):
+            continue
+        if len(cleaned) >= MIN_FACT_CHARS:
+            return True
+    return False
+
+
+def court_reason(text: str, *, claims_ship: bool = False) -> str | None:
+    """Silence when court would carry launch, or has no insight from the work."""
+    if claims_ship or looks_like_court_launch(text):
+        return COURT_NOT_A_LAUNCH_REASON
+    if not has_court_insight(text):
+        return "court_not_ready"
+    return None
 
 
 def looks_like_commit_noise(text: str) -> bool:
@@ -2644,6 +2715,9 @@ __all__ = [
     "BOT_AUTHOR_RE",
     "CANON_URL",
     "COMMIT_NOISE_RE",
+    "COURT_LAUNCH_RE",
+    "COURT_NOT_A_LAUNCH_REASON",
+    "COURT_PITCH_RE",
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "CONTEST_RE",
@@ -2722,9 +2796,11 @@ __all__ = [
     "arena_gate",
     "arena_play",
     "choose_arena",
+    "court_reason",
     "feedback_excerpt_texts",
     "fair_loop_reason",
     "has_cinema_package",
+    "has_court_insight",
     "has_fair_hook",
     "has_fair_loop",
     "has_monday_history",
@@ -2751,6 +2827,7 @@ __all__ = [
     "looks_like_bot_author",
     "looks_like_bot_bump_week",
     "looks_like_commit_noise",
+    "looks_like_court_launch",
     "looks_like_dunk",
     "looks_like_foreign_wave",
     "looks_like_reply",
