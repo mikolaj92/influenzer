@@ -44,6 +44,7 @@ from influenzer.playbook import (
     fair_loop_reason,
     tavern_reason,
     cafe_reason,
+    letter_reason,
     has_cinema_package,
     has_fair_hook,
     has_fair_loop,
@@ -474,7 +475,9 @@ def _dress_reddit(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_newsletter(bits: CopyBits, score: Score) -> str | None:
-    """Letter: named-editor cadence; user-facing change, not a blast."""
+    """Letter: named-editor cadence; give first, then maybe ask."""
+    if letter_reason(bits.blob):
+        return None
     if not bits.one_liner:
         return None
     parts = [bits.one_liner]
@@ -603,6 +606,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
+        or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))
     ):
         return None
     if unquotable_reason(triples):
@@ -640,6 +644,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             and court_reason(body, claims_ship=brief.claims_ship)
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(body))
+        or (score.arena is ArenaId.NEWSLETTER and letter_reason(body))
     ):
         return None
     if looks_like_open_source_without_license(body):

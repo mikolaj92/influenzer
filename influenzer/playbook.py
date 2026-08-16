@@ -357,7 +357,9 @@ def choose_arena(
     Preferred Discord sits so an empty tavern can be silence — public
     invite only with intent split and ~10 builders. Preferred Bluesky
     sits so an artifact-only cafe can be silence — pack onboarduje,
-    feed trzyma. GitHub is the website. HN only when there is a
+    feed trzyma. Preferred newsletter sits so subscribe / our launch
+    without a gift can be silence — give first, recs are adjacent.
+    GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
     Shopping while the window lives is not a new pick — the caller
     kills an explicit change; this keeps the locked costume when
@@ -385,6 +387,9 @@ def choose_arena(
     # #55: pack without a feed is half the game. Sit so artifact-only cafe dies.
     if wanted is ArenaId.BLUESKY:
         return ArenaId.BLUESKY
+    # #54: letter gives first. Sit so subscribe / our launch without a gift dies.
+    if wanted is ArenaId.NEWSLETTER:
+        return ArenaId.NEWSLETTER
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
         return ArenaId.LINKEDIN
@@ -2041,6 +2046,78 @@ def cafe_reason(text: str) -> str | None:
     return None
 
 
+# Letter gives first, then maybe asks. Subscribe / our launch without a
+# concrete gift for the reader is silence. Recs are adjacent (sąsiad),
+# not a crush. Pair of #30/#51 (owned list, dress letter).
+LETTER_ASK_WITHOUT_GIFT_REASON = "letter_ask_without_gift"
+LETTER_ASK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bsubscribe\b|"
+    r"\bsubskryb|"
+    r"\bjoin\s+(?:the|our)\s+(?:list|newsletter|letter)\b|"
+    r"\bsign\s+up\s+(?:for|to)\b|"
+    r"\bour\s+launch\b|"
+    r"\bjoin\s+(?:the|our)\s+launch\b|"
+    r"\bnasz(?:a|ej)?\s+launch\b|"
+    r"\bzapisz\s+si[eę]\b"
+    r")"
+)
+LETTER_CRUSH_RE = re.compile(
+    r"(?i)(?:"
+    r"\bcrush(?:es|ing)?\s+(?:the\s+)?(?:competitor|competition)s?\b|"
+    r"\bkill(?:s|ing)?\s+(?:the\s+)?(?:competitor|competition)s?\b|"
+    r"\bdestroy(?:s|ing)?\s+(?:the\s+)?(?:competitor|competition)s?\b|"
+    r"\beat\s+(?:their|the)\s+lunch\b|"
+    r"\bzdus\w*\s+konkurenc|"
+    r"\bkonkurenc\w*\s+do\s+zdusz"
+    r")"
+)
+
+
+def looks_like_letter_ask(text: str) -> bool:
+    """True for subscribe / our launch. An ask is not a gift."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(LETTER_ASK_RE.search(cleaned))
+
+
+def looks_like_letter_crush(text: str) -> bool:
+    """True for crush-the-competitor recs. A neighbor is not a kill."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(LETTER_CRUSH_RE.search(cleaned))
+
+
+def has_letter_gift(text: str) -> bool:
+    """True when a non-ask, non-crush line is concrete for the reader."""
+    for line in (text or "").splitlines():
+        cleaned = _URL_IN_TEXT_RE.sub(" ", line).strip()
+        if not cleaned:
+            continue
+        if looks_like_letter_ask(cleaned) or looks_like_letter_crush(cleaned):
+            continue
+        if len(cleaned) >= MIN_FACT_CHARS:
+            return True
+    return False
+
+
+def letter_reason(text: str) -> str | None:
+    """Silence when the letter only asks, asks first, or recs crush."""
+    if looks_like_letter_crush(text):
+        return LETTER_ASK_WITHOUT_GIFT_REASON
+    first: str | None = None
+    for line in (text or "").splitlines():
+        cleaned = _URL_IN_TEXT_RE.sub(" ", line).strip()
+        if len(cleaned) < MIN_FACT_CHARS:
+            continue
+        if looks_like_letter_ask(cleaned) or looks_like_letter_crush(cleaned):
+            if first is None:
+                return LETTER_ASK_WITHOUT_GIFT_REASON
+            continue
+        first = cleaned
+    if first is None:
+        return LETTER_ASK_WITHOUT_GIFT_REASON
+    return None
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -2945,6 +3022,9 @@ __all__ = [
     "DUNK_PHRASE_RE",
     "EMPTY_TAVERN_REASON",
     "BLUESKY_PACK_WITHOUT_FEED_REASON",
+    "LETTER_ASK_WITHOUT_GIFT_REASON",
+    "LETTER_ASK_RE",
+    "LETTER_CRUSH_RE",
     "CAFE_FEED_RE",
     "CAFE_PACK_RE",
     "CONTEST_RE",
@@ -3036,6 +3116,7 @@ __all__ = [
     "has_court_insight",
     "has_fair_hook",
     "has_fair_loop",
+    "has_letter_gift",
     "has_monday_history",
     "has_named_subreddit",
     "has_quote_mark",
@@ -3107,6 +3188,9 @@ __all__ = [
     "tavern_reason",
     "looks_like_store_pitch",
     "looks_like_launch_pitch",
+    "looks_like_letter_ask",
+    "looks_like_letter_crush",
+    "letter_reason",
     "looks_like_dead_link",
     "looks_like_dead_release_asset",
     "looks_like_dead_star_count",
