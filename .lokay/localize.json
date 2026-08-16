@@ -1,12 +1,15 @@
 {
   "paths": [
+    "github_feedback/feedback.py",
+    "github_survey/survey.py",
     "influenzer",
+    "influenzer/adapters/fake_provider.py",
+    "influenzer/hom_feedback.py",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
     "influenzer/adapters/child_worker.py",
     "influenzer/adapters/contract.py",
-    "influenzer/adapters/fake_provider.py",
     "influenzer/adapters/http_fake.py",
     "influenzer/adapters/platforms.py",
     "influenzer/adapters/registry.py",
@@ -24,7 +27,6 @@
     "influenzer/fala_result.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
-    "influenzer/hom_feedback.py",
     "influenzer/hom_outbox.py",
     "influenzer/hom_pass.py",
     "influenzer/hom_verdict.py",
@@ -37,13 +39,14 @@
     "influenzer/scheduler.py",
     "influenzer/security.py",
     "influenzer/storage.py",
-    "influenzer/tick.py",
-    "influenzer/tick_all.py",
-    "influenzer/adapters"
+    "influenzer/tick.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
+    "Survey",
+    "feedback",
+    "provider",
     "influenzer"
   ],
   "notes": [
@@ -51,7 +54,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__69-j-zyk-kostiumu-show-hn-i-github-po-angie-8bde5f37",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__68-pad-gh-to-cisza-nie-mier-p-tli-a1704025",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

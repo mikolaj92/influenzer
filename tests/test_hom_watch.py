@@ -214,6 +214,36 @@ class HomWatchTests(unittest.TestCase):
         self.assertFalse(out.get("published", False))
         self.assertFalse(out["operator"]["published"])
 
+    def test_gh_rate_pad_is_empty_look_and_interval_lives(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        out, fake = self._tick({"repo": GhCall(1, "", "HTTP 429: API rate limit exceeded")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertTrue(fake.calls)
+        self.assertEqual(loop_status(out), {"status": "cisza", "mutated": False, "published": False})
+
+        slept: list[float] = []
+        n = {"i": 0}
+
+        def tick_once() -> dict:
+            n["i"] += 1
+            if n["i"] == 1:
+                return out
+            return {"status": "ok", "n": n["i"], "mutated": False, "published": False}
+
+        results = loop_ticks(
+            guarded_tick(tick_once, supervise=True),
+            interval=15,
+            max_ticks=2,
+            sleep=slept.append,
+        )
+        self.assertEqual(results[0]["scan"]["reason"], "empty_survey")
+        self.assertEqual(results[1]["n"], 2)
+        self.assertEqual(slept, [15])
+
     def test_bad_gh_bytes_are_empty_look_and_loop_lives(self) -> None:
         set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
         out, fake = self._tick({"repo": GhCall(0, "not-json")})

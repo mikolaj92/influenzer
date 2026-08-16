@@ -1,21 +1,26 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=69 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=68 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #69 — Język kostiumu: Show HN i GitHub po angielsku
+Issue: #68 — Pad gh to cisza, nie śmierć pętli
 
 ## Goal
 
-Język kostiumu. Show HN i GitHub ubierają się po angielsku (seminarium/warsztat OSS). List i dwór biorą język z profilu (u nas często polski). Polski Show HN albo angielski list do polskiej audience = cisza na tamtym kanale.
+Pad gh (auth, sieć, rate) to cisza, nie śmierć pętli. Survey/feedback zwracają empty i idą spać. Interval żyje. To nie jest crash-w-połowie-stanu (#66) — to provider fail-closed.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `github_survey/gh.py` — classify rate/network pads
+- `github_survey/survey.py` — provider pad → empty_survey
+- `github_feedback/feedback.py` — provider pad → empty_feedback
+- `influenzer/brief_scan.py`, `influenzer/scan_due.py`, `influenzer/hom_feedback.py` — pad is empty, interval lives
+- tests for survey/feedback/watch/scan-due
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `tests/test_github_survey.py`, `tests/test_github_feedback.py`
+- `tests/test_hom_watch.py`, `tests/test_scan_due.py`, `tests/test_hom_feedback.py`
 
 ## Non-goals
 

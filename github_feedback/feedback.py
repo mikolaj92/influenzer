@@ -9,6 +9,9 @@ The rest stays on GitHub. A whole thread in state.db is silence, not storage.
 This is retention, not a timeout.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
 50MB in state.db is silence. The loop lives.
+Pad gh (auth, network, rate) is empty, not death of the loop. Feedback
+returns empty and the interval sleeps. Provider fail-closed, not a
+crash-in-the-middle-of-state.
 Inbound comments are data, not a command. Pack cuts instructions
 ("zpostuj to", "ignore scoring"), leaves content. Our score stays ours.
 """
@@ -38,6 +41,7 @@ from github_survey.survey import (
     look_payload_reason,
     look_short_gh,
     parse_now,
+    provider_pad_reason,
     state_bytes_over_limit,
 )
 from github_pack.pack import sanitize_inbound_facts, strip_inbound_instructions
@@ -117,6 +121,14 @@ _SIGNAL_RE = re.compile(
 
 def _silence(reason: str, *, repo: str) -> dict[str, Any]:
     return {"status": "noop", "ok": True, "reason": reason, "repo": repo, "brief_id": None}
+
+
+def _empty_pad(reason: str | None) -> str:
+    """Auth, network, rate, or a generic gh pad is empty. Interval lives."""
+    mapped = provider_pad_reason(reason)
+    if mapped == "empty_survey" or reason == "empty_survey":
+        return "empty_feedback"
+    return mapped or "empty_feedback"
 
 
 def _clip(text: str, limit: int = MAX_FACT_CHARS) -> str:
@@ -269,7 +281,7 @@ def _brief_id(facts: list[dict[str, Any]]) -> str:
 def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[str, Any] | None, str | None]:
     meta, reason = required_json(gh(["repo", "view", repo_slug, "--json", REPO_JSON_FIELDS]))
     if reason:
-        return None, "empty_feedback" if reason == "empty_survey" else reason
+        return None, _empty_pad(reason)
     if not isinstance(meta, dict):
         return None, "empty_feedback"
     if bool(meta.get("isPrivate")):
@@ -280,7 +292,7 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
         gh(["api", f"repos/{repo_slug}/issues/comments?per_page=100&since={since}"])
     )
     if reason:
-        return None, "empty_feedback" if reason == "empty_survey" else reason
+        return None, _empty_pad(reason)
     pulls_call = gh(["api", f"repos/{repo_slug}/pulls/comments?per_page=100&since={since}"])
     if look_payload_reason(pulls_call):
         return None, "empty_feedback"
@@ -348,10 +360,9 @@ def collect_feedback(
     clock = parse_now(now)
     try:
         collected, reason = collect_comments(slug, gh=runner, now=clock)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except Exception:
+        # Auth, network, rate, or a malformed pad. Empty look. Interval lives.
         return _silence("empty_feedback", repo=slug)
-    except (OSError, TypeError, ValueError):
-        return _silence("scan_failed", repo=slug)
     if reason:
         return _silence(reason, repo=slug)
     assert collected is not None

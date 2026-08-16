@@ -303,6 +303,15 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.assertNotIn(long_body, dumped)
         self.assertNotIn(second, dumped)
 
+    def test_rate_limit_is_empty_look_and_writes_no_brief(self) -> None:
+        out = self._run({"repo": GhCall(1, "", "HTTP 429: API rate limit exceeded")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse((self.home / "runtime.db").exists())
+
     def test_oversized_comments_are_empty_look_and_write_no_brief(self) -> None:
         pad = "How do I install this when uv is missing? " + ("x" * (MAX_GH_LOOK_BYTES + 1))
         script = feedback_question_script()

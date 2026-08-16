@@ -226,7 +226,7 @@ def collect_and_admit(
     try:
         runner = look_declared_gh(slug, gh) if gh is not None else None
         packed = collect_feedback(slug, gh=runner, now=now)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except Exception:
         return host_silence("empty_feedback", project_id=pid, repo_slug=slug)
     return admit_feedback(repo, packed, project_id=pid, now=now or utc_now())
 
