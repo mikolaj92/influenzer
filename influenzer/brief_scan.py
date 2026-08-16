@@ -31,6 +31,9 @@ cisza here or contribute, not our launch.
 A hung gh is silence, not a stuck loop. Timeout is harder and shorter
 than the tick interval. After it: cisza, the child is gone, next tick
 goes. This is not auth-fail.
+Crash mid-look resumes; it does not start from zero. Look already done
+and look in progress are two states. A second gh on a half-open look
+is an error. Pending brief after a crash is score+angle only.
 """
 
 from __future__ import annotations
@@ -57,7 +60,7 @@ from influenzer.playbook import (
     looks_like_template,
 )
 
-from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
+from influenzer.brief_admit import SOURCE, admit_pack, host_error, host_silence, open_story_reason
 from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.storage import StateRepository
 
@@ -362,8 +365,13 @@ def scan_github(
     repo_slug: str,
     gh: GhRunner | None = None,
     now: str | None = None,
+    begun: bool = False,
 ) -> dict[str, Any]:
-    """Compose survey → pack → admit. At most one pending brief, or silence."""
+    """Compose survey → pack → admit. At most one pending brief, or silence.
+
+    ``begun`` is the Monday look that just marked this git in progress.
+    A leftover in-progress look without that flag is a second gh: error.
+    """
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return host_silence("repo must be owner/name", project_id=project_id, repo_slug=slug)
@@ -375,6 +383,9 @@ def scan_github(
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
+    leftover = repo.look_state(slug)
+    if leftover == "in_progress" and not begun:
+        return host_error("half_open_look", project_id=project_id, repo_slug=slug)
     runner = look_only_gh(gh, slug)
     if repo_is_fork(runner, slug):
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)

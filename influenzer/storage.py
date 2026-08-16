@@ -290,6 +290,17 @@ class StateRepository:
             return list(self.conn.execute("SELECT * FROM domain_events ORDER BY event_id"))
         return list(self.conn.execute("SELECT * FROM domain_events WHERE project_id=? ORDER BY event_id", (project_id,)))
 
+    def record_github_look(self, project_id: str, repo_slug: str, *, started_at: str) -> None:
+        """Mark this git look in progress. Distinct from github.scanned (done)."""
+        with self.transaction() as c:
+            self._require_project(c, project_id)
+            self._event(
+                project_id,
+                "github.looking",
+                {"repo": repo_slug, "started_at": started_at},
+                conn=c,
+            )
+
     def record_github_scan(self, project_id: str, repo_slug: str, *, scanned_at: str) -> None:
         """Append a github.scanned domain event for this project+repo. No new table."""
         with self.transaction() as c:
@@ -300,6 +311,51 @@ class StateRepository:
                 {"repo": repo_slug, "scanned_at": scanned_at},
                 conn=c,
             )
+
+    def _latest_look(self, repo_slug: str) -> tuple[str, str, str | None] | None:
+        """Newest ``(state, project_id, stamp)`` for this git, or None."""
+        wanted = repo_slug.strip().lower()
+        if not wanted:
+            return None
+        latest: tuple[str, str, str | None] | None = None
+        for row in self.events():
+            event_type = row["event_type"]
+            if event_type not in {"github.looking", "github.scanned"}:
+                continue
+            try:
+                payload = json.loads(row["payload_json"])
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            if str(payload.get("repo") or "").strip().lower() != wanted:
+                continue
+            state = "in_progress" if event_type == "github.looking" else "done"
+            raw = payload.get("started_at") if state == "in_progress" else payload.get("scanned_at")
+            stamp = raw if isinstance(raw, str) and raw.strip() else row["created_at"]
+            latest = (state, str(row["project_id"]), stamp if isinstance(stamp, str) else None)
+        return latest
+
+    def look_state(self, repo_slug: str) -> str | None:
+        """Newest look state for this git: ``in_progress`` or ``done``, else None.
+
+        Per repo, not per project. ``github.looking`` is in progress;
+        ``github.scanned`` is already done. Two states, not one watermark.
+        """
+        latest = self._latest_look(repo_slug)
+        return None if latest is None else latest[0]
+
+    def look_owner(self, repo_slug: str) -> str | None:
+        """project_id of the newest looking/scanned event for this git."""
+        latest = self._latest_look(repo_slug)
+        return None if latest is None else latest[1]
+
+    def look_started_at(self, repo_slug: str) -> str | None:
+        """When the newest in-progress look began. None if not in progress."""
+        latest = self._latest_look(repo_slug)
+        if latest is None or latest[0] != "in_progress":
+            return None
+        return latest[2]
 
     def set_hom_watch(self, project_id: str, repo_slug: str, *, created_at: str) -> None:
         """Persist the singleton declared watch (one project, one repo)."""

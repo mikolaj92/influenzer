@@ -3,6 +3,9 @@
 One story at a time: a pending brief or unprocessed social draft is silence;
 the same ship artifact is not retold. Two watches on the same repo are one
 look: a second brief from the same git is silence, even with another project_id.
+Crash mid-look resumes; it does not start from zero. Look already done and
+look in progress are two states. A second gh on a half-open look is an error.
+Pending brief after a crash is score+angle only, no second survey/gh.
 
 Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
@@ -24,7 +27,7 @@ from github_survey.survey import look_bytes_over_limit, state_bytes_over_limit
 
 from influenzer.config import load_config
 from influenzer.domain import foreign_owner_reason, utc_now
-from influenzer.envelope import noop, ok
+from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
@@ -44,6 +47,19 @@ SOURCE = "github-scan"
 
 def host_silence(reason: str, *, project_id: str, repo_slug: str, **extra: Any) -> dict[str, Any]:
     return noop(
+        reason,
+        published=False,
+        project_id=project_id,
+        repo=repo_slug,
+        brief_id=None,
+        source=SOURCE,
+        **extra,
+    )
+
+
+def host_error(reason: str, *, project_id: str, repo_slug: str, **extra: Any) -> dict[str, Any]:
+    """Second gh on a half-open look is an error, not a new survey."""
+    return fail(
         reason,
         published=False,
         project_id=project_id,
