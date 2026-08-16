@@ -233,6 +233,45 @@ class HomDraftCostumeTests(unittest.TestCase):
         triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
         self.assertIsNone(invented_metric_reason(triples, extra=decision.draft.body))
 
+    def test_monday_without_history_is_undressable_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(
+                Fact(text="weekly update"),
+                Fact(text="newsletter cadence stays weekly"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.NEWSLETTER,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.NEWSLETTER].wave,
+            canon_url=ARENAS[ArenaId.NEWSLETTER].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "newsletter",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.NEWSLETTER].wave),
+                    "canon_url": ARENAS[ArenaId.NEWSLETTER].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        dumped = json.dumps(payload)
+        self.assertNotIn("weekly update", dumped.lower())
+        self.assertNotIn("Weekly update", dumped)
+
     def test_superlative_without_proof_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(
             claims_ship=False,

@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. A Monday without a ship or real public feedback is silence, not a recap. Weekly update without history stays in the changelog. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -166,7 +166,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         wave=(
             "Named editor, one promise, cadence you can keep on a bad week. Language from the profile (audience). A foreign-language letter is silence.",
             "Rent-to-own: social/GitHub feed the exportable list.",
-            "No user-facing change means no email.",
+            "No user-facing change means no email. Weekly update without a ship or real public feedback is silence, not a recap.",
             "Recs: adjacent, give first. Hygiene beats vanity size.",
         ),
         canon_path="newsletter.md",
@@ -875,6 +875,20 @@ VERSION_DIFF_RE = re.compile(
     r"\bdiff(?:s|y)?\s+(?:wersji|wersja|version)\b|"
     r"\btydzie[nń]\s+samych\s+bump"
     r")"
+)
+# A Monday look without a ship/tryable or a real public excerpt is
+# cisza społeczna, not a recap. Changelog stays in the repo. Pair of
+# no-noise (#64): "weekly update" is not history.
+WEEKLY_UPDATE_RE = re.compile(
+    r"(?i)\b(?:"
+    r"weekly\s+update|"
+    r"weekly\s+recap|"
+    r"week\s+in\s+review|"
+    r"this\s+week'?s\s+(?:update|recap)|"
+    r"aktualizacja\s+tygodniowa|"
+    r"podsumowanie\s+tygodnia|"
+    r"tygodniow(?:y|e|a)\s+(?:update|recap|podsumowanie)"
+    r")\b"
 )
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
@@ -1690,6 +1704,58 @@ def looks_like_bot_bump_week(
     )
 
 
+def looks_like_weekly_update(text: str) -> bool:
+    """True for 'weekly update' / recap copy. A cadence label is not history."""
+    if not text or not text.strip():
+        return False
+    return bool(WEEKLY_UPDATE_RE.search(text))
+
+
+def has_real_feedback(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> bool:
+    """True when a public GitHub issue/PR excerpt is in the brief."""
+    return bool(feedback_excerpt_texts(facts))
+
+
+def has_monday_history(
+    *,
+    tryable: bool,
+    artifact_urls: tuple[str, ...] | list[str] = (),
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]] = (),
+) -> bool:
+    """Ship/tryable or a real public excerpt. Otherwise the Monday look is empty."""
+    if tryable:
+        return True
+    if any(is_ship_artifact_url(url) for url in artifact_urls if url):
+        return True
+    return has_real_feedback(facts)
+
+
+def looks_like_monday_without_history(
+    *,
+    story_kind: StoryKind | str | None = None,
+    preferred_arena: ArenaId | str | None = None,
+    tryable: bool = False,
+    artifact_urls: tuple[str, ...] | list[str] = (),
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]] = (),
+    blob: str = "",
+) -> bool:
+    """Monday look / weekly update with no ship and no real feedback."""
+    if has_monday_history(tryable=tryable, artifact_urls=artifact_urls, facts=facts):
+        return False
+    kind = story_kind if isinstance(story_kind, StoryKind) or story_kind is None else StoryKind(story_kind)
+    arena = preferred_arena
+    if isinstance(preferred_arena, str) and preferred_arena:
+        try:
+            arena = ArenaId(preferred_arena)
+        except ValueError:
+            arena = preferred_arena
+    if kind is StoryKind.MAJOR or arena is ArenaId.NEWSLETTER or looks_like_weekly_update(blob):
+        return True
+    return False
+
+
 def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
@@ -2372,6 +2438,7 @@ __all__ = [
     "METRIC_TOKEN_RE",
     "MERGED_PR_FACT_RE",
     "VERSION_DIFF_RE",
+    "WEEKLY_UPDATE_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
     "NEWS_HOSTS",
@@ -2406,8 +2473,10 @@ __all__ = [
     "feedback_excerpt_texts",
     "has_cinema_package",
     "has_fair_hook",
+    "has_monday_history",
     "has_named_subreddit",
     "has_quote_mark",
+    "has_real_feedback",
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
@@ -2452,7 +2521,9 @@ __all__ = [
     "news_urls_only",
     "looks_like_listicle_title",
     "looks_like_merged_pr_fact",
+    "looks_like_monday_without_history",
     "looks_like_version_diff",
+    "looks_like_weekly_update",
     "looks_like_press_release",
     "looks_like_shouty_title",
     "looks_like_emoji_title",

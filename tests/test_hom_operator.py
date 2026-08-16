@@ -80,6 +80,10 @@ from influenzer.playbook import (
     looks_like_launch_pitch,
     looks_like_superlative,
     looks_like_version_diff,
+    looks_like_monday_without_history,
+    looks_like_weekly_update,
+    has_monday_history,
+    has_real_feedback,
     metric_tokens,
     quote_without_sourced_excerpt,
     strip_person_mentions,
@@ -1167,6 +1171,60 @@ class PlaybookCopyTests(unittest.TestCase):
             )
         )
         self.assertFalse(looks_like_bot_bump_week(("dependabot",)))
+
+    def test_weekly_update_without_history_is_not_a_story(self) -> None:
+        recaps = (
+            "weekly update",
+            "Weekly recap",
+            "week in review",
+            "this week's update",
+            "aktualizacja tygodniowa",
+            "podsumowanie tygodnia",
+            "tygodniowy recap",
+        )
+        for text in recaps:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_weekly_update(text))
+        self.assertFalse(looks_like_weekly_update("newsletter cadence stays weekly"))
+        self.assertFalse(
+            has_monday_history(
+                tryable=False,
+                artifact_urls=(),
+                facts=(("signal", "weekly update", None),),
+            )
+        )
+        self.assertTrue(
+            looks_like_monday_without_history(
+                story_kind=StoryKind.MAJOR,
+                tryable=False,
+                facts=(("signal", "weekly update", None),),
+                blob="weekly update",
+            )
+        )
+        self.assertFalse(
+            looks_like_monday_without_history(
+                story_kind=StoryKind.MAJOR,
+                tryable=True,
+                artifact_urls=(SHIP_PR,),
+                facts=(("signal", "Local tick scores briefs", SHIP_PR),),
+            )
+        )
+        self.assertTrue(
+            looks_like_monday_without_history(
+                preferred_arena=ArenaId.NEWSLETTER,
+                tryable=False,
+                facts=(("signal", "nothing shipped this week", None),),
+            )
+        )
+        excerpt = ("issue_comment", "@bob: the Windows install fails", FEEDBACK_COMMENT)
+        self.assertTrue(has_real_feedback((excerpt,)))
+        self.assertFalse(
+            looks_like_monday_without_history(
+                story_kind=StoryKind.MAJOR,
+                tryable=False,
+                facts=(excerpt,),
+            )
+        )
 
     def test_dead_link_is_not_tryable(self) -> None:
         corpses = (
@@ -3392,6 +3450,66 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertNotIn("Costume:", decision.draft.body)
         self.assertNotIn("One arena:", decision.draft.body)
         self.assertIn("I struggled with timeouts looking like success", decision.draft.body)
+
+    def test_monday_without_history_is_changelog_not_a_recap(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            story_kind=StoryKind.MAJOR,
+            facts=(
+                Fact(text="weekly update"),
+                Fact(text="newsletter cadence stays weekly"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, "monday_without_history")
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
+    def test_weekly_update_without_history_is_changelog_not_a_letter(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            preferred_arena=ArenaId.NEWSLETTER,
+            facts=(Fact(text="weekly update"), Fact(text="nothing shipped this week")),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "monday_without_history")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_monday_without_history_on_social_arena_is_killed(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            preferred_arena=ArenaId.LINKEDIN,
+            facts=(Fact(text="weekly update"), Fact(text="nothing shipped this week")),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "monday_without_history")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_feedback_without_ship_can_still_draft_a_hard_issue(self) -> None:
+        excerpt = "How do I install this when uv is missing?"
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            story_kind=StoryKind.HARD_ISSUE,
+            facts=(
+                Fact(kind="issue_comment", text=f"@bob: {excerpt}", artifact_url=FEEDBACK_COMMENT),
+                Fact(text=f"A stranger asked {excerpt}"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.draft.arena, ArenaId.GITHUB)
+        assert decision.draft is not None
+        self.assertIn(excerpt, decision.draft.body)
 
     def test_youtube_with_package_drafts_cinema_only(self) -> None:
         brief = self._brief(
