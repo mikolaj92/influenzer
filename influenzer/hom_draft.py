@@ -42,6 +42,7 @@ from influenzer.playbook import (
     arena_play,
     court_reason,
     fair_loop_reason,
+    tavern_reason,
     has_cinema_package,
     has_fair_hook,
     has_fair_loop,
@@ -500,8 +501,16 @@ def _dress_mastodon(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_discord(bits: CopyBits, score: Score) -> str | None:
-    """Tavern is not a launch costume. Fail closed."""
-    return None
+    """Tavern: public invite only with intent split and ~10 builders."""
+    if tavern_reason(bits.blob):
+        return None
+    if not bits.one_liner:
+        return None
+    parts = [bits.one_liner]
+    rest = _join_rest(bits)
+    if rest:
+        parts.extend(["", rest])
+    return _body_or_none("\n".join(parts))
 
 
 def _overflows_arena(arena: ArenaId, bits: CopyBits, body: str) -> bool:
@@ -537,8 +546,6 @@ assert set(_DRESSERS) == set(ARENAS)
 def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft | None:
     """Wear the chosen costume. Kill/changelog/undressable → None."""
     if score.verdict is not Verdict.DRAFT or score.arena is None or score.angle is None:
-        return None
-    if score.arena is ArenaId.DISCORD:
         return None
     bits = _copy_bits(brief)
     triples = tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
@@ -581,6 +588,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             score.arena is ArenaId.LINKEDIN
             and court_reason(bits.blob, claims_ship=brief.claims_ship)
         )
+        or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
     ):
         return None
     if unquotable_reason(triples):
@@ -617,6 +625,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             score.arena is ArenaId.LINKEDIN
             and court_reason(body, claims_ship=brief.claims_ship)
         )
+        or (score.arena is ArenaId.DISCORD and tavern_reason(body))
     ):
         return None
     if looks_like_open_source_without_license(body):

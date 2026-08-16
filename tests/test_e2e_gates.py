@@ -23,15 +23,20 @@ from influenzer.playbook import (
     ARENAS,
     ArenaId,
     COURT_NOT_A_LAUNCH_REASON,
+    EMPTY_TAVERN_REASON,
     Verdict,
     choose_arena,
     court_reason,
     fair_loop_reason,
     has_court_insight,
     has_fair_loop,
+    has_tavern_intent_split,
+    has_tavern_seed,
     looks_like_court_launch,
     looks_like_fair_cta,
     looks_like_poll,
+    looks_like_tavern_invite,
+    tavern_reason,
     unquotable_reason,
 )
 from influenzer.scheduler import DueWork, tick
@@ -446,6 +451,90 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, COURT_NOT_A_LAUNCH_REASON)
         self.assertIsNone(compose_draft(empty, score))
+
+    def test_empty_tavern_does_not_get_an_invite(self) -> None:
+        empties = (
+            "stand up a Discord",
+            "public invite to the tavern",
+            "help / show / contribute / lounge, no one here yet",
+            "~10 builders, one channel",
+        )
+        for idx, text in enumerate(empties):
+            with self.subTest(text=text):
+                self.assertEqual(tavern_reason(text), EMPTY_TAVERN_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-empty-tavern-{idx}",
+                    facts=(
+                        Fact(text=text),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.DISCORD,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.DISCORD,
+                        claims_ship=False,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=True,
+                    ),
+                    ArenaId.DISCORD,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, EMPTY_TAVERN_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.DISCORD,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.DISCORD].wave,
+                    canon_url=ARENAS[ArenaId.DISCORD].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.DISCORD, text),
+                    (Verdict.KILL, EMPTY_TAVERN_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        living = (
+            "help / show / contribute / lounge",
+            "seed about 10 builders before a public invite",
+        )
+        self.assertTrue(has_tavern_intent_split(living[0]))
+        self.assertTrue(has_tavern_seed(living[1]))
+        self.assertTrue(looks_like_tavern_invite(living[1]))
+        self.assertIsNone(tavern_reason("\n".join(living)))
+        self.assertFalse(has_tavern_intent_split("stand up a Discord"))
+        self.assertFalse(has_tavern_seed("public invite to the tavern"))
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-living-tavern",
+            facts=(
+                Fact(text=living[0]),
+                Fact(text=living[1]),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.DISCORD,
+        )
+        self.assertIsNone(_gate_violation(alive, ArenaId.DISCORD, "\n".join(living)))
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.DISCORD)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "tavern")
+        self.assertIn("help", draft.body.lower())
+        self.assertIn("lounge", draft.body.lower())
+        self.assertIn("10 builders", draft.body.lower())
 
 
 if __name__ == "__main__":
