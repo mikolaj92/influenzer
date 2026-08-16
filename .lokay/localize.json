@@ -1,7 +1,7 @@
 {
   "paths": [
     "influenzer",
-    "influenzer/adapters/spike_scores.json",
+    "influenzer/content.py",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -18,7 +18,6 @@
     "influenzer/catalog.py",
     "influenzer/cli.py",
     "influenzer/config.py",
-    "influenzer/content.py",
     "influenzer/domain.py",
     "influenzer/effector.py",
     "influenzer/envelope.py",
@@ -39,12 +38,13 @@
     "influenzer/security.py",
     "influenzer/storage.py",
     "influenzer/tick.py",
-    "influenzer/tick_all.py"
+    "influenzer/tick_all.py",
+    "influenzer/adapters"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "score",
+    "ten",
     "influenzer"
   ],
   "notes": [
@@ -52,7 +52,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__64-poniedzia-ek-bez-historii-to-cisza-nie-r-8692831f",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__63-formatu-nie-zmieniamy-p-ki-yje-stos-35634870",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

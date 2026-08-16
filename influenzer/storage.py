@@ -21,7 +21,7 @@ from .domain import (
 from .domain import content_hash
 from .hom import Brief, Draft, Score, angle_body_hash, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
-from .playbook import ArenaId, StoryKind, Verdict, is_social_arena
+from .playbook import ArenaId, StoryKind, Verdict, is_social_arena, living_stack_arena as stack_arena_of
 
 
 class StorageError(RuntimeError):
@@ -986,6 +986,14 @@ class StateRepository:
             return None
         last = max(drafts, key=lambda draft: (draft.created_at, draft.draft_id))
         return angle_body_hash(last.body)
+
+    def living_stack_arena(self, project_id: str, now: str | None) -> ArenaId | None:
+        """Open github/hn costume while the 48h window from the first draft lives."""
+        drafts = self.list_operator_drafts(project_id)
+        return stack_arena_of(
+            ((draft.arena, draft.created_at) for draft in drafts),
+            now,
+        )
 
     def persist_operator_decision(
         self,

@@ -7,7 +7,9 @@ This module is the machine-readable copy the plugin applies without freeform vib
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from urllib.parse import parse_qs, urlparse
 
@@ -218,6 +220,155 @@ def parse_arena(value: str | None) -> ArenaId | None:
     if value is None or value == "":
         return None
     return ArenaId(value)
+
+
+# Launch stack: one 24–48h github/hn costume. Pair of #61 (primary) and #26 (window).
+# Next look keeps that costume. Hold or a dead window can change it. Shopping is silence.
+STACK_HOURS = 48
+STACK_ARENAS: frozenset[ArenaId] = frozenset({ArenaId.GITHUB, ArenaId.HN})
+LIVING_STACK_REASON = "living_stack"
+
+
+def is_stack_arena(arena: ArenaId | str | None) -> bool:
+    """True for the github/hn launch pair. Other arenas are not this stack."""
+    if arena is None or arena == "":
+        return False
+    try:
+        key = arena if isinstance(arena, ArenaId) else ArenaId(arena)
+    except ValueError:
+        return False
+    return key in STACK_ARENAS
+
+
+def parse_stack_arena(value: ArenaId | str | None) -> ArenaId | None:
+    if not is_stack_arena(value):
+        return None
+    return value if isinstance(value, ArenaId) else ArenaId(str(value))
+
+
+def parse_stack_clock(value: datetime | str | None) -> datetime | None:
+    """Aware UTC clock. Naive or malformed is unreadable, not a second costume."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return None
+        return value.astimezone(timezone.utc)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def living_stack_arena(
+    entries: Iterable[tuple[ArenaId | str | None, str | None]] | None,
+    now: datetime | str | None,
+) -> ArenaId | None:
+    """Costume of the open github/hn stack while its 48h window lives.
+
+    The window starts at the oldest unheld github/hn draft. Later looks in
+    that stack do not refresh it — one launch, not a week of drip. Hold is
+    the caller's filter. An unreadable clock keeps the stack alive. At
+    exactly 48h the window is dead. A set-back clock is still living.
+    """
+    if not entries:
+        return None
+    found: list[tuple[datetime | None, ArenaId]] = []
+    for arena, created_at in entries:
+        locked = parse_stack_arena(arena)
+        if locked is None:
+            continue
+        found.append((parse_stack_clock(created_at), locked))
+    if not found:
+        return None
+    moment = parse_stack_clock(now)
+    readable = [(created, locked) for created, locked in found if created is not None]
+    # Unreadable now or created_at cannot prove the window is dead.
+    if moment is None or not readable or any(created is None for created, _ in found):
+        if readable:
+            readable.sort(key=lambda item: item[0])
+            return readable[0][1]
+        return found[0][1]
+    readable.sort(key=lambda item: item[0])
+    start, locked = readable[0]
+    if moment < start or moment - start < timedelta(hours=STACK_HOURS):
+        return locked
+    return None
+
+
+def stack_costume_reason(
+    preferred_arena: ArenaId | str | None,
+    stack_arena: ArenaId | str | None,
+) -> str | None:
+    """Explicit other arena while the stack lives is silence, not a new costume."""
+    locked = parse_stack_arena(stack_arena)
+    if locked is None or preferred_arena is None or preferred_arena == "":
+        return None
+    try:
+        wanted = (
+            preferred_arena
+            if isinstance(preferred_arena, ArenaId)
+            else ArenaId(preferred_arena)
+        )
+    except ValueError:
+        return LIVING_STACK_REASON
+    if wanted is not locked:
+        return LIVING_STACK_REASON
+    return None
+
+
+def choose_arena(
+    *,
+    preferred_arena: ArenaId | str | None = None,
+    stack_arena: ArenaId | str | None = None,
+    tryable: bool = False,
+    story_kind: StoryKind | str | None = None,
+    clickable: bool = False,
+    issues_disabled: bool = False,
+    fork: bool = False,
+    empty_repo: bool = False,
+    private_repo: bool = False,
+    archived_repo: bool = False,
+    server_splash: bool = False,
+) -> ArenaId:
+    """One primary arena. A living github/hn stack keeps that costume.
+
+    GitHub is the website. HN only when there is a clickable demo and no
+    stack already chose the other costume. Shopping while the window lives
+    is not a new pick — the caller kills an explicit change; this keeps
+    the locked costume when preferred is empty.
+    """
+    locked = parse_stack_arena(stack_arena)
+    if locked is not None:
+        return locked
+    if preferred_arena is not None and preferred_arena != "":
+        if isinstance(preferred_arena, ArenaId):
+            return preferred_arena
+        return ArenaId(preferred_arena)
+    kind = (
+        story_kind
+        if isinstance(story_kind, StoryKind) or story_kind is None
+        else StoryKind(story_kind)
+    )
+    if (
+        tryable
+        and kind in {StoryKind.MAJOR, StoryKind.HARD_ISSUE}
+        and clickable
+        and not issues_disabled
+        and not fork
+        and not empty_repo
+        and not private_repo
+        and not archived_repo
+        and not server_splash
+    ):
+        return ArenaId.HN
+    return ArenaId.GITHUB
 
 
 # --- Fail-closed tables. First matching gate wins; silence is a correct decision. ---
@@ -2413,6 +2564,7 @@ __all__ = [
     "HN_TITLE_LIMIT",
     "HN_TITLE_PREFIX",
     "LAUNCH_HOSTS",
+    "LIVING_STACK_REASON",
     "LINKEDIN_FOLD",
     "LAUNCH_PITCH_RE",
     "NEGATED_OPEN_SOURCE_RE",
@@ -2455,6 +2607,8 @@ __all__ = [
     "SHIP_ARTIFACT_RE",
     "SHORTENER_HOSTS",
     "SOCIAL_ARENAS",
+    "STACK_ARENAS",
+    "STACK_HOURS",
     "SOURCE_AVAILABLE_LICENSE_RE",
     "STORE_HOSTS",
     "STORE_PITCH_RE",
@@ -2470,6 +2624,7 @@ __all__ = [
     "X_REPLY_LIMIT",
     "arena_gate",
     "arena_play",
+    "choose_arena",
     "feedback_excerpt_texts",
     "has_cinema_package",
     "has_fair_hook",
@@ -2488,6 +2643,7 @@ __all__ = [
     "is_ship_artifact_url",
     "is_shortener_url",
     "is_social_arena",
+    "is_stack_arena",
     "is_store_host_url",
     "is_tryable_artifact_url",
     "invented_metric_reason",
@@ -2553,6 +2709,10 @@ __all__ = [
     "looks_like_prerelease",
     "looks_like_waitlist",
     "parse_arena",
+    "parse_stack_arena",
+    "parse_stack_clock",
+    "living_stack_arena",
+    "stack_costume_reason",
     "quote_without_sourced_excerpt",
     "quoted_spans",
     "strip_open_source_claim",

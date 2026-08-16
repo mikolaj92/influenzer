@@ -25,6 +25,7 @@ from influenzer.playbook import (
     Verdict,
     arena_gate,
     arena_play,
+    choose_arena,
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
@@ -35,6 +36,8 @@ from influenzer.playbook import (
     is_ship_artifact_url,
     is_social_arena,
     is_store_host_url,
+    parse_stack_arena,
+    stack_costume_reason,
     is_tryable_artifact_url,
     is_video_host_url,
     looks_like_bot_bump_week,
@@ -412,23 +415,22 @@ def _fact_triples(brief: Brief) -> tuple[tuple[str, str, str | None], ...]:
     return tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
 
 
-def _choose_arena(brief: Brief) -> ArenaId:
-    """One primary arena. GitHub is the website; HN only when there is a clickable demo."""
-    if brief.preferred_arena is not None:
-        return brief.preferred_arena
-    if (
-        brief.tryable
-        and brief.story_kind in {StoryKind.MAJOR, StoryKind.HARD_ISSUE}
-        and _has_clickable_url(brief)
-        and not looks_like_issues_disabled(_facts_blob(brief))
-        and not looks_like_fork(_facts_blob(brief))
-        and not looks_like_empty_repo(_facts_blob(brief))
-        and not looks_like_private_repo(_facts_blob(brief))
-        and not looks_like_archived_repo(_facts_blob(brief))
-        and not looks_like_server_splash(_facts_blob(brief))
-    ):
-        return ArenaId.HN
-    return ArenaId.GITHUB
+def _choose_arena(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> ArenaId:
+    """One primary arena. A living github/hn stack keeps that costume."""
+    blob = _facts_blob(brief)
+    return choose_arena(
+        preferred_arena=brief.preferred_arena,
+        stack_arena=stack_arena,
+        tryable=brief.tryable,
+        story_kind=brief.story_kind,
+        clickable=_has_clickable_url(brief),
+        issues_disabled=looks_like_issues_disabled(blob),
+        fork=looks_like_fork(blob),
+        empty_repo=looks_like_empty_repo(blob),
+        private_repo=looks_like_private_repo(blob),
+        archived_repo=looks_like_archived_repo(blob),
+        server_splash=looks_like_server_splash(blob),
+    )
 
 
 def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, str] | None:
@@ -495,7 +497,7 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
     return None
 
 
-def score_brief(brief: Brief) -> Score:
+def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Score:
     """Fail-closed speak / silence decision. Borderline briefs do not leak a social draft."""
     if not brief.facts:
         return _kill(brief, "empty_brief")
@@ -608,7 +610,11 @@ def score_brief(brief: Brief) -> Score:
             return _kill(brief, "decision_not_user_facing")
         return _changelog(brief, "decision_not_user_facing")
 
-    chosen = _choose_arena(brief)
+    locked = parse_stack_arena(stack_arena)
+    mismatch = stack_costume_reason(brief.preferred_arena, locked)
+    if mismatch:
+        return _kill(brief, mismatch)
+    chosen = _choose_arena(brief, stack_arena=locked)
     blocked = _gate_violation(brief, chosen, blob)
     if blocked is not None:
         verdict, reason = blocked
@@ -653,8 +659,13 @@ def compose_draft(brief: Brief, score: Score, *, now: str | None = None) -> Draf
     return dress_brief(brief, score, now=now)
 
 
-def apply_brief(brief: Brief, *, now: str | None = None) -> OperatorDecision:
-    score = score_brief(brief)
+def apply_brief(
+    brief: Brief,
+    *,
+    now: str | None = None,
+    stack_arena: ArenaId | str | None = None,
+) -> OperatorDecision:
+    score = score_brief(brief, stack_arena=stack_arena)
     draft = compose_draft(brief, score, now=now)
     return OperatorDecision(brief=brief, score=score, draft=draft)
 
