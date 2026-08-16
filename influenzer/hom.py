@@ -32,6 +32,7 @@ from influenzer.playbook import (
     cafe_reason,
     letter_reason,
     seminar_reason,
+    LETTER_WITHOUT_SURNAME_REASON,
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
@@ -513,6 +514,15 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
             return Verdict.KILL, tavern_fail
     if arena is ArenaId.NEWSLETTER:
         letter_fail = letter_reason(blob)
+        if letter_fail == LETTER_WITHOUT_SURNAME_REASON and looks_like_monday_without_history(
+            story_kind=brief.story_kind,
+            preferred_arena=arena,
+            tryable=brief.tryable,
+            artifact_urls=brief_artifacts(brief),
+            facts=_fact_triples(brief),
+            blob=blob,
+        ):
+            letter_fail = None
         if letter_fail:
             return Verdict.KILL, letter_fail
     if arena is ArenaId.HN:

@@ -2713,6 +2713,7 @@ class HomDraftCostumeTests(unittest.TestCase):
                 Fact(kind="hook", text="hook in 1-3s: brief in, draft out"),
                 Fact(text="last frame into first; rewatch is the signal"),
                 Fact(text="I struggled with timeouts looking like success in r/SideProject"),
+                Fact(text="Mikolaj Nowak"),
             ),
         )
         for arena in ARENAS:

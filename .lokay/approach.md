@@ -1,31 +1,31 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=52 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=51 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #52 — Trwałe Q&A nie idzie w Discord search
+Issue: #51 — List ma imię, bez nazwiska = cisza
 
 ## Goal
 
-Pytanie z feedbacku, które ma żyć (how-to, bug, decyzja) → GitHub (issue/Discussions), nie tawerna. Discord tylko na merge/celebrację. Score nie wybiera discord dla `hard_issue`.
+Newsletter dresses from `BrandProfile` (display_name / maintainer), not “we” / “the team”. One named editor, first and last name. A given name without a surname is silence on the letter. Same fail-closed pattern as #54 (gift first) and #53 (seminar brand voice).
 
 ## Files likely touched
 
-- `tests/test_e2e_gates.py` — lock the existing Discord story-kind gate: `hard_issue` / durable Q&A is GitHub or silence, never a tavern draft.
+- `influenzer/playbook.py` — letter surname / team-voice gate
+- `tests/test_e2e_gates.py` — e2e silence + living named letter
+- `influenzer/hom.py` / `influenzer/hom_draft.py` — already call `letter_reason`; no extra wiring
 
 ## Test plan
 
-- `python -m unittest tests.test_e2e_gates -v`
+- `python -m unittest tests.test_e2e_gates`
 
 ## Non-goals
 
-- No playbook / scorer rewrite: `ARENA_GATES[DISCORD].allowed_story_kinds` is already `{MAJOR}`, so `hard_issue` and `decision` already die with `discord_pre_pmf` even on a living tavern.
-- Do not change `choose_arena` sitting on preferred Discord (same #57 pattern: sit so the gate can fire).
-- Do not publish. Do not go live.
+- Injecting a byline from stored BrandProfile (Brief has no profile; gate reads the wearable copy)
+- Changing newsletter ESP / publish path
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Production already fails closed. The e2e gap was the missing lock that a living tavern still cannot carry how-to / bug / decision.
-- Default `hard_issue` (no preferred arena) drafts the GitHub workshop.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Localization seed was tests-only; sibling gates (#53/#54) live in playbook + dress + e2e.
+- Collector boundary: no unbounded collection.

@@ -1,18 +1,17 @@
 {
   "paths": [
+    "influenzer/playbook.py",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": [
-    "gate"
-  ],
+  "seed_paths": ["tests/test_e2e_gates.py"],
+  "matched_tokens": ["gate", "letter", "newsletter", "BrandProfile"],
   "notes": [
-    "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Agentless-style localization refined after inspection.",
+    "Sibling #53/#54 put the rule in playbook and the e2e in test_e2e_gates.",
+    "hom.py / hom_draft.py already call letter_reason(); no extra wiring."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__52-trwa-e-q-a-nie-idzie-w-discord-search-209ce438",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__51-list-ma-imi-bez-nazwiska-cisza-b98f779c",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

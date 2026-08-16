@@ -27,6 +27,7 @@ from influenzer.playbook import (
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
     LETTER_ASK_WITHOUT_GIFT_REASON,
+    LETTER_WITHOUT_SURNAME_REASON,
     SEMINAR_BRAND_VOICE_REASON,
     Verdict,
     cafe_reason,
@@ -38,6 +39,7 @@ from influenzer.playbook import (
     has_court_insight,
     has_fair_loop,
     has_letter_gift,
+    has_letter_surname,
     has_tavern_intent_split,
     has_tavern_seed,
     has_workshop_life,
@@ -49,6 +51,7 @@ from influenzer.playbook import (
     looks_like_fair_cta,
     looks_like_letter_ask,
     looks_like_letter_crush,
+    looks_like_letter_team_voice,
     looks_like_poll,
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
@@ -856,10 +859,12 @@ class OrderedLiveGateTests(unittest.TestCase):
         gift = "Local tick scores briefs and emits a draft"
         ask = "subscribe if you want the next cut"
         rec = "adjacent tool in the same niche, not a crush"
-        living = (gift, rec, ask)
+        byline = "Mikolaj Nowak"
+        living = (gift, rec, ask, byline)
         self.assertTrue(has_letter_gift(gift))
         self.assertTrue(looks_like_letter_ask(ask))
         self.assertFalse(looks_like_letter_crush(rec))
+        self.assertTrue(has_letter_surname(byline))
         self.assertIsNone(letter_reason("\n".join(living)))
         self.assertFalse(has_letter_gift("subscribe to our list"))
         self.assertFalse(looks_like_letter_ask("follow the README to run the demo"))
@@ -870,13 +875,14 @@ class OrderedLiveGateTests(unittest.TestCase):
                 Fact(text=gift, artifact_url=SHIP_PR),
                 Fact(text=rec),
                 Fact(text=ask),
+                Fact(text=byline),
             ),
             story_kind="major",
             claims_ship=True,
             tryable=True,
             preferred_arena=ArenaId.NEWSLETTER,
         )
-        self.assertIsNone(_gate_violation(alive, ArenaId.NEWSLETTER, "\n".join((gift, rec, ask, SHIP_PR))))
+        self.assertIsNone(_gate_violation(alive, ArenaId.NEWSLETTER, "\n".join((gift, rec, ask, byline, SHIP_PR))))
         score = score_brief(alive)
         self.assertEqual(score.verdict, Verdict.DRAFT)
         self.assertEqual(score.arena, ArenaId.NEWSLETTER)
@@ -885,6 +891,90 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "letter")
         self.assertIn("local tick", draft.body.lower())
         self.assertIn("adjacent", draft.body.lower())
+        self.assertIn("mikolaj nowak", draft.body.lower())
+        self.assertNotIn("Costume:", draft.body)
+
+    def test_letter_without_a_surname_is_silence(self) -> None:
+        nameless = (
+            "we shipped a gift for the list",
+            "the team wrote this week's letter",
+            "From Mikolaj",
+            "signed Mikolaj",
+            "My App weekly letter",
+        )
+        gift = "Local tick scores briefs and emits a draft"
+        rec = "adjacent tool in the same niche, not a crush"
+        for idx, text in enumerate(nameless):
+            with self.subTest(text=text):
+                blob = "\n".join((gift, rec, text))
+                self.assertTrue(has_letter_gift(blob))
+                if text.startswith(("we ", "the team")):
+                    self.assertTrue(looks_like_letter_team_voice(text))
+                self.assertFalse(has_letter_surname(text))
+                self.assertEqual(letter_reason(blob), LETTER_WITHOUT_SURNAME_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-nameless-letter-{idx}",
+                    facts=(
+                        Fact(text=gift, artifact_url=SHIP_PR),
+                        Fact(text=rec),
+                        Fact(text=text),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.NEWSLETTER,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LETTER_WITHOUT_SURNAME_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.NEWSLETTER,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.NEWSLETTER].wave,
+                    canon_url=ARENAS[ArenaId.NEWSLETTER].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.NEWSLETTER, f"{blob}\n{SHIP_PR}"),
+                    (Verdict.KILL, LETTER_WITHOUT_SURNAME_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        self.assertEqual(self.app.brand.display_name, "My App")
+        self.assertEqual(self.builder.brand.display_name, "Mikolaj")
+        self.assertFalse(has_letter_surname(self.app.brand.display_name))
+        self.assertFalse(has_letter_surname(self.builder.brand.display_name))
+        self.assertFalse(has_letter_surname(self.app.brand.maintainer))
+        named = "Mikolaj Nowak"
+        self.assertTrue(has_letter_surname(named))
+        self.assertFalse(looks_like_letter_team_voice(named))
+        signed = Brief.create(
+            project_id=self.builder.project_id,
+            brief_id="b-named-letter",
+            facts=(
+                Fact(text=gift, artifact_url=SHIP_PR),
+                Fact(text=rec),
+                Fact(text=named),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.NEWSLETTER,
+        )
+        self.assertIsNone(_gate_violation(signed, ArenaId.NEWSLETTER, "\n".join((gift, rec, named, SHIP_PR))))
+        score = score_brief(signed)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.NEWSLETTER)
+        draft = compose_draft(signed, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "letter")
+        self.assertIn("mikolaj nowak", draft.body.lower())
+        self.assertNotIn("we ", draft.body.lower())
+        self.assertNotIn("the team", draft.body.lower())
         self.assertNotIn("Costume:", draft.body)
 
     def test_show_hn_brand_voice_is_silence(self) -> None:
