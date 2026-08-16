@@ -26,6 +26,7 @@ from influenzer.playbook import (
     arena_gate,
     arena_play,
     choose_arena,
+    fair_loop_reason,
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
@@ -495,6 +496,12 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, gate.reason
     if gate.require_hook and "hook" not in kinds and not has_fair_hook(blob):
         return Verdict.KILL, gate.reason
+    if gate.require_loop or gate.forbid_cta_with_loop:
+        loop_fail = fair_loop_reason(blob, kinds=kinds)
+        if loop_fail == "fair_missing_loop" and gate.require_loop:
+            return Verdict.KILL, loop_fail
+        if loop_fail == "fair_cta_with_loop" and gate.forbid_cta_with_loop:
+            return Verdict.KILL, loop_fail
     return None
 
 

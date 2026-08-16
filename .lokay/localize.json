@@ -3,19 +3,19 @@
     "influenzer/playbook.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
-    "tests/test_hom_operator.py",
-    "tests/test_hom_draft.py",
-    "tests/test_e2e_gates.py"
+    "tests/test_e2e_gates.py",
+    "tests/test_hom_draft.py"
   ],
-  "source": "deterministic+inspection",
-  "seed_paths": ["tests/test_e2e_gates.py"],
-  "matched_tokens": ["gate"],
+  "source": "deterministic",
+  "seed_paths": [],
+  "matched_tokens": ["Draft", "gate", "shorts", "loop"],
   "notes": [
-    "Agentless-style localization started from tests/test_e2e_gates.py (token gate).",
-    "Inspection refined to the HOM fail-closed path used by #135 contest and #114 bait.",
-    "Poll / this or that / quiz / ankieta is silence, not an angle."
+    "Agentless-style localization: deterministic paths only (no embeddings).",
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137.",
+    "Refined after inspection: Shorts loop/CTA gate lives in playbook + score + dress."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__141-ankieta-nie-jest-k-tem-b006b15c",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__59-p-tla-shorts-ostatnia-klatka-wchodzi-w-p-547c113e",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

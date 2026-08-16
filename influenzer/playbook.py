@@ -1053,6 +1053,40 @@ WEEKLY_UPDATE_RE = re.compile(
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
+# Fair loop is last-frame-into-first / rewatch. A tick loop, event loop,
+# or "one loop per state.db" is not a Shorts cut. Pair of #36 (hook) and
+# #42 (one CTA): here the cut must loop, and loop+ask is silence.
+FAIR_LOOP_RE = re.compile(
+    r"(?i)(?:"
+    r"^\s*loop\s*$|"
+    r"\blast\s+frames?\s+(?:in)?to\s+(?:the\s+)?first\b|"
+    r"\bfirst\s+frames?\s+(?:from|into)\s+(?:the\s+)?last\b|"
+    r"\bostatni[aeą]\s+klatk|"
+    r"\brewatch(?:es|ing)?\b|"
+    r"\b(?:video|shorts?|fair|cut|clip)\s+loops?\b|"
+    r"\bloops?\s+(?:the\s+)?(?:cut|clip|video|short|fair)\b|"
+    r"%\s*viewed|"
+    r"\bviewed\s*>\s*100"
+    r")",
+    re.M,
+)
+# Spine is loop or one ask, not both. Subscribe / link-in-bio / swipe-up
+# on a looping cut is silence. "Follow the README" is product copy.
+FAIR_CTA_RE = re.compile(
+    r"(?i)(?:"
+    r"\bcta\b|"
+    r"\bcall[- ]to[- ]action\b|"
+    r"\bsubscribe\b|"
+    r"\bsubskryb|"
+    r"\blink\s+in\s+bio\b|"
+    r"\bswipe\s+up\b|"
+    r"\bsmash\s+(?:that\s+)?like\b|"
+    r"\bfollow\s+(?:for\s+more|and\s+subscribe)\b|"
+    r"\bone\s+ask\b|"
+    r"\bzapisz\s+si[eę]\b|"
+    r"\bcomment\s+(?:below|for)\b"
+    r")"
+)
 # A quotation mark is not a testimonial. No excerpt with a URL → no quotes.
 # "users love" without a sourced excerpt is invented opinion → silence.
 FEEDBACK_EXCERPT_KINDS: frozenset[str] = frozenset(
@@ -1358,6 +1392,8 @@ class ArenaGate:
     require_subreddit: bool = False
     require_package: bool = False
     require_hook: bool = False
+    require_loop: bool = False
+    forbid_cta_with_loop: bool = False
     forbid_ship_claim: bool = False
     min_facts: int = 0
     allowed_story_kinds: frozenset[StoryKind] | None = None
@@ -1396,6 +1432,8 @@ ARENA_GATES: dict[ArenaId, ArenaGate] = {
     ArenaId.SHORTS: ArenaGate(
         reason="fair_missing_hook",
         require_hook=True,
+        require_loop=True,
+        forbid_cta_with_loop=True,
         allowed_story_kinds=frozenset(
             {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE}
         ),
@@ -2568,6 +2606,28 @@ def has_fair_hook(text: str) -> bool:
     return bool(FAIR_HOOK_RE.search(text))
 
 
+def has_fair_loop(text: str) -> bool:
+    """True when the cut names last-frame-into-first / rewatch. A tick loop is not."""
+    return bool(FAIR_LOOP_RE.search(text))
+
+
+def looks_like_fair_cta(text: str) -> bool:
+    """True for subscribe / link-in-bio / swipe-up / CTA on a fair cut."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(FAIR_CTA_RE.search(cleaned))
+
+
+def fair_loop_reason(text: str, *, kinds: Iterable[str] = ()) -> str | None:
+    """Silence on a fair cut without a loop, or with CTA and loop together."""
+    named = {kind.strip().lower() for kind in kinds if kind and kind.strip()}
+    looped = "loop" in named or has_fair_loop(text)
+    if not looped:
+        return "fair_missing_loop"
+    if looks_like_fair_cta(text):
+        return "fair_cta_with_loop"
+    return None
+
+
 def arena_gate(arena: ArenaId | str) -> ArenaGate:
     key = arena if isinstance(arena, ArenaId) else ArenaId(arena)
     return ARENA_GATES[key]
@@ -2587,6 +2647,9 @@ __all__ = [
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "CONTEST_RE",
+    "FAIR_CTA_RE",
+    "FAIR_HOOK_RE",
+    "FAIR_LOOP_RE",
     "POLL_RE",
     "THREAD_NUMBER_RE",
     "THREAD_WORD_RE",
@@ -2660,8 +2723,10 @@ __all__ = [
     "arena_play",
     "choose_arena",
     "feedback_excerpt_texts",
+    "fair_loop_reason",
     "has_cinema_package",
     "has_fair_hook",
+    "has_fair_loop",
     "has_monday_history",
     "has_named_subreddit",
     "has_quote_mark",
@@ -2697,6 +2762,7 @@ __all__ = [
     "looks_like_ranking_dump",
     "looks_like_thread",
     "looks_like_engagement_bait",
+    "looks_like_fair_cta",
     "looks_like_hashtag_wall",
     "looks_like_hire_fundraise",
     "looks_like_license_file",
