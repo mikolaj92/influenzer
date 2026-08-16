@@ -1078,16 +1078,16 @@ WEEKLY_UPDATE_RE = re.compile(
 # issue, or life after the spike is changelog, not a launch. Workshop
 # scores usage, not a corpse on the wall.
 DEAD_STAR_COUNT_REASON = "dead_star_count"
-_STAR_TOTAL = r"(?:n|\d{1,3}(?:,\d{3})*(?:\.\d+)?[kmb]?)"
+_STAR_TOTAL = r"(?:n|\d{1,3}(?:,\d{3})+|(?:\d+))(?:\.\d+)?[kmb]?"
 DEAD_STAR_COUNT_RE = re.compile(
     r"(?i)(?:"
-    rf"\b{_STAR_TOTAL}\s*\u2605|"
+    rf"\b{_STAR_TOTAL}\s*[\u2605\u2b50]|"
     rf"\b{_STAR_TOTAL}\s*stars?\b|"
     rf"\b{_STAR_TOTAL}\s*gwiazd(?:ek|ki|ka|k\u0105)?\b|"
     r"\b(?:github\s+)?stars?\s*[:=]\s*(?:n|\d)|"
     r"\bstargazers?\s*[:=]\s*(?:n|\d)|"
     r"\b(?:total|lifetime|dead)\s+stars?\b|"
-    r"\bdead\s+(?:\d+[kmb]?\s*)?\u2605|"
+    r"\bdead\s+(?:\d+[kmb]?\s*)?[\u2605\u2b50]|"
     r"\bmartw[eyaie]+\s+gwiazd|"
     r"\bstar\s+ranking\b|"
     r"\branking\s+(?:gwiazdek|gwiazd|stars?)\b|"
@@ -2112,6 +2112,13 @@ def has_workshop_life(text: str) -> bool:
     if _is_readme_install_fact(text):
         return False
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    # "ranking without installs" is a corpse, not usage.
+    cleaned = re.sub(
+        r"(?i)\b(?:without|no|bez|brak)\s+(?:an?\s+|any\s+)?"
+        r"(?:install(?:s|ed|ation|ing)?|instalacj\w*|issue(?:s)?)\b",
+        " ",
+        cleaned,
+    )
     return bool(WORKSHOP_LIFE_RE.search(cleaned))
 
 
@@ -2915,6 +2922,9 @@ __all__ = [
     "LISTICLE_TITLE_RE",
     "DEAD_LINK_RE",
     "DEAD_RELEASE_ASSET_RE",
+    "DEAD_STAR_COUNT_RE",
+    "DEAD_STAR_COUNT_REASON",
+    "WORKSHOP_LIFE_RE",
     "ISSUES_DISABLED_RE",
     "FORK_RE",
     "EMPTY_REPO_RE",
@@ -2975,6 +2985,7 @@ __all__ = [
     "has_real_feedback",
     "has_tavern_intent_split",
     "has_tavern_seed",
+    "has_workshop_life",
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
@@ -3041,6 +3052,8 @@ __all__ = [
     "looks_like_launch_pitch",
     "looks_like_dead_link",
     "looks_like_dead_release_asset",
+    "looks_like_dead_star_count",
+    "looks_like_dead_star_story",
     "looks_like_issues_disabled",
     "looks_like_fork",
     "looks_like_empty_repo",

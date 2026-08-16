@@ -62,6 +62,7 @@ from influenzer.playbook import (
     looks_like_x_overflow,
     show_hn_title_text,
     looks_like_bot_bump_week,
+    looks_like_dead_star_story,
     looks_like_monday_without_history,
     looks_like_contest,
     looks_like_poll,
@@ -279,6 +280,10 @@ def _merge_log_bits(bits: CopyBits) -> bool:
 
 def _bot_bump_week_bits(bits: CopyBits) -> bool:
     return looks_like_bot_bump_week((bits.one_liner, *bits.rest))
+
+
+def _dead_star_story_bits(bits: CopyBits) -> bool:
+    return looks_like_dead_star_story((bits.one_liner, *bits.rest))
 
 
 def _body_or_none(body: str) -> str | None:
@@ -576,6 +581,11 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             kinds=tuple(fact.kind for fact in brief.facts),
         )
         or _bot_bump_week_bits(bits)
+        or looks_like_dead_star_story(
+            tuple(fact.text for fact in brief.facts),
+            kinds=tuple(fact.kind for fact in brief.facts),
+        )
+        or _dead_star_story_bits(bits)
         or looks_like_monday_without_history(
             story_kind=brief.story_kind,
             preferred_arena=score.arena or brief.preferred_arena,
