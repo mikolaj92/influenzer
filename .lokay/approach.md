@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=62 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=61 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #62 — Rytm CMO to poniedziałek, nie toczące się 7 dni
+Issue: #61 — Nie gramy w arenę, której nie umiemy obstawić
 
 ## Goal
 
-Rytm CMO to poniedziałek (Europe/Warsaw), nie toczące się 7 dni. Look (scan-due / pass gdy pora) w inne dni milczy społecznie; tick może score’ować. Środa bo minęło 168h to nie ten rytm.
+Nie gramy w arenę, której nie umiemy obstawić. Feedback dziś jest z GitHuba (i obóz HN). Primary kąt = github albo hn. X/LI/YT/shorts/discord/bsky bez słuchacza nie są pierwszym kostiumem — cisza albo changelog. Ship idzie tam, gdzie siedzimy.
 
 ## Files likely touched
 
