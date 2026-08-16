@@ -63,6 +63,7 @@ from influenzer.playbook import (
     looks_like_issues_disabled,
     looks_like_fork,
     looks_like_empty_repo,
+    looks_like_private_repo,
     looks_like_archived_repo,
     looks_like_login_gate,
     looks_like_shortener,
@@ -418,6 +419,7 @@ def _choose_arena(brief: Brief) -> ArenaId:
         and not looks_like_issues_disabled(_facts_blob(brief))
         and not looks_like_fork(_facts_blob(brief))
         and not looks_like_empty_repo(_facts_blob(brief))
+        and not looks_like_private_repo(_facts_blob(brief))
         and not looks_like_archived_repo(_facts_blob(brief))
         and not looks_like_server_splash(_facts_blob(brief))
     ):
@@ -453,6 +455,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "fork_not_a_site"
     if looks_like_empty_repo(blob):
         return Verdict.KILL, "empty_repo_not_a_site"
+    if looks_like_private_repo(blob):
+        return Verdict.KILL, "private_repo"
     if looks_like_archived_repo(blob):
         return Verdict.KILL, "archived_repo"
     if looks_like_server_splash(blob):
@@ -545,6 +549,8 @@ def score_brief(brief: Brief) -> Score:
         return _kill(brief, "fork_not_a_site")
     if looks_like_empty_repo(blob):
         return _kill(brief, "empty_repo_not_a_site")
+    if looks_like_private_repo(blob):
+        return _kill(brief, "private_repo")
     if looks_like_archived_repo(blob):
         return _kill(brief, "archived_repo")
     if looks_like_server_splash(blob):

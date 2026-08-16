@@ -94,6 +94,14 @@ class SurveySilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "private_repo")
 
+    def test_private_repo_is_silence_even_with_a_ship_window(self) -> None:
+        out = self._survey(ship_script(repo=GhCall(0, repo_json(private=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "private_repo")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+        self.assertNotIn("brief_id", out)
+
     def test_archived_repo_is_silence_even_with_a_ship_window(self) -> None:
         out = self._survey(ship_script(repo=GhCall(0, repo_json(archived=True))))
         self.assertEqual(out["status"], "noop")

@@ -1,32 +1,38 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=75 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=74 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #75 — Zarchiwizowane repo jest martwe, nie launchujemy muzeum
+Issue: #74 — Prywatne repo nie jest witryną
 
 ## Goal
 
-Zarchiwizowane albo disabled repo jest martwe. Watch na archived → look milczy. Nie launchujemy muzeum.
+Prywatne repo nie jest witryną. Watch na private → look milczy (nawet gdy owner nasz). Warsztat to publiczny README. Survey i tak public — tu fail-closed na watch, nie 404 w pętli.
 
 ## Files likely touched
 
-- `github_survey/survey.py` — fail-closed on `isArchived` / disabled meta before a look is a feast
-- `influenzer/brief_scan.py`, `influenzer/brief_admit.py`, `influenzer/hom_feedback.py` — watch/scan/admit stay silent
-- `influenzer/playbook.py`, `influenzer/hom.py`, `influenzer/hom_draft.py` — kill / undress a museum launch
+- `influenzer/playbook.py` — `looks_like_private_repo` + workshop/HN copy
+- `influenzer/brief_scan.py` — `repo_is_private` before survey, payload gate
+- `influenzer/brief_admit.py` / `influenzer/hom_feedback.py` — admit silence
+- `influenzer/hom.py` / `influenzer/hom_draft.py` — score/dress kill
+- `github_survey/survey.py` — keep `private_repo` fail-closed (visibility too)
+- READMEs — workshop is a public README
 
 ## Test plan
 
-- `tests/test_github_survey.py`, `tests/test_brief_admit.py`, `tests/test_hom_feedback.py`
-- `tests/test_hom_operator.py`, `tests/test_hom_draft.py`
+- `tests/test_brief_admit.py` private look/pack
+- `tests/test_hom_feedback.py` private look
+- `tests/test_hom_operator.py` detector + kill
+- `tests/test_hom_draft.py` undressable
+- `tests/test_github_survey.py` private survey
 
 ## Non-goals
 
-- Do not start a collection job. Do not launch, publish, or clone.
+- Do not start a 404 retry loop.
+- Do not treat owner-is-ours as an exception.
+- Do not expand survey beyond public GitHub.
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Same fail-closed shape as #90 fork, #89 empty, #75 archived.
+- Survey already returned `private_repo`; watch/look/score/dress now match.

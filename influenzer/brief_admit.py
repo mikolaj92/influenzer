@@ -31,6 +31,7 @@ from influenzer.playbook import (
     looks_like_failed_ci,
     looks_like_fork,
     looks_like_pending_ci,
+    looks_like_private_repo,
 )
 from influenzer.storage import StateRepository, StorageError
 
@@ -110,6 +111,8 @@ def admit_pack(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if bool(payload.get("isEmpty")) or looks_like_empty_repo(fact_blob):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if bool(payload.get("isPrivate")) or looks_like_private_repo(fact_blob):
+        return host_silence("private_repo", project_id=project_id, repo_slug=slug)
     if (
         bool(payload.get("isArchived"))
         or bool(payload.get("isDisabled"))

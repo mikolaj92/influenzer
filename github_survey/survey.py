@@ -9,6 +9,9 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
+A private repo is not a website. isPrivate is silence, even when the
+owner is ours. Watch on private is silence, not a 404 loop. Workshop
+is a public README.
 An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
@@ -517,7 +520,8 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, reason
     if not isinstance(meta, dict):
         return None, "empty_survey"
-    if bool(meta.get("isPrivate")):
+    visibility = str(meta.get("visibility") or "").strip().casefold()
+    if bool(meta.get("isPrivate")) or visibility == "private":
         return None, "private_repo"
     if _repo_is_dead(meta):
         return None, "archived_repo"

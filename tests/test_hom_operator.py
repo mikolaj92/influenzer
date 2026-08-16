@@ -59,6 +59,7 @@ from influenzer.playbook import (
     looks_like_issues_disabled,
     looks_like_fork,
     looks_like_empty_repo,
+    looks_like_private_repo,
     looks_like_archived_repo,
     looks_like_login_gate,
     looks_like_shortener,
@@ -983,6 +984,36 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_archived_repo(text))
+
+    def test_private_repo_is_not_a_website(self) -> None:
+        locks = (
+            "isPrivate: true",
+            "is_private: true",
+            "visibility: private",
+            "this repo is private",
+            "this repository is private",
+            "private github repo",
+            "private repo",
+            "repo is private",
+            "prywatne repo",
+        )
+        for text in locks:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_private_repo(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "isPrivate: false",
+            "is_private: false",
+            "visibility: public",
+            "privacy-first local operator",
+            "private keys stay on the machine",
+            "HTTP 200 on the demo",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_private_repo(text))
 
     def test_empty_repo_is_not_a_website(self) -> None:
         blanks = (
@@ -1927,6 +1958,28 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_private_repo_is_killed_even_when_owner_is_ours(self) -> None:
+        locks = (
+            "isPrivate: true",
+            "this repo is private",
+            "visibility: private",
+            "prywatne repo",
+        )
+        for text in locks:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.GITHUB,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "private_repo")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_empty_repo_is_killed_even_when_a_release_exists(self) -> None:
         blanks = (
             "isEmpty: true",
@@ -1990,6 +2043,19 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="we archive old logs each night"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_product_copy_without_private_repo_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="privacy-first local operator"),
             ),
         )
         score = score_brief(brief)

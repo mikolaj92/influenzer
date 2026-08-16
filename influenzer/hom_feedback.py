@@ -25,6 +25,9 @@ A fork is not a website. isFork is silence, even when the owner is ours.
 Helping upstream is silence here, not our launch.
 An empty repo is not a website. No tree or no README is silence. This is
 not README-without-a-GIF: here there is not even a card.
+A private repo is not a website. isPrivate is silence, even when the
+owner is ours. Watch on private is silence, not a 404 loop. Workshop
+is a public README.
 An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
 """
@@ -43,13 +46,19 @@ from github_survey import GhRunner, invalid_repo_reason
 from github_survey.survey import look_bytes_over_limit, look_declared_gh, state_bytes_over_limit
 
 from influenzer.brief_admit import already_told, open_story_reason
-from influenzer.brief_scan import repo_is_archived, repo_is_empty, repo_is_fork
+from influenzer.brief_scan import repo_is_archived, repo_is_empty, repo_is_fork, repo_is_private
 from influenzer.config import load_config
 from influenzer.domain import utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping
-from influenzer.playbook import StoryKind, looks_like_archived_repo, looks_like_empty_repo, looks_like_fork
+from influenzer.playbook import (
+    StoryKind,
+    looks_like_archived_repo,
+    looks_like_empty_repo,
+    looks_like_fork,
+    looks_like_private_repo,
+)
 from influenzer.storage import StateRepository, StorageError
 
 SOURCE = "github-feedback"
@@ -100,6 +109,8 @@ def admit_feedback(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if bool(payload.get("isEmpty")):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if bool(payload.get("isPrivate")):
+        return host_silence("private_repo", project_id=project_id, repo_slug=slug)
     if bool(payload.get("isArchived")) or bool(payload.get("isDisabled")):
         return host_silence("archived_repo", project_id=project_id, repo_slug=slug)
     blocked = open_story_reason(repo, project_id)
@@ -117,6 +128,8 @@ def admit_feedback(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if looks_like_empty_repo(fact_blob):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if looks_like_private_repo(fact_blob):
+        return host_silence("private_repo", project_id=project_id, repo_slug=slug)
     if looks_like_archived_repo(fact_blob):
         return host_silence("archived_repo", project_id=project_id, repo_slug=slug)
     brief_id = str(payload.get("brief_id") or "")
@@ -186,6 +199,8 @@ def collect_and_admit(
         return host_silence("fork_not_a_site", project_id=pid, repo_slug=slug)
     if repo_is_empty(inner, slug):
         return host_silence("empty_repo_not_a_site", project_id=pid, repo_slug=slug)
+    if repo_is_private(inner, slug):
+        return host_silence("private_repo", project_id=pid, repo_slug=slug)
     if repo_is_archived(inner, slug):
         return host_silence("archived_repo", project_id=pid, repo_slug=slug)
     try:

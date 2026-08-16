@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. An archived or disabled repo is dead. Do not launch a museum. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no archived repo, no disabled repo, no museum launch, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -626,6 +626,22 @@ EMPTY_REPO_RE = re.compile(
     r"|\bnie\s+ma\s+nawet\s+kartk"
     r"|\bdiskUsage\"?\s*[:=]\s*\"?0\b"
     r"|\bdisk_usage\"?\s*[:=]\s*\"?0\b"
+    r")"
+)
+# A private repo is not a website. isPrivate, even when the owner is ours,
+# is silence. Watch on private is silence, not a 404 loop. Survey is
+# already public; this is fail-closed on watch. Workshop is a public
+# README. Pair of #73 (watch only our repo) and #48 (README without a demo).
+# A living public repo stays; a locked tree does not.
+PRIVATE_REPO_RE = re.compile(
+    r"(?i)(?:"
+    r"\bisPrivate\"?\s*[:=]\s*\"?true\b"
+    r"|\bis_private\"?\s*[:=]\s*\"?true\b"
+    r"|\bvisibility\"?\s*[:=]\s*\"?private\b"
+    r"|\bthis\s+(?:repo(?:sitory)?|project)\s+is\s+private\b"
+    r"|\bprivate\s+(?:git(?:hub)?\s+)?repo(?:sitory)?\b"
+    r"|\brepo(?:sitory)?\s+is\s+private\b"
+    r"|\bprywatn[aey]\s+repo"
     r")"
 )
 # A template repo is not a product. isTemplate, or generate-from-template
@@ -1574,6 +1590,13 @@ def looks_like_empty_repo(text: str) -> bool:
     return bool(EMPTY_REPO_RE.search(text))
 
 
+def looks_like_private_repo(text: str) -> bool:
+    """True when the repo is private. A locked tree is not a website."""
+    if not text or not text.strip():
+        return False
+    return bool(PRIVATE_REPO_RE.search(text))
+
+
 def looks_like_template(text: str) -> bool:
     """True for isTemplate / generate-from-template / boilerplate. A template is not a product."""
     if not text or not text.strip():
@@ -2153,6 +2176,7 @@ __all__ = [
     "ISSUES_DISABLED_RE",
     "FORK_RE",
     "EMPTY_REPO_RE",
+    "PRIVATE_REPO_RE",
     "TEMPLATE_RE",
     "ARCHIVED_REPO_RE",
     "LOGIN_GATE_RE",
@@ -2251,6 +2275,7 @@ __all__ = [
     "looks_like_issues_disabled",
     "looks_like_fork",
     "looks_like_empty_repo",
+    "looks_like_private_repo",
     "looks_like_template",
     "looks_like_archived_repo",
     "looks_like_login_gate",
