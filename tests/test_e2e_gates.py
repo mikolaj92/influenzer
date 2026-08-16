@@ -7,7 +7,7 @@ from pathlib import Path
 from influenzer.adapters.base import AdapterRequest
 from influenzer.config import Config
 from influenzer.content import create_revision, persist_revision
-from influenzer.hom import Brief, Fact, compose_draft, score_brief
+from influenzer.hom import Brief, Fact, Score, _gate_violation, compose_draft, score_brief
 from influenzer.domain import (
     AccountStatus,
     AttemptStatus,
@@ -19,7 +19,16 @@ from influenzer.domain import (
     PublishPlan,
     PlanStatus,
 )
-from influenzer.playbook import Verdict, looks_like_poll, unquotable_reason
+from influenzer.playbook import (
+    ARENAS,
+    ArenaId,
+    Verdict,
+    fair_loop_reason,
+    has_fair_loop,
+    looks_like_fair_cta,
+    looks_like_poll,
+    unquotable_reason,
+)
 from influenzer.scheduler import DueWork, tick
 from influenzer.storage import StateRepository
 
@@ -223,6 +232,112 @@ class OrderedLiveGateTests(unittest.TestCase):
                 self.assertEqual(score.reason, "poll")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_shorts_without_loop_or_with_cta_and_loop_is_silence(self) -> None:
+        missing = (
+            "hook in 1-3s: brief in, draft out",
+            "first 3s: picture plus voice plus text",
+        )
+        for idx, text in enumerate(missing):
+            with self.subTest(text=text):
+                self.assertFalse(has_fair_loop(text))
+                self.assertEqual(fair_loop_reason(text), "fair_missing_loop")
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-noloop-{idx}",
+                    facts=(
+                        Fact(kind="hook", text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.SHORTS,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+                    canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.SHORTS, "\n".join((text, "hook"))),
+                    (Verdict.KILL, "fair_missing_loop"),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        both = (
+            "last frame into first, then subscribe",
+            "rewatch the cut — link in bio",
+            "ostatnia klatka w pierwszą i CTA",
+        )
+        for idx, text in enumerate(both):
+            with self.subTest(text=text):
+                self.assertTrue(has_fair_loop(text))
+                self.assertTrue(looks_like_fair_cta(text))
+                self.assertEqual(fair_loop_reason(text), "fair_cta_with_loop")
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-both-{idx}",
+                    facts=(
+                        Fact(kind="hook", text="hook in 1-3s: brief in, draft out", artifact_url=SHIP_PR),
+                        Fact(text=text),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.SHORTS,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+                    canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.SHORTS, "\n".join(("hook", text))),
+                    (Verdict.KILL, "fair_cta_with_loop"),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        looped = "last frame into first; rewatch is the signal"
+        self.assertTrue(has_fair_loop(looped))
+        self.assertFalse(looks_like_fair_cta(looped))
+        self.assertIsNone(fair_loop_reason(looped))
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-loop",
+            facts=(
+                Fact(kind="hook", text="hook in 1-3s: brief in, draft out", artifact_url=SHIP_PR),
+                Fact(text=looped),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        leaked = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.SHORTS,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+            canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+        )
+        self.assertIsNone(_gate_violation(brief, ArenaId.SHORTS, "\n".join(("hook", looped))))
+        draft = compose_draft(brief, leaked)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.SHORTS)
+        self.assertIn("hook in 1-3s", draft.body)
+        self.assertNotIn("subscribe", draft.body.lower())
+        self.assertNotIn("cta", draft.body.lower())
+        self.assertFalse(has_fair_loop("one loop per state.db"))
+        self.assertFalse(has_fair_loop("event loop"))
+        self.assertFalse(looks_like_fair_cta("follow the README to run the demo"))
 
 
 if __name__ == "__main__":

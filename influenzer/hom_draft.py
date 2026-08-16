@@ -40,9 +40,12 @@ from influenzer.playbook import (
     ArenaId,
     Verdict,
     arena_play,
+    fair_loop_reason,
     has_cinema_package,
     has_fair_hook,
+    has_fair_loop,
     has_named_subreddit,
+    looks_like_fair_cta,
     is_blog_host_url,
     is_launch_host_url,
     is_merge_log_texts,
@@ -128,6 +131,7 @@ class CopyBits:
     subreddit: str | None
     package_text: str | None
     hook_text: str | None
+    loop_text: str | None
     blob: str
 
 
@@ -178,6 +182,7 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
     texts: list[str] = []
     package_text: str | None = None
     hook_text: str | None = None
+    loop_text: str | None = None
     subreddit: str | None = None
     evidence = "\n".join(
         part
@@ -200,6 +205,8 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
             package_text = wearable
         if kind == "hook" or (hook_text is None and has_fair_hook(wearable)):
             hook_text = wearable
+        if kind == "loop" or (loop_text is None and has_fair_loop(wearable)):
+            loop_text = wearable
         found_room = _SUBREDDIT_RE.search(wearable)
         if kind == "subreddit" or (subreddit is None and found_room):
             subreddit = found_room.group(0) if found_room else wearable
@@ -224,6 +231,7 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
         subreddit=subreddit,
         package_text=package_text,
         hook_text=hook_text,
+        loop_text=loop_text,
         blob=blob,
     )
 
@@ -420,15 +428,26 @@ def _dress_youtube(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_shorts(bits: CopyBits, score: Score) -> str | None:
-    """Fair: hook in the first line, then one beat. Not an essay."""
+    """Fair: hook, then the loop beat. Missing loop or CTA+loop is silence."""
+    if fair_loop_reason(bits.blob):
+        return None
     hook = bits.hook_text or bits.one_liner
     if not hook:
         return None
-    pay = next((text for text in (bits.one_liner, *bits.rest) if text != hook), "")
+    loop = bits.loop_text if bits.loop_text and bits.loop_text != hook else ""
+    pay = next(
+        (text for text in (bits.one_liner, *bits.rest) if text not in {hook, loop}),
+        "",
+    )
     parts = [_clip(hook, 120)]
-    if pay:
+    if loop:
+        parts.extend(["", _clip(loop, 160)])
+    elif pay:
         parts.extend(["", _clip(pay, 160)])
-    return _body_or_none("\n".join(parts))
+    body = _body_or_none("\n".join(parts))
+    if body is None or looks_like_fair_cta(body):
+        return None
+    return body
 
 
 def _dress_reddit(bits: CopyBits, score: Score) -> str | None:

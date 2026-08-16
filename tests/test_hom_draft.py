@@ -2481,6 +2481,121 @@ class HomDraftCostumeTests(unittest.TestCase):
         )
         self.assertIsNone(dress_brief(brief, fake))
 
+    def test_shorts_without_loop_is_undressable_even_when_score_says_draft(self) -> None:
+        missing = (
+            "hook in 1-3s: brief in, draft out",
+            "first 3s: picture plus voice plus text",
+        )
+        for text in missing:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(kind="hook", text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.SHORTS,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+                    canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "shorts",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.SHORTS].wave),
+                            "canon_url": ARENAS[ArenaId.SHORTS].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("hook in 1-3s", dumped)
+                self.assertNotIn("first 3s", dumped)
+
+    def test_shorts_cta_and_loop_together_is_undressable_even_when_score_says_draft(self) -> None:
+        both = (
+            "last frame into first, then subscribe",
+            "rewatch the cut — link in bio",
+            "ostatnia klatka w pierwszą i CTA",
+        )
+        for text in both:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(kind="hook", text="hook in 1-3s: brief in, draft out", artifact_url=SHIP_PR),
+                        Fact(text=text),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.SHORTS,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+                    canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "shorts",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.SHORTS].wave),
+                            "canon_url": ARENAS[ArenaId.SHORTS].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("subscribe", dumped.lower())
+                self.assertNotIn("link in bio", dumped.lower())
+                self.assertNotIn("CTA", dumped)
+
+    def test_shorts_loop_without_cta_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.SHORTS,
+            facts=(
+                Fact(kind="hook", text="hook in 1-3s: brief in, draft out", artifact_url=SHIP_PR),
+                Fact(text="last frame into first; rewatch is the signal"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.SHORTS,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+            canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+        )
+        draft = dress_brief(brief, fake)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.SHORTS)
+        self.assertEqual(draft.costume, "fair")
+        self.assertIn("hook in 1-3s", draft.body)
+        self.assertIn("last frame into first", draft.body)
+        self.assertNotIn("subscribe", draft.body.lower())
+        self.assertNotIn("cta", draft.body.lower())
+        self.assertNotIn("Costume:", draft.body)
+
     def test_every_arena_dresser_refuses_the_label_dump(self) -> None:
         from influenzer.hom_draft import _DRESSERS, _FORBIDDEN_IN_BODY
 
@@ -2491,6 +2606,7 @@ class HomDraftCostumeTests(unittest.TestCase):
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(kind="package", text="title plus thumb in 0.5s: one-angle operator tick"),
                 Fact(kind="hook", text="hook in 1-3s: brief in, draft out"),
+                Fact(text="last frame into first; rewatch is the signal"),
                 Fact(text="I struggled with timeouts looking like success in r/SideProject"),
             ),
         )
