@@ -51,7 +51,11 @@ def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
     outcomes: list[dict[str, Any]] = []
     for brief in repo.list_pending_briefs():
         decision = drop_repeat_angle(
-            apply_brief(brief, now=now),
+            apply_brief(
+                brief,
+                now=now,
+                stack_arena=repo.living_stack_arena(brief.project_id, now),
+            ),
             repo.last_angle_body_hash(brief.project_id),
         )
         revision = None

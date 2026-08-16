@@ -26,10 +26,16 @@ from influenzer.hom import (
 from influenzer.playbook import (
     ARENAS,
     CANON_URL,
+    LIVING_STACK_REASON,
     SOCIAL_ARENAS,
+    STACK_ARENAS,
+    STACK_HOURS,
     ArenaId,
     StoryKind,
     Verdict,
+    choose_arena,
+    living_stack_arena,
+    stack_costume_reason,
     is_blog_host_url,
     is_launch_host_url,
     is_news_host_url,
@@ -127,6 +133,68 @@ class PlaybookCopyTests(unittest.TestCase):
                 self.assertGreaterEqual(len(play.wave), 3)
                 self.assertTrue(play.canon_url.startswith(CANON_URL))
                 self.assertNotIn("champion", play.game.lower())
+
+    def test_stack_is_github_and_hn_for_forty_eight_hours(self) -> None:
+        self.assertEqual(STACK_HOURS, 48)
+        self.assertEqual(STACK_ARENAS, frozenset({ArenaId.GITHUB, ArenaId.HN}))
+        self.assertEqual(LIVING_STACK_REASON, "living_stack")
+
+    def test_choose_arena_keeps_living_github_or_hn_costume(self) -> None:
+        self.assertEqual(
+            choose_arena(stack_arena=ArenaId.GITHUB, tryable=True, story_kind=StoryKind.MAJOR, clickable=True),
+            ArenaId.GITHUB,
+        )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.HN,
+                stack_arena=ArenaId.GITHUB,
+                tryable=True,
+                story_kind=StoryKind.MAJOR,
+                clickable=True,
+            ),
+            ArenaId.GITHUB,
+        )
+        self.assertEqual(
+            choose_arena(tryable=True, story_kind=StoryKind.MAJOR, clickable=True),
+            ArenaId.HN,
+        )
+        self.assertEqual(choose_arena(tryable=False, story_kind=StoryKind.MAJOR), ArenaId.GITHUB)
+        self.assertEqual(
+            living_stack_arena(((ArenaId.HN, "2026-08-13T05:00:00Z"),), "2026-08-14T04:59:59Z"),
+            ArenaId.HN,
+        )
+        self.assertIsNone(
+            living_stack_arena(((ArenaId.HN, "2026-08-13T05:00:00Z"),), "2026-08-15T05:00:00Z")
+        )
+        self.assertIsNone(
+            living_stack_arena(
+                (
+                    (ArenaId.GITHUB, "2026-08-13T05:00:00Z"),
+                    (ArenaId.GITHUB, "2026-08-14T04:00:00Z"),
+                ),
+                "2026-08-15T05:00:00Z",
+            )
+        )
+        self.assertEqual(
+            living_stack_arena(((ArenaId.HN, "not-a-clock"),), "2026-08-20T05:00:00Z"),
+            ArenaId.HN,
+        )
+        self.assertEqual(
+            living_stack_arena(
+                (
+                    (ArenaId.GITHUB, "not-a-clock"),
+                    (ArenaId.GITHUB, "2026-08-13T05:00:00Z"),
+                ),
+                "2026-08-20T05:00:00Z",
+            ),
+            ArenaId.GITHUB,
+        )
+        self.assertEqual(
+            stack_costume_reason(ArenaId.X, ArenaId.HN),
+            LIVING_STACK_REASON,
+        )
+        self.assertIsNone(stack_costume_reason(ArenaId.HN, ArenaId.HN))
+        self.assertIsNone(stack_costume_reason(None, ArenaId.HN))
 
     def test_ship_artifact_accepts_repo_pr_issue_release(self) -> None:
         self.assertTrue(is_ship_artifact(SHIP_PR))
@@ -1673,6 +1741,29 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "discord_pre_pmf")
+
+    def test_living_stack_keeps_github_costume_on_the_next_look(self) -> None:
+        brief = self._brief()
+        decision = apply_brief(brief, now="2026-08-13T06:00:00Z", stack_arena=ArenaId.GITHUB)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.GITHUB)
+        assert decision.draft is not None
+        self.assertEqual(decision.draft.costume, "workshop")
+        self.assertFalse(decision.draft.body.lstrip().startswith("Show HN:"))
+
+    def test_shopping_another_arena_while_the_stack_lives_is_silence(self) -> None:
+        brief = self._brief(preferred_arena=ArenaId.X)
+        score = score_brief(brief, stack_arena=ArenaId.HN)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_same_github_or_hn_costume_on_a_living_stack_is_kept(self) -> None:
+        brief = self._brief(preferred_arena=ArenaId.HN)
+        score = score_brief(brief, stack_arena=ArenaId.HN)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
 
     def test_major_tryable_ship_drafts_one_hn_arena(self) -> None:
         brief = self._brief(
@@ -3630,6 +3721,126 @@ class TickBriefPathTests(unittest.TestCase):
         self.assertEqual(again["operator"]["processed"], 0)
         drafts = list(self.repo.conn.execute("SELECT draft_id FROM operator_drafts"))
         self.assertEqual(len(drafts), 1)
+
+    def test_next_look_in_a_living_stack_keeps_the_github_or_hn_costume(self) -> None:
+        first = Brief.create(
+            project_id="app-1",
+            brief_id="stack-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        self.repo.save_brief(first)
+        first_out = tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
+        self.assertEqual(first_out["operator"]["outcomes"][0]["arena"], "github")
+        self.assertEqual(self.repo.living_stack_arena("app-1", "2026-08-14T04:59:59Z"), ArenaId.GITHUB)
+        self.assertIsNone(self.repo.living_stack_arena("app-1", "2026-08-15T05:00:00Z"))
+
+        next_look = Brief.create(
+            project_id="app-1",
+            brief_id="stack-2",
+            facts=(
+                Fact(
+                    text="a stranger can click and run the demo from the README",
+                    artifact_url=SHIP_PR,
+                ),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(next_look)
+        again = tick(self.repo, self.cfg, due=(), now="2026-08-14T04:00:00Z")
+        outcome = again["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "draft")
+        self.assertEqual(outcome["arena"], "github")
+        second = self.repo.get_operator_draft("app-1", "stack-2")
+        assert second is not None
+        self.assertEqual(second.arena, ArenaId.GITHUB)
+        self.assertEqual(second.costume, "workshop")
+        self.assertFalse(second.body.lstrip().startswith("Show HN:"))
+
+        shop = Brief.create(
+            project_id="app-1",
+            brief_id="stack-3",
+            facts=(
+                Fact(
+                    text="dry-run still default and strangers can try it",
+                    artifact_url=SHIP_PR,
+                ),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.X,
+        )
+        self.repo.save_brief(shop)
+        silenced = tick(self.repo, self.cfg, due=(), now="2026-08-14T04:30:00Z")
+        shop_out = silenced["operator"]["outcomes"][0]
+        self.assertEqual(shop_out["verdict"], "kill")
+        self.assertEqual(shop_out["reason"], LIVING_STACK_REASON)
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "stack-3"))
+
+        after = Brief.create(
+            project_id="app-1",
+            brief_id="stack-4",
+            facts=(
+                Fact(
+                    text="local tick scores briefs and emits a tryable draft",
+                    artifact_url=SHIP_PR,
+                ),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(after)
+        later = tick(self.repo, self.cfg, due=(), now="2026-08-15T05:00:00Z")
+        later_out = later["operator"]["outcomes"][0]
+        self.assertEqual(later_out["verdict"], "draft")
+        self.assertEqual(later_out["arena"], "hn")
+        fourth = self.repo.get_operator_draft("app-1", "stack-4")
+        assert fourth is not None
+        self.assertTrue(fourth.body.startswith("Show HN:"))
+
+    def test_hold_releases_the_stack_so_the_next_look_may_pick_again(self) -> None:
+        first = Brief.create(
+            project_id="app-1",
+            brief_id="hold-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        self.repo.save_brief(first)
+        tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
+        draft = self.repo.get_operator_draft("app-1", "hold-1")
+        assert draft is not None
+        self.repo.record_draft_verdict(draft, "hold")
+        self.assertIsNone(self.repo.living_stack_arena("app-1", "2026-08-13T06:00:00Z"))
+
+        nxt = Brief.create(
+            project_id="app-1",
+            brief_id="hold-2",
+            facts=(
+                Fact(
+                    text="a stranger can click and run the demo from the README",
+                    artifact_url=SHIP_PR,
+                ),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+        )
+        self.repo.save_brief(nxt)
+        out = tick(self.repo, self.cfg, due=(), now="2026-08-13T06:00:00Z")
+        self.assertEqual(out["operator"]["outcomes"][0]["arena"], "hn")
+        second = self.repo.get_operator_draft("app-1", "hold-2")
+        assert second is not None
+        self.assertEqual(second.costume, "seminar")
 
     def test_same_angle_body_as_last_is_cisza_not_a_second_draft(self) -> None:
         first = Brief.create(
