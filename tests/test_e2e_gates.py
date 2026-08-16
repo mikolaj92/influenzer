@@ -553,6 +553,97 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertIn("lounge", draft.body.lower())
         self.assertIn("10 builders", draft.body.lower())
 
+    def test_durable_qa_does_not_go_to_discord_search(self) -> None:
+        # #52: how-to / bug / decision lives on GitHub (issue/Discussions).
+        # Score does not pick Discord for hard_issue. Tavern is merge/celebration.
+        living = (
+            "help / show / contribute / lounge",
+            "seed about 10 builders before a public invite",
+        )
+        questions = (
+            "How do I install this when uv is missing?",
+            "how-to: wire the operator tick",
+            "bug: timeouts look like success",
+            "decyzja: durable Q&A stays on GitHub Discussions",
+        )
+        for idx, text in enumerate(questions):
+            with self.subTest(text=text):
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-durable-qa-{idx}",
+                    facts=(
+                        Fact(text=text),
+                        Fact(text=living[0]),
+                        Fact(text=living[1]),
+                    ),
+                    story_kind="hard_issue",
+                    claims_ship=False,
+                    tryable=False,
+                    preferred_arena=ArenaId.DISCORD,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.DISCORD,
+                        claims_ship=False,
+                        tryable=False,
+                        story_kind="hard_issue",
+                        clickable=False,
+                    ),
+                    ArenaId.DISCORD,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, EMPTY_TAVERN_REASON)
+                self.assertNotEqual(score.arena, ArenaId.DISCORD)
+                self.assertIn(score.arena, {ArenaId.GITHUB, None})
+                self.assertIsNone(compose_draft(brief, score))
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.DISCORD, "\n".join((text, *living))),
+                    (Verdict.KILL, EMPTY_TAVERN_REASON),
+                )
+
+        decision = Brief.create(
+            project_id="app-1",
+            brief_id="b-durable-qa-decision",
+            facts=(
+                Fact(text="decyzja: durable Q&A stays on GitHub Discussions"),
+                Fact(text=living[0]),
+                Fact(text=living[1]),
+            ),
+            story_kind="decision",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.DISCORD,
+        )
+        decision_score = score_brief(decision)
+        self.assertNotEqual(decision_score.arena, ArenaId.DISCORD)
+        self.assertIn(decision_score.arena, {ArenaId.GITHUB, None})
+        self.assertIsNone(compose_draft(decision, decision_score))
+        self.assertEqual(
+            _gate_violation(decision, ArenaId.DISCORD, "\n".join(("decyzja", *living))),
+            (Verdict.KILL, EMPTY_TAVERN_REASON),
+        )
+
+        workshop = Brief.create(
+            project_id="app-1",
+            brief_id="b-durable-qa-github",
+            facts=(
+                Fact(text="I struggled with timeouts looking like success"),
+                Fact(text="unknown plus reconcile is the rule now"),
+            ),
+            story_kind="hard_issue",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(workshop)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.GITHUB)
+        draft = compose_draft(workshop, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "workshop")
+        self.assertIn("I struggled with timeouts", draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_bluesky_without_pack_and_feed_is_silence(self) -> None:
         empties = (
             "vibe posting about the operator",
