@@ -21,6 +21,8 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 Two watches on the same repo are one look. A second brief or angle from the
 same git is silence, even with another project_id.
+An archived or disabled repo is dead. Watch on a museum is silence.
+Do not launch a museum.
 """
 
 from __future__ import annotations

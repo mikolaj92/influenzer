@@ -94,6 +94,21 @@ class SurveySilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "private_repo")
 
+    def test_archived_repo_is_silence_even_with_a_ship_window(self) -> None:
+        out = self._survey(ship_script(repo=GhCall(0, repo_json(archived=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+        self.assertNotIn("brief_id", out)
+
+    def test_disabled_repo_is_silence_not_a_museum_launch(self) -> None:
+        out = self._survey(ship_script(repo=GhCall(0, repo_json(disabled=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+
     def test_malformed_json_is_silence_not_crash(self) -> None:
         out = self._survey({"repo": GhCall(0, "not-json")})
         self.assertEqual(out["status"], "noop")

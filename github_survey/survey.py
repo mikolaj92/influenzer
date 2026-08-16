@@ -9,6 +9,8 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
+An archived or disabled repo is dead. Watch on a museum is silence.
+Do not launch a museum.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
 50MB in state.db is silence. The loop lives.
 """
@@ -459,6 +461,33 @@ def _looks_like_own_ship_pr(item: dict[str, Any]) -> bool:
     return bool(_SHIP_PR_TITLE_RE.search(title))
 
 
+def _flag_true(meta: dict[str, Any], *keys: str) -> bool:
+    """True only for an explicit true tombstone. Unknown is not a museum."""
+    for key in keys:
+        value = meta.get(key)
+        if value is True:
+            return True
+        if isinstance(value, str) and value.strip().casefold() in {"true", "1", "yes"}:
+            return True
+    return False
+
+
+def _repo_is_dead(meta: dict[str, Any]) -> bool:
+    """True when the repo is archived or disabled. A museum is not a launch."""
+    if _flag_true(
+        meta,
+        "isArchived",
+        "is_archived",
+        "isDisabled",
+        "is_disabled",
+        "archived",
+        "disabled",
+    ):
+        return True
+    archived_at = meta.get("archivedAt") or meta.get("archived_at")
+    return isinstance(archived_at, str) and bool(archived_at.strip())
+
+
 def template_repo_silence(meta: dict[str, Any], *, prs: Sequence[Any], releases: Sequence[Any]) -> str | None:
     """A template, or generate-from-template without an own ship, is silence."""
     if _truthy_meta(meta, "isTemplate", "is_template"):
@@ -480,7 +509,7 @@ def template_repo_silence(meta: dict[str, Any], *, prs: Sequence[Any], releases:
 
 
 def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict[str, Any] | None, str | None]:
-    repo_call = gh(["repo", "view", repo_slug, "--json", REPO_JSON_FIELDS])
+    repo_call = gh(["repo", "view", repo_slug, "--json", f"{REPO_JSON_FIELDS},isArchived"])
     if look_payload_reason(repo_call):
         return None, "empty_survey"
     meta, reason = required_json(repo_call)
@@ -490,6 +519,8 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, "empty_survey"
     if bool(meta.get("isPrivate")):
         return None, "private_repo"
+    if _repo_is_dead(meta):
+        return None, "archived_repo"
     if _truthy_meta(meta, "isTemplate", "is_template"):
         return None, "template_not_a_product"
 
@@ -582,6 +613,8 @@ def survey_public_repo(
     assert survey is not None
     if not survey["releases"] and not survey["prs"] and not survey["tags"]:
         return _silence("empty_survey", repo=slug)
+    if _repo_is_dead(survey["meta"]):
+        return _silence("archived_repo", repo=slug)
     blocked = template_repo_silence(survey["meta"], prs=survey["prs"], releases=survey["releases"])
     if blocked:
         return _silence(blocked, repo=slug)

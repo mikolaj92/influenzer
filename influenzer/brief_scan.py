@@ -20,6 +20,8 @@ An empty repo is not a website. No tree or no README is silence. This is
 not README-without-a-GIF: here there is not even a card.
 A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
+An archived or disabled repo is dead. Watch on a museum is silence.
+Do not launch a museum.
 A hung gh is silence, not a stuck loop. Timeout is harder and shorter
 than the tick interval. After it: cisza, the child is gone, next tick
 goes. This is not auth-fail.
@@ -40,6 +42,7 @@ from github_pack import pack_survey
 from github_survey import GhCall, GhRunner, invalid_repo_reason, survey_public_repo
 from github_survey.survey import look_declared_gh, look_short_gh
 from influenzer.playbook import (
+    looks_like_archived_repo,
     looks_like_empty_repo,
     looks_like_failed_ci,
     looks_like_fork,
@@ -50,11 +53,11 @@ from influenzer.playbook import (
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
 from influenzer.domain import utc_now
 from influenzer.storage import StateRepository
-from influenzer.tick import DEFAULT_INTERVAL_SECONDS
 
-# Harder and shorter than the always-on tick interval. A hang is not auth.
+# Harder and shorter than the always-on tick interval (300s). A hang is not auth.
+# The number is inlined so look does not import tick (tick → watch → pass → scan).
 GH_HANG_TIMEOUT_S = 20.0
-assert GH_HANG_TIMEOUT_S < DEFAULT_INTERVAL_SECONDS
+assert GH_HANG_TIMEOUT_S < 300
 
 
 def _kill_lingering_gh() -> None:
@@ -145,6 +148,28 @@ def repo_is_empty(gh: GhRunner | None, repo_slug: str) -> bool:
     except (json.JSONDecodeError, UnicodeDecodeError):
         return False
     return isinstance(data, dict) and bool(data.get("isEmpty"))
+
+
+def repo_is_archived(gh: GhRunner | None, repo_slug: str) -> bool:
+    """True when gh says isArchived. A museum is not a launch."""
+    slug = (repo_slug or "").strip()
+    if not slug or invalid_repo_reason(slug):
+        return False
+    runner = look_only_gh(gh, slug)
+    try:
+        call = runner(["repo", "view", slug, "--json", "isArchived"])
+    except (OSError, TypeError, ValueError):
+        return False
+    raw = getattr(call, "stdout", "") or ""
+    if not isinstance(raw, str) or not raw.strip():
+        return False
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    return isinstance(data, dict) and (
+        bool(data.get("isArchived")) or bool(data.get("isDisabled"))
+    )
 
 
 def repo_is_template(gh: GhRunner | None, repo_slug: str) -> bool:
@@ -240,6 +265,28 @@ def _payload_has_failed_ci(payload: dict[str, Any]) -> bool:
     return looks_like_failed_ci(_payload_ci_bits(payload))
 
 
+def _payload_is_archived(payload: dict[str, Any]) -> bool:
+    if bool(payload.get("isArchived")) or bool(payload.get("isDisabled")):
+        return True
+    if payload.get("reason") == "archived_repo":
+        return True
+    survey = payload.get("survey")
+    if not isinstance(survey, dict):
+        return False
+    meta = survey.get("meta")
+    bits: list[str] = []
+    if isinstance(meta, dict):
+        if bool(meta.get("isArchived")) or bool(meta.get("is_archived")):
+            return True
+        if bool(meta.get("isDisabled")) or bool(meta.get("is_disabled")):
+            return True
+        if meta.get("archivedAt") or meta.get("archived_at"):
+            return True
+        bits.append(str(meta.get("description") or ""))
+    bits.append(str(survey.get("readme_text") or ""))
+    return looks_like_archived_repo("\n".join(bits))
+
+
 def _payload_is_template(payload: dict[str, Any]) -> bool:
     if bool(payload.get("isTemplate")):
         return True
@@ -282,6 +329,8 @@ def scan_github(
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
     if repo_is_template(runner, slug):
         return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
+    if repo_is_archived(runner, slug):
+        return host_silence("archived_repo", project_id=project_id, repo_slug=slug)
     try:
         surveyed = survey_public_repo(slug, gh=runner, now=now)
         if _payload_is_fork(surveyed):
@@ -290,6 +339,8 @@ def scan_github(
             return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
         if _payload_is_template(surveyed):
             return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
+        if _payload_is_archived(surveyed):
+            return host_silence("archived_repo", project_id=project_id, repo_slug=slug)
         if _payload_has_pending_ci(surveyed):
             return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
         if _payload_has_failed_ci(surveyed):
@@ -300,4 +351,12 @@ def scan_github(
     return admit_pack(repo, packed, project_id=project_id, now=now or utc_now())
 
 
-__all__ = ["SOURCE", "look_only_gh", "repo_is_empty", "repo_is_fork", "repo_is_template", "scan_github"]
+__all__ = [
+    "SOURCE",
+    "look_only_gh",
+    "repo_is_archived",
+    "repo_is_empty",
+    "repo_is_fork",
+    "repo_is_template",
+    "scan_github",
+]

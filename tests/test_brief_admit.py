@@ -166,6 +166,48 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
         self.assertEqual(self.repo.list_briefs("app-2"), [])
 
+    def test_archived_repo_look_is_silence_even_with_a_ship_window(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(archived=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_disabled_repo_look_is_silence_not_a_museum_launch(self) -> None:
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(disabled=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_archived_repo_pack_is_silence(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": "isArchived: true"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
     def test_fork_look_is_silence_even_when_owner_is_ours(self) -> None:
         out = self._scan(ship_script(repo=GhCall(0, repo_json(fork=True))))
         self.assertEqual(out["status"], "noop")
