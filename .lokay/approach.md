@@ -1,32 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=96 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=87 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #96 — Pad zapisu Fala nie cofa score/draft
+Issue: #87 — Revert w tym samym oknie zabija ship
 
 ## Goal
 
-Pad zapisu Fala (reaction dir) nie cofa score/draft w state.db i nie zabija pętli. Domena wygrywa. Journal jest obserwacją, nie właścicielem historii.
+Revert w tym samym oknie zabija ship. Jeśli look widzi merge i revert tego samego — nie claims_ship, nie Show HN. Nie reklamujemy rzeczy, której już nie ma na main.
 
 ## Files likely touched
 
-- `influenzer/fala_result.py` — swallow OSError on reaction-dir write
-- `tests/test_hom_operator.py` — pad keeps score/draft; organ exits 0
+- (infer from repo inspection)
 
 ## Test plan
 
-- `tests/test_hom_operator.py::TickBriefPathTests.test_tick_all_writes_fala_subprocess_result_without_opening_runtime_db`
-- `tests/test_hom_operator.py::TickBriefPathTests.test_fala_reaction_dir_pad_keeps_score_draft_and_does_not_kill_tick`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Do not wipe or recreate state.db (#94).
-- Do not make the journal the owner of score/draft history.
-- Do not stop the organ / interval loop on a reaction-dir pad.
+- (none stated)
 
 ## Notes
 
-- Persist in `state.db` already happens before `write_fala_result`. The hole was the journal write raising and killing the organ after domain had already committed.
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
