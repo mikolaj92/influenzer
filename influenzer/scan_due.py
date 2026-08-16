@@ -22,6 +22,10 @@ A clock that goes backward is silence, not a second look. Look is monotonic.
 Two watches on the same repo are one look. A second brief or angle from the
 same git is silence, even with another project_id. That is the machine lock,
 not a second survey.
+Crash mid-look resumes; it does not start from zero. Look already done
+and look in progress are two states. A second gh on a half-open look
+is an error. Pending brief after a crash is score+angle only, no second
+survey/gh.
 Watch only on our repo. Owner must be the project maintainer (same
 GitHub login). A foreign owner is silence, not a ship. Helping them is
 cisza here or contribute, not our launch.
@@ -36,7 +40,7 @@ from typing import Any
 
 from github_survey import GhRunner, invalid_repo_reason
 
-from influenzer.brief_admit import SOURCE, host_silence, open_story_reason
+from influenzer.brief_admit import SOURCE, host_error, host_silence, open_story_reason
 from influenzer.brief_scan import scan_github
 from influenzer.config import load_config
 from influenzer.domain import foreign_owner_reason, utc_now
@@ -83,6 +87,28 @@ def brief_mentions_repo(brief: Brief, repo_slug: str) -> bool:
         if _url_repo(url) == wanted:
             return True
     return False
+
+
+def current_look_state(repo: StateRepository, repo_slug: str) -> str | None:
+    """``in_progress`` or ``done`` for this git. Brief from this look is done.
+
+    ``github.looking`` without a github-scan brief from this look is still
+    in progress. An older brief from a previous Monday is not this look.
+    A leftover looking event after admit is already done, not a new Monday.
+    """
+    state = repo.look_state(repo_slug)
+    if state != "in_progress":
+        return state
+    started = parse_utc(repo.look_started_at(repo_slug))
+    for brief in repo.list_briefs():
+        if brief.source != SOURCE or not brief_mentions_repo(brief, repo_slug):
+            continue
+        created = parse_utc(brief.created_at)
+        if created is None:
+            continue
+        if started is None or created >= started:
+            return "done"
+    return "in_progress"
 
 
 def last_scan_at(repo: StateRepository, project_id: str, repo_slug: str) -> str | None:
@@ -162,6 +188,11 @@ def scan_due_reason(
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
         return foreign
+    if current_look_state(repo, slug) == "in_progress":
+        blocked = open_story_reason(repo, project_id)
+        if blocked:
+            return blocked
+        return None
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return blocked
@@ -183,6 +214,10 @@ def scan_github_if_due(
     """Compose existing scan only when due. Does not call gh itself."""
     slug = repo_slug.strip()
     clock = now or utc_now()
+    state = current_look_state(repo, slug)
+    owner = repo.look_owner(slug)
+    if state == "in_progress" and owner and owner != project_id:
+        return host_error("half_open_look", project_id=project_id, repo_slug=slug)
     blocked = scan_due_reason(
         repo,
         project_id=project_id,
@@ -192,8 +227,17 @@ def scan_github_if_due(
     )
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
+    if repo.look_state(slug) != "in_progress":
+        repo.record_github_look(project_id, slug, started_at=clock)
     try:
-        out = scan_github(repo, project_id=project_id, repo_slug=slug, gh=gh, now=clock)
+        out = scan_github(
+            repo,
+            project_id=project_id,
+            repo_slug=slug,
+            gh=gh,
+            now=clock,
+            begun=True,
+        )
     except Exception:
         out = host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     repo.record_github_scan(project_id, slug, scanned_at=clock)
@@ -235,6 +279,7 @@ if __name__ == "__main__":
 __all__ = [
     "DEFAULT_WINDOW_DAYS",
     "brief_mentions_repo",
+    "current_look_state",
     "last_scan_at",
     "main",
     "scan_due_reason",

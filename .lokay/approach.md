@@ -1,26 +1,21 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=68 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=66 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #68 — Pad gh to cisza, nie śmierć pętli
+Issue: #66 — Crash w połowie przebiegu wznawia, nie zaczyna od zera
 
 ## Goal
 
-Pad gh (auth, sieć, rate) to cisza, nie śmierć pętli. Survey/feedback zwracają empty i idą spać. Interval żyje. To nie jest crash-w-połowie-stanu (#66) — to provider fail-closed.
+Crash w połowie przebiegu wznawia, nie zaczyna od zera. Pending brief po padzie → tylko score+kąt, bez drugiego survey/gh. Look „już zrobiony” i look „w trakcie” to dwa stany. Drugi gh na półotwartą historię = błąd.
 
 ## Files likely touched
 
-- `github_survey/gh.py` — classify rate/network pads
-- `github_survey/survey.py` — provider pad → empty_survey
-- `github_feedback/feedback.py` — provider pad → empty_feedback
-- `influenzer/brief_scan.py`, `influenzer/scan_due.py`, `influenzer/hom_feedback.py` — pad is empty, interval lives
-- tests for survey/feedback/watch/scan-due
+- (infer from repo inspection)
 
 ## Test plan
 
-- `tests/test_github_survey.py`, `tests/test_github_feedback.py`
-- `tests/test_hom_watch.py`, `tests/test_scan_due.py`, `tests/test_hom_feedback.py`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 

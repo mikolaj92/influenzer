@@ -9,6 +9,10 @@ repo inventory.
 
 One loop per state.db. A second pass while another tick holds the house
 is cisza: no second look. Advisory lock, not two CMOs in one home.
+Crash mid-look resumes; it does not start from zero. Pending brief after
+a crash is score+angle only, no second survey/gh. Look already done and
+look in progress are two states. A second gh on a half-open look is an
+error.
 
 Does not publish. Does not enable live social. Does not call gh
 (github_survey owns gh). Does not know Heimdall. Does not know my-auth.
