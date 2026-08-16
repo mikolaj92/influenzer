@@ -78,7 +78,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Two jobs: comment earns the click; profile converts the follow.",
             "Max P(reply), then reply to replies. Quote beats Repost when small.",
             "Under 1k mostly replies; author diversity; first hour is the clock.",
-            "Do not flood originals into an empty feed. Not a hashtag catalog.",
+            "Do not flood originals into an empty feed. Not a hashtag catalog. Over 280 is silence, not a mid-word clip.",
         ),
         canon_path="x.md",
     ),
@@ -89,7 +89,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         wave=(
             "Retrieval: 3–4 pillars until the graph knows why to fetch you.",
             "Seed ICP: early 2+ line add (not echo) on people buyers already watch.",
-            "Dwell: win the ~210-char fold; body must be finishable.",
+            "Dwell: win the ~210-char fold; body must be finishable. Overflow is silence, not a mid-word clip.",
             "First 60–90 min: reply with new substance (re-entry).",
             "Zero-click: insight in the post. No pitch in line one, no hashtag wall.",
         ),
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -1413,6 +1413,55 @@ def looks_like_emoji_title(text: str) -> bool:
     return bool(title and _EMOJI_RE.search(title))
 
 
+# Hard arena limits. Overflow is silence, not a mid-word clip.
+X_REPLY_LIMIT = 280
+LINKEDIN_FOLD = 210
+# One HN line, not a blog. Prefix + title stay on a single screen line.
+HN_TITLE_LIMIT = 72
+HN_TITLE_PREFIX = "Show HN: "
+
+
+def _one_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+def show_hn_title_text(text: str) -> str:
+    """Bare title after an optional Show HN: prefix. Empty is silence."""
+    title = _one_line(text)
+    if title.lower().startswith("show hn:"):
+        title = title.split(":", 1)[1].strip()
+    return title
+
+
+def looks_like_hn_title_overflow(text: str) -> bool:
+    """True when a Show HN title is longer than one line or a blog."""
+    title = show_hn_title_text(text)
+    if not title:
+        return True
+    if "\n" in text.strip():
+        return True
+    return len(f"{HN_TITLE_PREFIX}{title}") > HN_TITLE_LIMIT
+
+
+def looks_like_x_overflow(text: str, url: str | None = None) -> bool:
+    """True when the agora body will not fit in 280. URL sits on its own line."""
+    hook = _one_line(text)
+    if not hook:
+        return True
+    proof = (url or "").strip()
+    if proof:
+        return len(hook) + 1 + len(proof) > X_REPLY_LIMIT
+    return len(hook) > X_REPLY_LIMIT
+
+
+def looks_like_linkedin_fold_overflow(text: str) -> bool:
+    """True when the court insight will not win the ~210-char fold."""
+    insight = _one_line(text)
+    if not insight:
+        return True
+    return len(insight) > LINKEDIN_FOLD
+
+
 def looks_like_commit_noise(text: str) -> bool:
     return bool(COMMIT_NOISE_RE.search(text.strip()))
 
@@ -2160,7 +2209,10 @@ __all__ = [
     "HASHTAG_RE",
     "HIRE_FUNDRAISE_RE",
     "HN_STORY_KINDS",
+    "HN_TITLE_LIMIT",
+    "HN_TITLE_PREFIX",
     "LAUNCH_HOSTS",
+    "LINKEDIN_FOLD",
     "LAUNCH_PITCH_RE",
     "NEGATED_OPEN_SOURCE_RE",
     "NEGATED_SOURCE_AVAILABLE_RE",
@@ -2213,6 +2265,7 @@ __all__ = [
     "StoryKind",
     "Verdict",
     "WORKSHOP_STORY_KINDS",
+    "X_REPLY_LIMIT",
     "arena_gate",
     "arena_play",
     "feedback_excerpt_texts",
@@ -2268,7 +2321,11 @@ __all__ = [
     "looks_like_press_release",
     "looks_like_shouty_title",
     "looks_like_emoji_title",
+    "looks_like_hn_title_overflow",
+    "looks_like_linkedin_fold_overflow",
+    "looks_like_x_overflow",
     "looks_like_superlative",
+    "show_hn_title_text",
     "looks_like_store_pitch",
     "looks_like_launch_pitch",
     "looks_like_dead_link",

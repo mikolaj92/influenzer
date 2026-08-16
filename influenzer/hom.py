@@ -47,6 +47,8 @@ from influenzer.playbook import (
     looks_like_thread,
     looks_like_emoji_title,
     looks_like_hashtag_wall,
+    looks_like_hn_title_overflow,
+    looks_like_linkedin_fold_overflow,
     looks_like_listicle_title,
     looks_like_hire_fundraise,
     looks_like_private_conversation,
@@ -56,6 +58,7 @@ from influenzer.playbook import (
     news_urls_only,
     looks_like_shouty_title,
     looks_like_store_pitch,
+    looks_like_x_overflow,
     looks_like_launch_pitch,
     looks_like_superlative,
     looks_like_dead_link,
@@ -302,13 +305,19 @@ def _facts_blob(brief: Brief) -> str:
 
 def _has_clickable_url(brief: Brief) -> bool:
     """A tryable demo URL. Scheme+host are the gate: https on an allowlisted host."""
+    return _proof_url_for_brief(brief) is not None
+
+
+def _proof_url_for_brief(brief: Brief) -> str | None:
+    """Ship artifact first, then the first tryable URL. Same proof slot dress wears."""
+    ship = next((url for url in brief_artifacts(brief) if is_ship_artifact(url)), None)
+    if ship:
+        return ship
     for fact in brief.facts:
         url = (fact.artifact_url or "").strip()
-        if is_ship_artifact(url):
-            return True
         if is_tryable_artifact_url(url) and not is_ranking_host_url(url):
-            return True
-    return False
+            return url
+    return None
 
 
 def _film_only_urls(brief: Brief) -> bool:
@@ -461,6 +470,12 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "shouty_title"
     if arena in {ArenaId.HN, ArenaId.GITHUB} and looks_like_emoji_title(title):
         return Verdict.KILL, "emoji_title"
+    if arena is ArenaId.HN and title and looks_like_hn_title_overflow(title):
+        return Verdict.KILL, "hn_title_overflow"
+    if arena is ArenaId.X and title and looks_like_x_overflow(title, _proof_url_for_brief(brief)):
+        return Verdict.KILL, "x_overflow"
+    if arena is ArenaId.LINKEDIN and title and looks_like_linkedin_fold_overflow(title):
+        return Verdict.KILL, "linkedin_fold_overflow"
     if gate.require_clickable_url and not _has_clickable_url(brief):
         return Verdict.KILL, gate.reason
     if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):

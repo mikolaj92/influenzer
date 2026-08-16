@@ -33,6 +33,10 @@ from influenzer.hom import (
 from influenzer.playbook import (
     ARENAS,
     CANON_URL,
+    HN_TITLE_LIMIT,
+    HN_TITLE_PREFIX,
+    LINKEDIN_FOLD,
+    X_REPLY_LIMIT,
     ArenaId,
     Verdict,
     arena_play,
@@ -48,6 +52,10 @@ from influenzer.playbook import (
     is_social_arena,
     is_tryable_artifact_url,
     is_video_host_url,
+    looks_like_hn_title_overflow,
+    looks_like_linkedin_fold_overflow,
+    looks_like_x_overflow,
+    show_hn_title_text,
     looks_like_bot_bump_week,
     looks_like_contest,
     looks_like_dunk,
@@ -107,10 +115,6 @@ _PITCH_LINE_RE = re.compile(
 )
 _URL_IN_TEXT_RE = re.compile(r"https?://", re.I)
 _SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
-
-LINKEDIN_FOLD = 210
-X_REPLY_LIMIT = 280
-HN_TITLE_LIMIT = 72
 
 
 @dataclass(frozen=True)
@@ -293,12 +297,17 @@ def _dress_github(bits: CopyBits, score: Score) -> str | None:
     return _body_or_none("\n".join(lines))
 
 
-def _show_hn_title(one_liner: str) -> str:
-    text = one_liner.strip()
-    lowered = text.lower()
-    if lowered.startswith("show hn:"):
-        text = text.split(":", 1)[1].strip()
-    return f"Show HN: {_clip(text, HN_TITLE_LIMIT)}"
+def _show_hn_title(one_liner: str) -> str | None:
+    """One line, not a blog. Overflow is silence, not a mid-word clip."""
+    if looks_like_hn_title_overflow(one_liner):
+        return None
+    title = show_hn_title_text(one_liner)
+    if not title:
+        return None
+    dressed = f"{HN_TITLE_PREFIX}{title}"
+    if len(dressed) > HN_TITLE_LIMIT or "\n" in dressed:
+        return None
+    return dressed
 
 
 def _dress_hn(bits: CopyBits, score: Score) -> str | None:
@@ -309,6 +318,8 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     if looks_like_merged_pr_fact(title_src) or _merge_log_bits(bits) or _bot_bump_week_bits(bits):
         return None
     if looks_like_listicle_title(title_src) or looks_like_shouty_title(title_src) or looks_like_emoji_title(title_src):
+        return None
+    if looks_like_hn_title_overflow(bits.one_liner):
         return None
     url = _proof_url(bits)
     if (
@@ -326,7 +337,10 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
         return None
     if looks_like_launch_pitch("\n".join((bits.one_liner, *bits.rest))):
         return None
-    parts = [_show_hn_title(bits.one_liner), url]
+    title = _show_hn_title(bits.one_liner)
+    if title is None:
+        return None
+    parts = [title, url]
     backstory = _join_rest(bits)
     if backstory:
         parts.append(backstory)
@@ -339,11 +353,17 @@ def _dress_x(bits: CopyBits, score: Score) -> str | None:
     if not hook:
         return None
     url = _proof_url(bits)
+    if looks_like_x_overflow(hook, url):
+        return None
+    cleaned = " ".join(hook.split())
     if url:
-        budget = max(24, X_REPLY_LIMIT - len(url) - 1)
-        hook = _clip(hook, budget)
-        return _body_or_none(f"{hook}\n{url}")
-    return _body_or_none(_clip(hook, X_REPLY_LIMIT))
+        body = f"{cleaned}\n{url}"
+        if len(body) > X_REPLY_LIMIT:
+            return None
+        return _body_or_none(body)
+    if len(cleaned) > X_REPLY_LIMIT:
+        return None
+    return _body_or_none(cleaned)
 
 
 def _court_insight(bits: CopyBits) -> str | None:
@@ -363,7 +383,9 @@ def _dress_linkedin(bits: CopyBits, score: Score) -> str | None:
     insight = _court_insight(bits)
     if insight is None:
         return None
-    fold = insight if len(insight) <= LINKEDIN_FOLD else _clip(insight, LINKEDIN_FOLD)
+    if looks_like_linkedin_fold_overflow(insight):
+        return None
+    fold = " ".join(insight.split())
     leftover = [text for text in (bits.one_liner, *bits.rest) if text.strip() != insight]
     parts = [fold]
     rest = "\n\n".join(leftover)
@@ -460,6 +482,19 @@ def _dress_discord(bits: CopyBits, score: Score) -> str | None:
     return None
 
 
+def _overflows_arena(arena: ArenaId, bits: CopyBits, body: str) -> bool:
+    """Hard arena limits. Overflow is silence, not a mid-word clip."""
+    if arena is ArenaId.X:
+        return len(body) > X_REPLY_LIMIT or looks_like_x_overflow(bits.one_liner, _proof_url(bits))
+    if arena is ArenaId.HN:
+        title = body.splitlines()[0] if body.strip() else ""
+        return looks_like_hn_title_overflow(title) or "\n" in title
+    if arena is ArenaId.LINKEDIN:
+        fold = body.split("\n\n", 1)[0]
+        return looks_like_linkedin_fold_overflow(fold) or len(fold) > LINKEDIN_FOLD
+    return False
+
+
 _DRESSERS = {
     ArenaId.GITHUB: _dress_github,
     ArenaId.HN: _dress_hn,
@@ -519,6 +554,8 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     if dresser is None:
         return None
     body = dresser(bits, score)
+    if body is not None and _overflows_arena(score.arena, bits, body):
+        return None
     if (
         body is None
         or unquotable_reason(triples, extra=body)
