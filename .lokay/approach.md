@@ -1,32 +1,29 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=71 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=70 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #71 — Ten sam tekst nie wychodzi drugi raz
+Issue: #70 — Limity areny są twarde: overflow = cisza
 
 ## Goal
 
-Ten sam tekst nie wychodzi drugi raz. Format stosu zostaje, body musi być nowe. Identyczny content_hash co ostatni kąt = cisza. Nie recap, nie copy-paste.
+Limity areny są twarde. Overflow = cisza, nie obcięcie w pół słowa. X mieści się w 280. Tytuł Show HN krótki (jedna linia, bez bloga). Fold LinkedIn ~210 na insight. Dłuższe nie wychodzi.
 
 ## Files likely touched
 
-- `influenzer/hom.py` — body-only `content_hash`; `drop_repeat_angle`
-- `influenzer/storage.py` — `last_angle_body_hash` (held still counts)
-- `influenzer/scheduler.py` — tick drops a repeat before persist
-- `tests/test_hom_operator.py` — same body is kill; new body still drafts
+- (infer from repo inspection)
 
 ## Test plan
 
-- `uv run python -m unittest tests.test_hom_operator.TickBriefPathTests tests.test_hom_outbox tests.test_hom_draft.HomDraftCostumeTests`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Not #65 (two ticks = one brief) and not #64 (Monday with no history = cisza).
-- No fuzzy recap detector. Exact body hash only.
+- (none stated)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
