@@ -26,6 +26,7 @@ from influenzer.playbook import (
     arena_gate,
     arena_play,
     choose_arena,
+    court_reason,
     fair_loop_reason,
     has_cinema_package,
     has_fair_hook,
@@ -424,6 +425,7 @@ def _choose_arena(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> 
         preferred_arena=brief.preferred_arena,
         stack_arena=stack_arena,
         tryable=brief.tryable,
+        claims_ship=brief.claims_ship,
         story_kind=brief.story_kind,
         clickable=_has_clickable_url(brief),
         issues_disabled=looks_like_issues_disabled(blob),
@@ -481,6 +483,10 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "x_overflow"
     if arena is ArenaId.LINKEDIN and title and looks_like_linkedin_fold_overflow(title):
         return Verdict.KILL, "linkedin_fold_overflow"
+    if arena is ArenaId.LINKEDIN:
+        court_fail = court_reason(blob, claims_ship=brief.claims_ship)
+        if court_fail:
+            return Verdict.KILL, court_fail
     if gate.require_clickable_url and not _has_clickable_url(brief):
         return Verdict.KILL, gate.reason
     if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):

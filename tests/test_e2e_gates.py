@@ -22,9 +22,14 @@ from influenzer.domain import (
 from influenzer.playbook import (
     ARENAS,
     ArenaId,
+    COURT_NOT_A_LAUNCH_REASON,
     Verdict,
+    choose_arena,
+    court_reason,
     fair_loop_reason,
+    has_court_insight,
     has_fair_loop,
+    looks_like_court_launch,
     looks_like_fair_cta,
     looks_like_poll,
     unquotable_reason,
@@ -338,6 +343,109 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertFalse(has_fair_loop("one loop per state.db"))
         self.assertFalse(has_fair_loop("event loop"))
         self.assertFalse(looks_like_fair_cta("follow the README to run the demo"))
+
+    def test_court_is_not_a_launch_channel(self) -> None:
+        launches = (
+            "Show HN: local tick scores briefs",
+            "we just shipped the operator",
+            "właśnie wypuściliśmy lokalny tick",
+        )
+        for idx, text in enumerate(launches):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_court_launch(text))
+                self.assertEqual(court_reason(text, claims_ship=False), COURT_NOT_A_LAUNCH_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-court-launch-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.LINKEDIN,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.LINKEDIN,
+                        claims_ship=True,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=True,
+                    ),
+                    ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertNotEqual(score.arena, ArenaId.LINKEDIN)
+                self.assertIn(score.arena, {ArenaId.HN, ArenaId.GITHUB, None})
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.LINKEDIN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.LINKEDIN].wave,
+                    canon_url=ARENAS[ArenaId.LINKEDIN].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.LINKEDIN, text),
+                    (Verdict.KILL, COURT_NOT_A_LAUNCH_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        dry = "Dry-run still default on every tick"
+        self.assertFalse(looks_like_court_launch(dry))
+        self.assertTrue(has_court_insight(dry))
+        self.assertIsNone(court_reason(dry, claims_ship=False))
+        self.assertEqual(court_reason(dry, claims_ship=True), COURT_NOT_A_LAUNCH_REASON)
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.LINKEDIN,
+                claims_ship=False,
+                tryable=True,
+                story_kind="major",
+                clickable=True,
+            ),
+            ArenaId.LINKEDIN,
+        )
+        insight = Brief.create(
+            project_id="app-1",
+            brief_id="b-court-insight",
+            facts=(
+                Fact(text=dry),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.LINKEDIN,
+        )
+        self.assertIsNone(_gate_violation(insight, ArenaId.LINKEDIN, "\n".join((dry, "Local tick"))))
+        score = score_brief(insight)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.LINKEDIN)
+        draft = compose_draft(insight, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "court")
+        self.assertFalse(draft.body.lower().startswith("show hn:"))
+        self.assertNotIn("just shipped", draft.body.lower())
+        empty = Brief.create(
+            project_id="app-1",
+            brief_id="b-court-empty",
+            facts=(
+                Fact(text="we just shipped the operator", artifact_url=SHIP_PR),
+                Fact(text="Show HN: local tick scores briefs"),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.LINKEDIN,
+        )
+        score = score_brief(empty)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, COURT_NOT_A_LAUNCH_REASON)
+        self.assertIsNone(compose_draft(empty, score))
 
 
 if __name__ == "__main__":
