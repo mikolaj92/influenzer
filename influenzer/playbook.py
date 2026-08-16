@@ -351,15 +351,17 @@ def choose_arena(
     """One primary arena. A living github/hn stack keeps that costume.
 
     We sit on github (feedback) and hn (camp). Preferred X / YouTube /
-    shorts / Bluesky without a listener is not a first costume — ship
-    goes where we sit. Court is insight from the work, never a launch
-    channel: preferred LinkedIn sits only when the brief does not claim
-    ship. Preferred Discord sits so an empty tavern can be silence —
-    public invite only with intent split and ~10 builders. GitHub is the
-    website. HN only when there is a clickable demo and no stack already
-    chose the other costume. Shopping while the window lives is not a
-    new pick — the caller kills an explicit change; this keeps the locked
-    costume when preferred is empty.
+    shorts without a listener is not a first costume — ship goes where
+    we sit. Court is insight from the work, never a launch channel:
+    preferred LinkedIn sits only when the brief does not claim ship.
+    Preferred Discord sits so an empty tavern can be silence — public
+    invite only with intent split and ~10 builders. Preferred Bluesky
+    sits so an artifact-only cafe can be silence — pack onboarduje,
+    feed trzyma. GitHub is the website. HN only when there is a
+    clickable demo and no stack already chose the other costume.
+    Shopping while the window lives is not a new pick — the caller
+    kills an explicit change; this keeps the locked costume when
+    preferred is empty.
     """
     locked = parse_stack_arena(stack_arena)
     if locked is not None:
@@ -380,6 +382,9 @@ def choose_arena(
     # #57: empty tavern is silence. Sit so a public invite on emptiness dies.
     if wanted is ArenaId.DISCORD:
         return ArenaId.DISCORD
+    # #55: pack without a feed is half the game. Sit so artifact-only cafe dies.
+    if wanted is ArenaId.BLUESKY:
+        return ArenaId.BLUESKY
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
         return ArenaId.LINKEDIN
@@ -1112,6 +1117,31 @@ WORKSHOP_LIFE_RE = re.compile(
 )
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
+# Cafe: starter pack onboarduje, custom feed trzyma. Artifact alone (#35)
+# is reach without retention. A GitHub pack / news feed / empty X feed
+# is not this costume. Pair of #35 (artifact, not vibe).
+BLUESKY_PACK_WITHOUT_FEED_REASON = "bluesky_pack_without_feed"
+CAFE_PACK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bstarter[- ]packs?\b|"
+    r"\bniche[- ]packs?\b|"
+    r"\b(?:bluesky|bsky)[- ]packs?\b|"
+    r"\bpacks?\s+onboard|"
+    r"\b20\s*[\u2013-]\s*50\s+active\s+accounts\b|"
+    r"\b(?:about\s+)?(?:20|30|40|50)\s+active\s+accounts\b|"
+    r"bsky\.app/starter-pack(?:-short)?/"
+    r")"
+)
+CAFE_FEED_RE = re.compile(
+    r"(?i)(?:"
+    r"\bcustom[- ]feeds?\b|"
+    r"\b(?:bluesky|bsky)[- ]feeds?\b|"
+    r"\bfeeds?\s+retain|"
+    r"\b2\s*[\u2013-]\s*3\s+custom\s+feeds\b|"
+    r"app\.bsky\.feed\.generator|"
+    r"bsky\.app/profile/[^/\s]+/feed/"
+    r")"
+)
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
 # Fair loop is last-frame-into-first / rewatch. A tick loop, event loop,
 # or "one loop per state.db" is not a Shorts cut. Pair of #36 (hook) and
@@ -1453,6 +1483,8 @@ class ArenaGate:
     require_package: bool = False
     require_hook: bool = False
     require_loop: bool = False
+    require_cafe_pack: bool = False
+    require_cafe_feed: bool = False
     forbid_cta_with_loop: bool = False
     forbid_ship_claim: bool = False
     min_facts: int = 0
@@ -1513,6 +1545,8 @@ ARENA_GATES: dict[ArenaId, ArenaGate] = {
     ArenaId.BLUESKY: ArenaGate(
         reason="bluesky_vibe_without_artifact",
         require_ship_artifact=True,
+        require_cafe_pack=True,
+        require_cafe_feed=True,
         allowed_story_kinds=frozenset({StoryKind.MAJOR, StoryKind.HARD_ISSUE}),
     ),
     ArenaId.MASTODON: ArenaGate(
@@ -1987,6 +2021,23 @@ def tavern_reason(text: str) -> str | None:
     """Silence when Discord would invite into an empty tavern."""
     if not has_tavern_intent_split(text) or not has_tavern_seed(text):
         return EMPTY_TAVERN_REASON
+    return None
+
+
+def has_cafe_pack(text: str) -> bool:
+    """True when facts name a Bluesky starter / niche pack."""
+    return bool(CAFE_PACK_RE.search(text or ""))
+
+
+def has_cafe_feed(text: str) -> bool:
+    """True when facts name a Bluesky custom feed."""
+    return bool(CAFE_FEED_RE.search(text or ""))
+
+
+def cafe_reason(text: str) -> str | None:
+    """Silence when Bluesky would post without pack and feed. Artifact is not enough."""
+    if not has_cafe_pack(text) or not has_cafe_feed(text):
+        return BLUESKY_PACK_WITHOUT_FEED_REASON
     return None
 
 
@@ -2893,6 +2944,9 @@ __all__ = [
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "EMPTY_TAVERN_REASON",
+    "BLUESKY_PACK_WITHOUT_FEED_REASON",
+    "CAFE_FEED_RE",
+    "CAFE_PACK_RE",
     "CONTEST_RE",
     "FAIR_CTA_RE",
     "FAIR_HOOK_RE",
@@ -2972,9 +3026,12 @@ __all__ = [
     "arena_gate",
     "arena_play",
     "choose_arena",
+    "cafe_reason",
     "court_reason",
     "feedback_excerpt_texts",
     "fair_loop_reason",
+    "has_cafe_feed",
+    "has_cafe_pack",
     "has_cinema_package",
     "has_court_insight",
     "has_fair_hook",

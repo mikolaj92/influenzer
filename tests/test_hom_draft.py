@@ -2516,6 +2516,63 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertIn(SHIP_PR, body)
         self.assertNotIn("Costume:", body)
 
+    def test_bluesky_without_pack_and_feed_is_undressable_even_when_score_says_draft(self) -> None:
+        brief = _ship_brief(preferred_arena=ArenaId.BLUESKY)
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.BLUESKY,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.BLUESKY].wave,
+            canon_url=ARENAS[ArenaId.BLUESKY].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "bluesky",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.BLUESKY].wave),
+                    "canon_url": ARENAS[ArenaId.BLUESKY].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        dumped = json.dumps(payload)
+        self.assertNotIn(SHIP_PR, dumped)
+        self.assertNotIn("Costume:", dumped)
+
+    def test_bluesky_with_pack_and_feed_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.BLUESKY,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="starter pack of 30 active accounts in the local-first niche"),
+                Fact(text="two custom feeds retain the same people"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.BLUESKY,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.BLUESKY].wave,
+            canon_url=ARENAS[ArenaId.BLUESKY].canon_url,
+        )
+        draft = dress_brief(brief, fake)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.BLUESKY)
+        self.assertEqual(draft.costume, "newer cafe")
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_discord_cannot_be_dressed(self) -> None:
         brief = _ship_brief(preferred_arena=ArenaId.DISCORD, claims_ship=False)
         fake = Score(
@@ -2659,7 +2716,7 @@ class HomDraftCostumeTests(unittest.TestCase):
             ),
         )
         for arena in ARENAS:
-            if arena is ArenaId.DISCORD:
+            if arena in {ArenaId.DISCORD, ArenaId.LINKEDIN, ArenaId.BLUESKY}:
                 continue
             score = Score(
                 brief_id=brief.brief_id,

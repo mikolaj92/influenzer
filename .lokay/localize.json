@@ -4,21 +4,24 @@
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
     "tests/test_e2e_gates.py",
-    "tests/test_hom_operator.py",
     "tests/test_hom_draft.py"
   ],
-  "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": [
-    "gate",
-    "star",
-    "changelog"
+  "source": "deterministic+inspection",
+  "seed_paths": [
+    "github_pack/pack.py",
+    "tests/test_e2e_gates.py",
+    "tests/test_github_feedback.py",
+    "tests/test_github_pack.py",
+    "tests/test_hom_draft.py",
+    "tests/test_hom_feedback.py"
   ],
+  "matched_tokens": ["Draft", "pack", "feed", "gate", "bluesky", "bsky"],
   "notes": [
-    "Agentless-style localization refined after inspection.",
-    "Score rule lives in playbook/hom; e2e gates lock the workshop path."
+    "Token match hit github_pack (GitHub survey pack). Inspection: issue is the Bluesky cafe costume — pack onboarduje, feed trzyma. Artifact alone (#35) is not retention.",
+    "Real gate lives in playbook/hom/hom_draft, same pattern as Discord tavern (#57).",
+    "github_pack/feedback organs are a different 'pack'."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__56-martwe-gwiazdki-to-nie-historia-2d99e9b6",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__55-bluesky-bez-feedu-to-p-gry-f1b46ac4",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
