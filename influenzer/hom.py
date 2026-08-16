@@ -44,6 +44,7 @@ from influenzer.playbook import (
     looks_like_commit_noise,
     looks_like_monday_without_history,
     looks_like_contest,
+    looks_like_poll,
     looks_like_dunk,
     looks_like_foreign_wave,
     looks_like_engagement_bait,
@@ -587,6 +588,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, "engagement_bait")
     if looks_like_contest(blob):
         return _kill(brief, "contest")
+    if looks_like_poll(blob):
+        return _kill(brief, "poll")
     if looks_like_thread(blob):
         return _kill(brief, "thread")
     if looks_like_ranking_dump(blob):

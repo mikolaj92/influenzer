@@ -1267,6 +1267,19 @@ CONTEST_RE = re.compile(
     r"\bdo\s+wygrania\b"
     r")"
 )
+# A poll is not an angle. Poll / this or that / quiz /
+# ankieta is silence. This is not a product.
+POLL_RE = re.compile(
+    r"(?i)(?:"
+    r"\bpolls?\b|"
+    r"\bquiz(?:zes)?\b|"
+    r"\bankiet(?:a|y|ę|ą|cie|om|ami|ach)?\b|"
+    r"\bthis\s+or\s+that\b|"
+    r"\bthis-or-that\b|"
+    r"\bto\s+czy\s+tamto\b|"
+    r"\bto\s+albo\s+tamto\b"
+    r")"
+)
 # A 1/n serial is not an angle. Numbering / thread / storm is silence.
 # One post, not a serial. OS thread-safe / pthread is not a format.
 THREAD_NUMBER_RE = re.compile(
@@ -2191,6 +2204,12 @@ def looks_like_contest(text: str) -> bool:
     return bool(CONTEST_RE.search(cleaned))
 
 
+def looks_like_poll(text: str) -> bool:
+    """True for a poll, this-or-that, quiz, or ankieta. Not a product."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(POLL_RE.search(cleaned))
+
+
 def looks_like_thread(text: str) -> bool:
     """True for a 1/n serial, thread, or storm. One post, not a serial."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -2464,7 +2483,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -2507,6 +2526,10 @@ def unquotable_reason(
         return "contest"
     if extra and looks_like_contest(extra):
         return "contest"
+    if any(looks_like_poll(text) for text in operator_texts):
+        return "poll"
+    if extra and looks_like_poll(extra):
+        return "poll"
     if any(looks_like_thread(text) for text in operator_texts):
         return "thread"
     if extra and looks_like_thread(extra):
@@ -2564,6 +2587,7 @@ __all__ = [
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
     "CONTEST_RE",
+    "POLL_RE",
     "THREAD_NUMBER_RE",
     "THREAD_WORD_RE",
     "ENGAGEMENT_BAIT_RE",
@@ -2669,6 +2693,7 @@ __all__ = [
     "PARENT_FACT_KINDS",
     "REPLY_SHAPE_RE",
     "looks_like_contest",
+    "looks_like_poll",
     "looks_like_ranking_dump",
     "looks_like_thread",
     "looks_like_engagement_bait",
