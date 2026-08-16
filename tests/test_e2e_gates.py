@@ -23,6 +23,7 @@ from influenzer.playbook import (
     ARENAS,
     ArenaId,
     COURT_NOT_A_LAUNCH_REASON,
+    DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
     Verdict,
     choose_arena,
@@ -32,7 +33,10 @@ from influenzer.playbook import (
     has_fair_loop,
     has_tavern_intent_split,
     has_tavern_seed,
+    has_workshop_life,
     looks_like_court_launch,
+    looks_like_dead_star_count,
+    looks_like_dead_star_story,
     looks_like_fair_cta,
     looks_like_poll,
     looks_like_tavern_invite,
@@ -535,6 +539,76 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertIn("help", draft.body.lower())
         self.assertIn("lounge", draft.body.lower())
         self.assertIn("10 builders", draft.body.lower())
+
+    def test_dead_star_count_is_changelog_not_a_launch(self) -> None:
+        corpses = (
+            "N stars",
+            "5k\u2605",
+            "we hit 1200 stars",
+            "star ranking without installs",
+            "martwe gwiazdki",
+        )
+        for idx, text in enumerate(corpses):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dead_star_count(text))
+                self.assertTrue(looks_like_dead_star_story((text,)))
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-dead-stars-{idx}",
+                    facts=(
+                        Fact(text=text),
+                        Fact(text="README has an install/quickstart a stranger can run"),
+                    ),
+                    story_kind="major",
+                    claims_ship=False,
+                    tryable=False,
+                    preferred_arena=ArenaId.GITHUB,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+                self.assertEqual(score.reason, DEAD_STAR_COUNT_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.GITHUB,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.GITHUB].wave,
+                    canon_url=ARENAS[ArenaId.GITHUB].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+                self.assertIsNone(compose_draft(brief, score))
+
+        living = (
+            "pip install influenzer",
+            "strangers opened issue #4 after the spike",
+        )
+        self.assertTrue(has_workshop_life(living[0]))
+        self.assertTrue(has_workshop_life(living[1]))
+        self.assertFalse(looks_like_dead_star_story(("N stars", living[0])))
+        self.assertFalse(looks_like_dead_star_count("star the repo after you try it"))
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-living-stars",
+            facts=(
+                Fact(text="we hit 1200 stars this week"),
+                Fact(text=living[0]),
+                Fact(text=living[1], artifact_url=SHIP_PR),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.GITHUB)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "workshop")
+        self.assertIn("pip install", draft.body.lower())
+        self.assertIn("issue #4", draft.body.lower())
 
 
 if __name__ == "__main__":

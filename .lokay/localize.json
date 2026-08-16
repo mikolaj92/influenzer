@@ -4,18 +4,21 @@
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
     "tests/test_e2e_gates.py",
-    "tests/test_hom_operator.py"
+    "tests/test_hom_operator.py",
+    "tests/test_hom_draft.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["gate"],
-  "notes": [
-    "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137.",
-    "Refined after inspection: empty-tavern invite gate lives in playbook + score + dress."
+  "matched_tokens": [
+    "gate",
+    "star",
+    "changelog"
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__57-pusta-tawerna-nie-dostaje-zaproszenia-5a99e42a",
+  "notes": [
+    "Agentless-style localization refined after inspection.",
+    "Score rule lives in playbook/hom; e2e gates lock the workshop path."
+  ],
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__56-martwe-gwiazdki-to-nie-historia-2d99e9b6",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

@@ -1,33 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=57 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=56 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #57 — Pusta tawerna nie dostaje zaproszenia
+Issue: #56 — Martwe gwiazdki to nie historia
 
 ## Goal
 
-Discord bez podziału intencji (help / show / contribute / lounge) albo bez sygnału że jest ~10 builderów — cisza na tavern. Publiczny invite na pustkę to nie kostium.
+Jeśli fakty to tylko „N stars” / ranking bez instalacji, issue, albo życia po spike — score zabija kąt. Changelog wolno. Warsztat liczy użycie, nie trupa na tle.
 
 ## Files likely touched
 
-- `influenzer/playbook.py`
-- `influenzer/hom.py`
-- `influenzer/hom_draft.py`
-- `tests/test_e2e_gates.py`
-- `tests/test_hom_operator.py`
+- `influenzer/playbook.py` — dead-star count detector + usage-after-spike exception
+- `influenzer/hom.py` — score a star-only look as changelog, not a launch
+- `influenzer/hom_draft.py` — refuse to dress a leaked star-only draft
+- `tests/test_e2e_gates.py` — e2e: corpse count is changelog; install/issue stays
+- `tests/test_hom_operator.py` — detector + score
+- `tests/test_hom_draft.py` — leaked draft stays silent
 
 ## Test plan
 
-- `python3 -m pytest tests/test_e2e_gates.py tests/test_hom_operator.py::ScoreBriefTests::test_discord_is_not_a_launch_arena tests/test_hom_operator.py::ScoreBriefTests::test_every_arena_has_a_fail_closed_gate tests/test_hom_draft.py::HomDraftCostumeTests::test_discord_cannot_be_dressed -q`
+- `python -m unittest tests.test_e2e_gates tests.test_hom_operator tests.test_hom_draft`
 
 ## Non-goals
 
-- (none stated)
+- Do not treat a ranking dump / HN front as this gate (#134 stays kill).
+- Do not treat “star the repo after you try it” as a corpse count.
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Pair of #134 (ranking dump is not an artifact) and #85 (a week of bumps is not a story).
+- Collector boundary: no unbounded collection in this patch.

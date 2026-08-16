@@ -43,8 +43,10 @@ from influenzer.playbook import (
     stack_costume_reason,
     is_tryable_artifact_url,
     is_video_host_url,
+    DEAD_STAR_COUNT_REASON,
     looks_like_bot_bump_week,
     looks_like_commit_noise,
+    looks_like_dead_star_story,
     looks_like_monday_without_history,
     looks_like_contest,
     looks_like_poll,
@@ -415,6 +417,20 @@ def _is_bot_bump_week_brief(brief: Brief) -> bool:
     )
 
 
+def _is_dead_star_story_brief(brief: Brief) -> bool:
+    wearable = [
+        fact
+        for fact in brief.facts
+        if fact.text.strip()
+        and fact.kind.strip().lower() != "artifact"
+        and fact.text.strip().casefold() != "ship artifact"
+    ]
+    return looks_like_dead_star_story(
+        tuple(fact.text for fact in wearable),
+        kinds=tuple(fact.kind for fact in wearable),
+    )
+
+
 def _fact_triples(brief: Brief) -> tuple[tuple[str, str, str | None], ...]:
     return tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts)
 
@@ -532,6 +548,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _changelog(brief, "bot_bump_week")
     if _is_merge_log_brief(brief):
         return _changelog(brief, "merge_log_changelog")
+    if _is_dead_star_story_brief(brief):
+        return _changelog(brief, DEAD_STAR_COUNT_REASON)
     if brief.claims_ship:
         if not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
             return _kill(brief, "ship_claim_missing_artifact")

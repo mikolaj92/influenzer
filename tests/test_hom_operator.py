@@ -45,8 +45,12 @@ from influenzer.playbook import (
     is_shortener_url,
     is_video_host_url,
     invented_metric_reason,
+    DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
     looks_like_bot_bump_week,
+    looks_like_dead_star_count,
+    looks_like_dead_star_story,
+    has_workshop_life,
     looks_like_contest,
     looks_like_poll,
     looks_like_dunk,
@@ -1273,6 +1277,42 @@ class PlaybookCopyTests(unittest.TestCase):
         )
         self.assertFalse(looks_like_bot_bump_week(("dependabot",)))
 
+    def test_dead_star_count_is_not_a_story(self) -> None:
+        corpses = (
+            "N stars",
+            "5k\u2605",
+            "1200 stars",
+            "we hit 1200 stars",
+            "star ranking",
+            "martwe gwiazdki",
+            "total stars",
+            "stars: 5000",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dead_star_count(text))
+                self.assertTrue(looks_like_dead_star_story((text,)))
+        self.assertTrue(
+            looks_like_dead_star_story(
+                ("N stars", "README has an install/quickstart a stranger can run")
+            )
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "star the repo after you try it",
+            "product dashboard for the local tick",
+            "pip install influenzer",
+            "strangers opened issue #4 after the spike",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_dead_star_count(text))
+        self.assertTrue(has_workshop_life("pip install influenzer"))
+        self.assertFalse(
+            looks_like_dead_star_story(("N stars", "pip install influenzer"))
+        )
+        self.assertFalse(looks_like_dead_star_story(("star the repo after you try it",)))
+
     def test_weekly_update_without_history_is_not_a_story(self) -> None:
         recaps = (
             "weekly update",
@@ -1951,6 +1991,40 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.score.reason, "bot_bump_week")
         self.assertIsNone(decision.score.arena)
         self.assertIsNone(decision.draft)
+
+    def test_dead_star_count_is_changelog_not_a_launch(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(
+                Fact(text="N stars"),
+                Fact(text="README has an install/quickstart a stranger can run"),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, DEAD_STAR_COUNT_REASON)
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
+        self.assertIsNone(compose_draft(brief, decision.score))
+
+    def test_star_count_with_install_and_issue_can_still_draft(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+            facts=(
+                Fact(text="we hit 1200 stars this week"),
+                Fact(text="pip install influenzer"),
+                Fact(text="strangers opened issue #4 after the spike", artifact_url=SHIP_ISSUE),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.GITHUB)
+        assert decision.draft is not None
+        self.assertIn("pip install", decision.draft.body.lower())
+        self.assertIn("issue #4", decision.draft.body.lower())
 
     def test_human_feat_next_to_a_bot_bump_can_still_draft(self) -> None:
         brief = self._brief(

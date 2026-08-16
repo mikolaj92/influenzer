@@ -1073,6 +1073,43 @@ WEEKLY_UPDATE_RE = re.compile(
     r"tygodniow(?:y|e|a)\s+(?:update|recap|podsumowanie)"
     r")\b"
 )
+# Pair of #134 (a ranking dump is not an artifact) and #85 (a week of
+# bumps is not a story). "N stars" / a star ranking without install,
+# issue, or life after the spike is changelog, not a launch. Workshop
+# scores usage, not a corpse on the wall.
+DEAD_STAR_COUNT_REASON = "dead_star_count"
+_STAR_TOTAL = r"(?:n|\d{1,3}(?:,\d{3})+|(?:\d+))(?:\.\d+)?[kmb]?"
+DEAD_STAR_COUNT_RE = re.compile(
+    r"(?i)(?:"
+    rf"\b{_STAR_TOTAL}\s*[\u2605\u2b50]|"
+    rf"\b{_STAR_TOTAL}\s*stars?\b|"
+    rf"\b{_STAR_TOTAL}\s*gwiazd(?:ek|ki|ka|k\u0105)?\b|"
+    r"\b(?:github\s+)?stars?\s*[:=]\s*(?:n|\d)|"
+    r"\bstargazers?\s*[:=]\s*(?:n|\d)|"
+    r"\b(?:total|lifetime|dead)\s+stars?\b|"
+    r"\bdead\s+(?:\d+[kmb]?\s*)?[\u2605\u2b50]|"
+    r"\bmartw[eyaie]+\s+gwiazd|"
+    r"\bstar\s+ranking\b|"
+    r"\branking\s+(?:gwiazdek|gwiazd|stars?)\b|"
+    rf"\bwe\s+(?:have|hit|reached|crossed)\s+{_STAR_TOTAL}\s*stars?\b"
+    r")"
+)
+# Install, a public issue, or life after the spike. A README that merely
+# names an install is not usage — see _is_readme_install_fact.
+WORKSHOP_LIFE_RE = re.compile(
+    r"(?i)(?:"
+    r"\binstall(?:s|ed|ation|ing)?\b|"
+    r"\bpip\s+install\b|"
+    r"\bnpm\s+i(?:nstall)?\b|"
+    r"\buv\s+(?:add|run|tool|pip)\b|"
+    r"\bquickstart\b|"
+    r"\bissues?\b|"
+    r"\bissue\s+#\d+|"
+    r"\blife\s+after\s+(?:the\s+)?spike\b|"
+    r"\bafter\s+the\s+spike\b|"
+    r"\bżycia?\s+po\s+(?:the\s+)?spike\b"
+    r")"
+)
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
 CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
 FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
@@ -2053,6 +2090,81 @@ def looks_like_weekly_update(text: str) -> bool:
     return bool(WEEKLY_UPDATE_RE.search(text))
 
 
+def looks_like_dead_star_count(text: str) -> bool:
+    """True for 'N stars' / a star ranking. A star ask after a try stays."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    if not DEAD_STAR_COUNT_RE.search(cleaned):
+        return False
+    # "star the repo after you try it" is an ask, not a corpse count.
+    if re.search(r"(?i)\bstar\s+the\s+repo\b", cleaned) and not DEAD_STAR_COUNT_RE.search(
+        re.sub(r"(?i)\bstar\s+the\s+repo\b", " ", cleaned)
+    ):
+        return False
+    return True
+
+
+def has_workshop_life(text: str) -> bool:
+    """True for install, a public issue, or life after the spike."""
+    if not text or not text.strip():
+        return False
+    if _is_readme_install_fact(text):
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    # "ranking without installs" is a corpse, not usage.
+    cleaned = re.sub(
+        r"(?i)\b(?:without|no|bez|brak)\s+(?:an?\s+|any\s+)?"
+        r"(?:install(?:s|ed|ation|ing)?|instalacj\w*|issue(?:s)?)\b",
+        " ",
+        cleaned,
+    )
+    return bool(WORKSHOP_LIFE_RE.search(cleaned))
+
+
+def looks_like_dead_star_story(
+    texts: tuple[str, ...] | list[str],
+    *,
+    kinds: tuple[str, ...] | list[str] | None = None,
+) -> bool:
+    """True when the look is a star count / ranking without usage after the spike.
+
+    A human feat, an install, a public issue, or life after the spike stays.
+    A README that merely names an install is not usage.
+    """
+    meat = [item.strip() for item in texts if item and item.strip()]
+    if not meat:
+        return False
+    if kinds is not None and len(tuple(kinds)) == len(tuple(texts)):
+        structured: list[str] = []
+        for kind, text in zip(kinds, texts, strict=False):
+            label = str(kind or "").strip().lower()
+            line = str(text or "").strip()
+            if not line:
+                continue
+            if label in {"release", "tag", "pull", "issue", "issue_comment"}:
+                structured.append(line)
+        if structured:
+            meat = structured
+    story = [item for item in meat if not _is_readme_install_fact(item)]
+    if not story:
+        return False
+    if any(has_workshop_life(item) for item in story):
+        return False
+    leftover = [
+        item
+        for item in story
+        if not (
+            looks_like_dead_star_count(item)
+            or looks_like_ranking_dump(item)
+            or looks_like_commit_noise(item)
+        )
+    ]
+    if leftover:
+        return False
+    return any(looks_like_dead_star_count(item) for item in story)
+
+
 def has_real_feedback(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
 ) -> bool:
@@ -2810,6 +2922,9 @@ __all__ = [
     "LISTICLE_TITLE_RE",
     "DEAD_LINK_RE",
     "DEAD_RELEASE_ASSET_RE",
+    "DEAD_STAR_COUNT_RE",
+    "DEAD_STAR_COUNT_REASON",
+    "WORKSHOP_LIFE_RE",
     "ISSUES_DISABLED_RE",
     "FORK_RE",
     "EMPTY_REPO_RE",
@@ -2870,6 +2985,7 @@ __all__ = [
     "has_real_feedback",
     "has_tavern_intent_split",
     "has_tavern_seed",
+    "has_workshop_life",
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
@@ -2936,6 +3052,8 @@ __all__ = [
     "looks_like_launch_pitch",
     "looks_like_dead_link",
     "looks_like_dead_release_asset",
+    "looks_like_dead_star_count",
+    "looks_like_dead_star_story",
     "looks_like_issues_disabled",
     "looks_like_fork",
     "looks_like_empty_repo",
