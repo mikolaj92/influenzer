@@ -437,7 +437,7 @@ class HomFeedbackCLITests(unittest.TestCase):
                     "--audience",
                     "a",
                     "--maintainer",
-                    "m",
+                    "mikolaj92",
                     "--kind",
                     "app",
                 ]

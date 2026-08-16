@@ -8,6 +8,9 @@ Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
 Does not run the project. Launching on watch is silence.
 Tryable is a README+URL heuristic. Code in look is untrusted.
+Watch only on our repo. Owner must be the project maintainer (same
+GitHub login). A ship angle on a foreign repo is silence. Helping them
+is cisza here or contribute, not our launch.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from typing import Any
 from github_survey.survey import look_bytes_over_limit, state_bytes_over_limit
 
 from influenzer.config import load_config
-from influenzer.domain import utc_now
+from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
@@ -86,6 +89,11 @@ def admit_pack(
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
+    project = repo.get_project(project_id)
+    maintainer = project.brand.maintainer if project is not None else None
+    foreign = foreign_owner_reason(slug, maintainer)
+    if foreign:
+        return host_silence(foreign, project_id=project_id, repo_slug=slug)
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)

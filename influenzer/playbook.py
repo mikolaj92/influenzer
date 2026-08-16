@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -584,8 +584,9 @@ ISSUES_DISABLED_RE = re.compile(
 )
 # A fork is not a website. isFork, even when the owner is ours, is
 # silence. Angle from the canonical source, not a copy. Helping
-# upstream is silence here, not our launch. Pair of nasze-repo and
-# nie-klon. "fork" as a product noun stays; a GitHub copy does not.
+# upstream is silence here, not our launch. Pair of #73 (watch only
+# our repo) and nie-klon. "fork" as a product noun stays; a GitHub
+# copy does not.
 FORK_RE = re.compile(
     r"(?i)(?:"
     r"\bisFork\"?\s*[:=]\s*\"?true\b"

@@ -30,6 +30,9 @@ owner is ours. Watch on private is silence, not a 404 loop. Workshop
 is a public README.
 An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
+Watch only on our repo. Owner must be the project maintainer (same
+GitHub login). A foreign owner is silence, not a ship. Helping them is
+cisza here or contribute, not our launch.
 """
 
 from __future__ import annotations
@@ -48,7 +51,7 @@ from github_survey.survey import look_bytes_over_limit, look_declared_gh, state_
 from influenzer.brief_admit import already_told, open_story_reason
 from influenzer.brief_scan import repo_is_archived, repo_is_empty, repo_is_fork, repo_is_private
 from influenzer.config import load_config
-from influenzer.domain import utc_now
+from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping
@@ -90,6 +93,11 @@ def resolve_target(
     bad = invalid_repo_reason(slug)
     if bad:
         return host_silence(bad, project_id=pid, repo_slug=slug)
+    project = repo.get_project(pid)
+    maintainer = project.brand.maintainer if project is not None else None
+    foreign = foreign_owner_reason(slug, maintainer)
+    if foreign:
+        return host_silence(foreign, project_id=pid, repo_slug=slug)
     return pid, slug
 
 
@@ -105,6 +113,11 @@ def admit_feedback(
         return host_silence("empty_feedback", project_id=project_id, repo_slug=slug)
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
+    project = repo.get_project(project_id)
+    maintainer = project.brand.maintainer if project is not None else None
+    foreign = foreign_owner_reason(slug, maintainer)
+    if foreign:
+        return host_silence(foreign, project_id=project_id, repo_slug=slug)
     if bool(payload.get("isFork")):
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if bool(payload.get("isEmpty")):

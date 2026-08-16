@@ -340,6 +340,47 @@ class Campaign:
 
 ACTIVE_ATTEMPT = frozenset({AttemptStatus.PENDING, AttemptStatus.RUNNING, AttemptStatus.UNKNOWN})
 
+FOREIGN_OWNER = "foreign_owner"
+_GITHUB_LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
+
+
+def github_owner(repo_slug: str) -> str | None:
+    """Owner half of owner/name. A bad slug is not an owner."""
+    if not isinstance(repo_slug, str):
+        return None
+    slug = repo_slug.strip()
+    if slug.count("/") != 1:
+        return None
+    owner, name = slug.split("/", 1)
+    if not owner or not name:
+        return None
+    return owner
+
+
+def our_github_login(value: str | None) -> str | None:
+    """Maintainer login, or None. Empty or not a GitHub login is silence."""
+    if not isinstance(value, str):
+        return None
+    login = value.strip()
+    if not login or not _GITHUB_LOGIN_RE.fullmatch(login):
+        return None
+    return login
+
+
+def foreign_owner_reason(repo_slug: str, maintainer: str | None) -> str | None:
+    """Watch/ship only on our GitHub. Owner must match the project maintainer.
+
+    Missing login, missing owner, or a mismatch is silence, not a launch.
+    Helping someone else's repo is contribute, not our ship angle.
+    """
+    ours = our_github_login(maintainer)
+    owner = github_owner(repo_slug)
+    if ours is None or owner is None:
+        return FOREIGN_OWNER
+    if ours.casefold() != owner.casefold():
+        return FOREIGN_OWNER
+    return None
+
 
 def assert_same_project(project_id: str, *owned_project_ids: str) -> None:
     for owned in owned_project_ids:
