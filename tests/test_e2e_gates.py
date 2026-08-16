@@ -7,6 +7,7 @@ from pathlib import Path
 from influenzer.adapters.base import AdapterRequest
 from influenzer.config import Config
 from influenzer.content import create_revision, persist_revision
+from influenzer.hom import Brief, Fact, compose_draft, score_brief
 from influenzer.domain import (
     AccountStatus,
     AttemptStatus,
@@ -18,8 +19,11 @@ from influenzer.domain import (
     PublishPlan,
     PlanStatus,
 )
+from influenzer.playbook import Verdict, looks_like_poll, unquotable_reason
 from influenzer.scheduler import DueWork, tick
 from influenzer.storage import StateRepository
+
+SHIP_PR = "https://github.com/mikolaj92/influenzer/pull/12"
 
 
 class OrderedLiveGateTests(unittest.TestCase):
@@ -188,6 +192,37 @@ class OrderedLiveGateTests(unittest.TestCase):
             ).fetchone()["project_id"],
             "builder-1",
         )
+
+    def test_poll_quiz_or_this_or_that_is_silence_not_an_angle(self) -> None:
+        polls = (
+            "poll: dark mode or light",
+            "this or that: CLI or TUI",
+            "quiz: can you score a thin brief?",
+            "ankieta o lokalnym ticku",
+        )
+        for idx, text in enumerate(polls):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_poll(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "poll",
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-poll-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "poll")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
 
 
 if __name__ == "__main__":

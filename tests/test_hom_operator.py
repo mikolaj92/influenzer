@@ -48,6 +48,7 @@ from influenzer.playbook import (
     looks_like_bot_author,
     looks_like_bot_bump_week,
     looks_like_contest,
+    looks_like_poll,
     looks_like_dunk,
     looks_like_foreign_wave,
     looks_like_reply,
@@ -676,6 +677,38 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_contest(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_poll_is_quiz_this_or_that_or_ankieta(self) -> None:
+        polls = (
+            "poll: dark mode or light",
+            "a Twitter poll on the local tick",
+            "this or that: CLI or TUI",
+            "this-or-that for the installer",
+            "quiz: can you score a thin brief?",
+            "quizzes on the local tick",
+            "ankieta o lokalnym ticku",
+            "wypełnij ankietę",
+            "to czy tamto: README czy demo",
+            "to albo tamto",
+        )
+        for text in polls:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_poll(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "poll",
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "follow the README to run the demo",
+            "pollen count is not a product story",
+            "polling the GitHub API is the look",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_poll(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_thread_is_numbering_thread_or_storm_not_a_serial(self) -> None:
@@ -2682,6 +2715,27 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, "contest")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_poll_is_killed(self) -> None:
+        polls = (
+            "poll: dark mode or light",
+            "this or that: CLI or TUI",
+            "quiz: can you score a thin brief?",
+            "ankieta o lokalnym ticku",
+        )
+        for text in polls:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "poll")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
