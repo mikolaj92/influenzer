@@ -1,7 +1,9 @@
 """Coarse GitHub look: same as scan only when due, else silence.
 
-One job: if a weekly-ish window has elapsed for this project+repo, compose
-existing scan_github (survey → pack → admit). Otherwise emit silence.
+One job: if it is Monday (Europe/Warsaw) and this Monday has no look yet,
+compose existing scan_github (survey → pack → admit). Otherwise emit silence.
+A rolling 168h window is not this rhythm. Wednesday because 168h elapsed
+is silence. Tick may still score; social look does not.
 `--project-id` and `--repo` are required; this block does not invent a
 repo inventory.
 
@@ -38,8 +40,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from github_survey import GhRunner, invalid_repo_reason
 
@@ -52,6 +55,7 @@ from influenzer.hom import Brief
 from influenzer.storage import StateRepository
 
 DEFAULT_WINDOW_DAYS = 7
+CMO_TZ = ZoneInfo("Europe/Warsaw")
 
 
 def parse_utc(value: str | None) -> datetime | None:
@@ -153,24 +157,44 @@ def last_scan_at(repo: StateRepository, project_id: str, repo_slug: str) -> str 
     return max(known, key=lambda item: item[0])[1]
 
 
-def window_elapsed(last: str | None, now: str, *, window_days: int) -> bool:
-    """True when a look is due.
+def warsaw_monday(now: str) -> datetime | None:
+    """Monday 00:00 Europe/Warsaw that owns this clock, as UTC. None if unparseable."""
+    now_dt = parse_utc(now)
+    if now_dt is None:
+        return None
+    local = now_dt.astimezone(CMO_TZ)
+    if local.weekday() != 0:
+        return None
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start.astimezone(timezone.utc)
 
-    Missing or unparseable last → due (first look). now < last, or an
-    unparseable now after a known last, is not due. A set-back clock
-    (NTP, manual) is skew, not another Monday. Look is monotonic.
+
+def window_elapsed(last: str | None, now: str, *, window_days: int = DEFAULT_WINDOW_DAYS) -> bool:
+    """True when a Monday look is due.
+
+    Calendar is Monday Europe/Warsaw, not rolling 168h. A Wednesday clock
+    is not due even if last was more than a week ago. Missing or
+    unparseable last → due on Monday (first look). An unparseable now is
+    not due. now < last is not due. A set-back clock (NTP, manual) is
+    skew, not another Monday. Look is monotonic. ``window_days`` is
+    accepted for the old CLI flag and ignored: the rhythm is the
+    calendar, not an interval.
     """
+    _ = window_days
+    monday = warsaw_monday(now)
+    if monday is None:
+        return False
+    now_dt = parse_utc(now)
+    if now_dt is None:
+        return False
     if last is None:
         return True
     last_dt = parse_utc(last)
-    now_dt = parse_utc(now)
     if last_dt is None:
         return True
-    if now_dt is None or now_dt < last_dt:
+    if now_dt < last_dt:
         return False
-    if window_days < 1:
-        return True
-    return now_dt - last_dt >= timedelta(days=window_days)
+    return last_dt < monday
 
 
 def scan_due_reason(
@@ -181,7 +205,11 @@ def scan_due_reason(
     now: str | None = None,
     window_days: int = DEFAULT_WINDOW_DAYS,
 ) -> str | None:
-    """Silence reason if scan-due would not look. None means due. Does not call gh."""
+    """Silence reason if scan-due would not look. None means due. Does not call gh.
+
+    Due is Monday Europe/Warsaw with no look yet this Monday. A rolling
+    168h window is not this rhythm. ``window_days`` is ignored.
+    """
     slug = repo_slug.strip()
     clock = now or utc_now()
     if invalid_repo_reason(slug):
@@ -267,12 +295,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project-id", required=True)
     parser.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
     parser.add_argument("--config", help="path to config.json")
-    parser.add_argument("--now", help="ISO-8601 clock for the due window")
+    parser.add_argument("--now", help="ISO-8601 clock for the Monday due check")
     parser.add_argument(
         "--window-days",
         type=int,
         default=DEFAULT_WINDOW_DAYS,
-        help="coarse cadence in days (default 7)",
+        help="ignored; rhythm is Monday Europe/Warsaw, not a day interval",
     )
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
@@ -295,6 +323,7 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "CMO_TZ",
     "DEFAULT_WINDOW_DAYS",
     "brief_mentions_repo",
     "current_look_state",
@@ -302,5 +331,6 @@ __all__ = [
     "main",
     "scan_due_reason",
     "scan_github_if_due",
+    "warsaw_monday",
     "window_elapsed",
 ]

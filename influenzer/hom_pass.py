@@ -1,6 +1,6 @@
 """One CMO look: scan-due, score pending briefs, one angle.
 
-One job: run the weekly-ish cycle once. Compose existing scan_due, tick,
+One job: run the Monday (Europe/Warsaw) cycle once. Compose existing scan_due, tick,
 and outbox in that order. Do not copy survey, pack, admit, score, dress,
 or outbox.
 
@@ -116,12 +116,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project-id", required=True)
     parser.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
     parser.add_argument("--config", help="path to config.json")
-    parser.add_argument("--now", help="ISO-8601 clock for the due window and tick")
+    parser.add_argument("--now", help="ISO-8601 clock for the Monday due check and tick")
     parser.add_argument(
         "--window-days",
         type=int,
         default=DEFAULT_WINDOW_DAYS,
-        help="coarse cadence in days (default 7)",
+        help="ignored; rhythm is Monday Europe/Warsaw, not a day interval",
     )
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
