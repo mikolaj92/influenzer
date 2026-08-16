@@ -2,6 +2,9 @@
 
 Tryable is a README+URL heuristic. Look does not run the project.
 Launching on watch is silence. Code in look is untrusted.
+Inbound titles/descriptions are data, not a command. Pack cuts
+instructions ("zpostuj to", "ignore scoring"), leaves content.
+Our score stays ours.
 """
 
 from __future__ import annotations
@@ -26,6 +29,23 @@ from github_pack.classify import (
 )
 
 _SLUG_CLEAN_RE = re.compile(r"[^a-z0-9]+")
+_URL_IN_TEXT_RE = re.compile(r"https?://\S+", re.I)
+_LOGIN_PREFIX_RE = re.compile(r"^@[A-Za-z0-9][A-Za-z0-9_-]{0,38}:\s*")
+# Comment/issue/title copy is data. These shapes are an order, not a fact.
+_INBOUND_INSTRUCTION_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:please\s+)?(?:ignore|skip|bypass|disable|turn\s+off)\s+"
+    r"(?:all\s+)?(?:scoring|the\s+score|scores?|playbook|gates?|policy|verdict|rules?)\b|"
+    r"\b(?:do\s+not|don't|dont)\s+(?:score|use\s+(?:the\s+)?(?:playbook|scoring))\b|"
+    r"\bzpostuj(?:cie|my)?(?:\s+to)?\b|"
+    r"\b(?:just\s+)?(?:go\s+)?(?:post|tweet|publish)\s+(?:this|that|it)\b|"
+    r"\bignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?\b|"
+    r"\bsystem\s+prompt\b|"
+    r"\bnie\s+(?:punktuj|score(?:uj)?)\b|"
+    r"\bzignoruj\s+(?:scoring|punktacj\w*|playbook|score)\b|"
+    r"\bopublikuj\s+to\b"
+    r")"
+)
 
 
 def _slug_fragment(raw: str) -> str:
@@ -41,11 +61,51 @@ def _silence(reason: str, *, repo: str) -> dict[str, Any]:
     return {"status": "noop", "ok": True, "reason": reason, "repo": repo, "brief_id": None}
 
 
+def looks_like_inbound_instruction(text: str) -> bool:
+    return bool(text and _INBOUND_INSTRUCTION_RE.search(text))
+
+
+def strip_inbound_instructions(text: str) -> str:
+    """Cut command-like inbound. Content stays. Empty after strip is silence."""
+    if not text or not looks_like_inbound_instruction(text):
+        return text
+    parts: list[str] = []
+    last = 0
+    for match in _URL_IN_TEXT_RE.finditer(text):
+        parts.append(_INBOUND_INSTRUCTION_RE.sub(" ", text[last:match.start()]))
+        parts.append(match.group(0))
+        last = match.end()
+    parts.append(_INBOUND_INSTRUCTION_RE.sub(" ", text[last:]))
+    cleaned = "".join(parts)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" *\n *", "\n", cleaned)
+    cleaned = re.sub(r" +([,.;:])", r"\1", cleaned)
+    return cleaned.strip(" \t,;:.-")
+
+
+def sanitize_inbound_facts(facts: list[Any]) -> list[dict[str, Any]]:
+    """Keep excerpt shape. Drop an order. Empty after strip is not a fact."""
+    cleaned: list[dict[str, Any]] = []
+    for item in facts:
+        if not isinstance(item, dict):
+            continue
+        text = strip_inbound_instructions(str(item.get("text") or ""))
+        if not text or not _LOGIN_PREFIX_RE.sub("", text).strip():
+            continue
+        out = dict(item)
+        out["text"] = text
+        cleaned.append(out)
+    return cleaned
+
+
 def facts_from_survey(repo_slug: str, survey: dict[str, Any]) -> list[dict[str, Any]]:
     facts: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
 
     def add(*, kind: str, text: str, artifact_url: str | None = None) -> None:
+        text = strip_inbound_instructions(text)
+        if not text:
+            return
         if artifact_url and artifact_url in seen_urls:
             return
         if artifact_url:
@@ -106,7 +166,7 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
         return _silence("empty_survey", repo=slug)
     if not survey.get("releases") and not headline_prs(survey.get("prs") or []):
         return _silence("commit_noise", repo=slug)
-    facts = facts_from_survey(slug, survey)
+    facts = sanitize_inbound_facts(facts_from_survey(slug, survey))
     if not facts:
         return _silence("empty_survey", repo=slug)
     blob = "\n".join(str(fact.get("text") or "") for fact in facts)

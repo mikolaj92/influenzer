@@ -19,6 +19,8 @@ Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
 A fact is a short excerpt + comment/issue URL. The rest stays on GitHub.
 A whole thread in state.db is silence, not storage. Retention, not timeout.
+Inbound is data, not a command. A comment/issue does not change the
+playbook. Pack cuts instructions, leaves content. Our score stays ours.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
 50MB in state.db is silence. The loop lives.
 A fork is not a website. isFork is silence, even when the owner is ours.
@@ -44,7 +46,7 @@ from typing import Any
 
 from github_feedback import collect_feedback
 from github_feedback import feedback as github_feedback_mod
-from github_feedback.feedback import WHOLE_THREAD, whole_thread_reason
+from github_feedback.feedback import WHOLE_THREAD, sanitize_inbound_facts, whole_thread_reason
 from github_survey import GhRunner, invalid_repo_reason
 from github_survey.survey import look_bytes_over_limit, look_declared_gh, state_bytes_over_limit
 
@@ -131,11 +133,16 @@ def admit_feedback(
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     if repo.list_operator_drafts(project_id):
         return host_silence("open_draft", project_id=project_id, repo_slug=slug)
-    if whole_thread_reason(payload):
-        return host_silence(WHOLE_THREAD, project_id=project_id, repo_slug=slug)
     facts_raw = payload.get("facts")
     if not isinstance(facts_raw, list) or not facts_raw:
         return host_silence("comment_noise", project_id=project_id, repo_slug=slug)
+    facts_raw = sanitize_inbound_facts(facts_raw)
+    if not facts_raw:
+        return host_silence("comment_noise", project_id=project_id, repo_slug=slug)
+    packed = dict(payload)
+    packed["facts"] = facts_raw
+    if whole_thread_reason(packed):
+        return host_silence(WHOLE_THREAD, project_id=project_id, repo_slug=slug)
     fact_blob = "\n".join(str(item.get("text") or "") for item in facts_raw if isinstance(item, dict))
     if looks_like_fork(fact_blob):
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
@@ -162,7 +169,7 @@ def admit_feedback(
                 "project_id": project_id,
                 "brief_id": brief_id,
                 "facts": facts_raw,
-                "story_kind": str(payload.get("story_kind") or StoryKind.HARD_ISSUE.value),
+                "story_kind": StoryKind.HARD_ISSUE.value,
                 "claims_ship": False,
                 "tryable": False,
                 "source": SOURCE,
