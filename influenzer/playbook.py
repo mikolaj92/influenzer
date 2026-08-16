@@ -224,8 +224,11 @@ def parse_arena(value: str | None) -> ArenaId | None:
 
 # Launch stack: one 24–48h github/hn costume. Pair of #61 (primary) and #26 (window).
 # Next look keeps that costume. Hold or a dead window can change it. Shopping is silence.
+# #61: we sit on github (feedback) and hn (camp). X/LI/YT/shorts/discord/bsky
+# without a listener are not a first costume. Ship goes where we sit.
 STACK_HOURS = 48
 STACK_ARENAS: frozenset[ArenaId] = frozenset({ArenaId.GITHUB, ArenaId.HN})
+PRIMARY_ARENAS: frozenset[ArenaId] = STACK_ARENAS
 LIVING_STACK_REASON = "living_stack"
 
 
@@ -238,6 +241,11 @@ def is_stack_arena(arena: ArenaId | str | None) -> bool:
     except ValueError:
         return False
     return key in STACK_ARENAS
+
+
+def is_primary_arena(arena: ArenaId | str | None) -> bool:
+    """True when we sit there with a listener. Today that is github/hn."""
+    return is_stack_arena(arena)
 
 
 def parse_stack_arena(value: ArenaId | str | None) -> ArenaId | None:
@@ -339,18 +347,19 @@ def choose_arena(
 ) -> ArenaId:
     """One primary arena. A living github/hn stack keeps that costume.
 
-    GitHub is the website. HN only when there is a clickable demo and no
-    stack already chose the other costume. Shopping while the window lives
-    is not a new pick — the caller kills an explicit change; this keeps
-    the locked costume when preferred is empty.
+    We sit on github (feedback) and hn (camp). Preferred X / LinkedIn /
+    YouTube / shorts / Discord / Bluesky without a listener is not a first
+    costume — ship goes where we sit. GitHub is the website. HN only when
+    there is a clickable demo and no stack already chose the other costume.
+    Shopping while the window lives is not a new pick — the caller kills
+    an explicit change; this keeps the locked costume when preferred is empty.
     """
     locked = parse_stack_arena(stack_arena)
     if locked is not None:
         return locked
-    if preferred_arena is not None and preferred_arena != "":
-        if isinstance(preferred_arena, ArenaId):
-            return preferred_arena
-        return ArenaId(preferred_arena)
+    seated = parse_stack_arena(preferred_arena)
+    if seated is not None:
+        return seated
     kind = (
         story_kind
         if isinstance(story_kind, StoryKind) or story_kind is None
@@ -2595,6 +2604,7 @@ __all__ = [
     "MIN_SOCIAL_FACTS",
     "NEWS_HOSTS",
     "NEWSLETTER_STORY_KINDS",
+    "PRIMARY_ARENAS",
     "PRIVATE_CHANNEL_HOSTS",
     "PRIVATE_CONVERSATION_RE",
     "QUOTE_MARKS",
@@ -2637,6 +2647,7 @@ __all__ = [
     "is_launch_host_url",
     "is_merge_log_texts",
     "is_news_host_url",
+    "is_primary_arena",
     "is_private_channel_url",
     "is_public_issue_url",
     "is_ranking_host_url",
