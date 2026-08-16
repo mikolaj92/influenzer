@@ -43,6 +43,7 @@ from influenzer.playbook import (
     court_reason,
     fair_loop_reason,
     tavern_reason,
+    cafe_reason,
     has_cinema_package,
     has_fair_hook,
     has_fair_loop,
@@ -487,7 +488,9 @@ def _dress_newsletter(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_bluesky(bits: CopyBits, score: Score) -> str | None:
-    """Newer cafe: artifact, not vibe."""
+    """Newer cafe: pack onboarduje, feed trzyma. Artifact alone is half the game."""
+    if cafe_reason(bits.blob):
+        return None
     url = bits.artifact_url
     if not url:
         return None
@@ -599,6 +602,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             and court_reason(bits.blob, claims_ship=brief.claims_ship)
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
+        or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
     ):
         return None
     if unquotable_reason(triples):
