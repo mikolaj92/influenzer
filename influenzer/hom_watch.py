@@ -26,6 +26,9 @@ the owner is ours. Not a 404 loop. Fail-closed on watch.
 Workshop is a public README.
 An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
+Watch only on our repo. Owner must be the project maintainer (same
+GitHub login). A foreign owner is silence, not a ship. Helping them is
+cisza here or contribute, not our launch.
 """
 
 from __future__ import annotations
@@ -36,7 +39,7 @@ from typing import Any, Mapping
 from github_survey import invalid_repo_reason
 
 from influenzer.config import Config, load_config
-from influenzer.domain import utc_now
+from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.envelope import fail, noop, ok
 from influenzer.hom_pass import run_pass
 from influenzer.scan_due import scan_due_reason
@@ -54,12 +57,16 @@ class Watch:
 
 
 def get_watch(repo: StateRepository) -> Watch | None:
-    """Declared watch, or None. A bad slug from the database is silence."""
+    """Declared watch, or None. A bad slug or foreign owner from the database is silence."""
     row = repo.get_hom_watch()
     if row is None:
         return None
     slug = str(row["repo"] or "").strip()
     if invalid_repo_reason(slug):
+        return None
+    project = repo.get_project(row["project_id"])
+    maintainer = project.brand.maintainer if project is not None else None
+    if foreign_owner_reason(slug, maintainer):
         return None
     return Watch(project_id=row["project_id"], repo_slug=slug, created_at=row["created_at"])
 
@@ -76,8 +83,12 @@ def set_watch(
     bad = invalid_repo_reason(slug)
     if bad:
         return fail(bad, published=False)
-    if repo.get_project(project_id) is None:
+    project = repo.get_project(project_id)
+    if project is None:
         return fail("project not found", published=False)
+    foreign = foreign_owner_reason(slug, project.brand.maintainer)
+    if foreign:
+        return fail(foreign, published=False)
     clock = now or utc_now()
     try:
         repo.set_hom_watch(project_id, slug, created_at=clock)
@@ -147,6 +158,10 @@ def interval_tick(
     if allow_hom_pass:
         watch = get_watch(repo)
         if watch is not None and not invalid_repo_reason(watch.repo_slug):
+            project = repo.get_project(watch.project_id)
+            maintainer = project.brand.maintainer if project is not None else None
+            if foreign_owner_reason(watch.repo_slug, maintainer):
+                return tick(repo, cfg, due=(), cli_live=cli_live, now=clock)
             blocked = scan_due_reason(
                 repo,
                 project_id=watch.project_id,

@@ -25,6 +25,9 @@ A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
 An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
+Watch only on our repo. Owner must be the project maintainer (same
+GitHub login). A foreign owner is silence, not a ship. Helping them is
+cisza here or contribute, not our launch.
 A hung gh is silence, not a stuck loop. Timeout is harder and shorter
 than the tick interval. After it: cisza, the child is gone, next tick
 goes. This is not auth-fail.
@@ -55,7 +58,7 @@ from influenzer.playbook import (
 )
 
 from influenzer.brief_admit import SOURCE, admit_pack, host_silence, open_story_reason
-from influenzer.domain import utc_now
+from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.storage import StateRepository
 
 # Harder and shorter than the always-on tick interval (300s). A hang is not auth.
@@ -364,6 +367,11 @@ def scan_github(
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return host_silence("repo must be owner/name", project_id=project_id, repo_slug=slug)
+    project = repo.get_project(project_id)
+    maintainer = project.brand.maintainer if project is not None else None
+    foreign = foreign_owner_reason(slug, maintainer)
+    if foreign:
+        return host_silence(foreign, project_id=project_id, repo_slug=slug)
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)

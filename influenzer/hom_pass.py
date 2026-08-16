@@ -23,6 +23,9 @@ Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
 text, not a new survey. Look stays on the declared repo.
+Watch only on our repo. Owner must be the project maintainer (same
+GitHub login). A foreign owner is silence, not a ship. Helping them is
+cisza here or contribute, not our launch.
 """
 
 from __future__ import annotations

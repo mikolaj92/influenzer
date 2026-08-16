@@ -22,6 +22,9 @@ A clock that goes backward is silence, not a second look. Look is monotonic.
 Two watches on the same repo are one look. A second brief or angle from the
 same git is silence, even with another project_id. That is the machine lock,
 not a second survey.
+Watch only on our repo. Owner must be the project maintainer (same
+GitHub login). A foreign owner is silence, not a ship. Helping them is
+cisza here or contribute, not our launch.
 """
 
 from __future__ import annotations
@@ -36,7 +39,7 @@ from github_survey import GhRunner, invalid_repo_reason
 from influenzer.brief_admit import SOURCE, host_silence, open_story_reason
 from influenzer.brief_scan import scan_github
 from influenzer.config import load_config
-from influenzer.domain import utc_now
+from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Brief
 from influenzer.storage import StateRepository
@@ -154,6 +157,11 @@ def scan_due_reason(
     clock = now or utc_now()
     if invalid_repo_reason(slug):
         return "repo must be owner/name"
+    project = repo.get_project(project_id)
+    maintainer = project.brand.maintainer if project is not None else None
+    foreign = foreign_owner_reason(slug, maintainer)
+    if foreign:
+        return foreign
     blocked = open_story_reason(repo, project_id)
     if blocked:
         return blocked
