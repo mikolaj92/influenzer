@@ -15,9 +15,11 @@ from influenzer.hom import (
     Brief,
     Fact,
     HomError,
+    angle_body_hash,
     apply_brief,
     brief_from_mapping,
     compose_draft,
+    drop_repeat_angle,
     is_ship_artifact,
     score_brief,
 )
@@ -3510,6 +3512,84 @@ class TickBriefPathTests(unittest.TestCase):
         self.assertEqual(again["operator"]["processed"], 0)
         drafts = list(self.repo.conn.execute("SELECT draft_id FROM operator_drafts"))
         self.assertEqual(len(drafts), 1)
+
+    def test_same_angle_body_as_last_is_cisza_not_a_second_draft(self) -> None:
+        first = Brief.create(
+            project_id="app-1",
+            brief_id="ship-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.repo.save_brief(first)
+        first_out = tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
+        first_draft = self.repo.get_operator_draft("app-1", "ship-1")
+        assert first_draft is not None
+        self.assertEqual(first_out["operator"]["outcomes"][0]["verdict"], "draft")
+        self.assertEqual(first_draft.content_hash, angle_body_hash(first_draft.body))
+
+        copy = Brief.create(
+            project_id="app-1",
+            brief_id="ship-2",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.repo.save_brief(copy)
+        again = tick(self.repo, self.cfg, due=(), now="2026-08-13T06:00:00Z")
+        outcome = again["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "kill")
+        self.assertEqual(outcome["reason"], "same_angle_body")
+        self.assertIsNone(outcome.get("body"))
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "ship-2"))
+        drafts = list(self.repo.conn.execute("SELECT draft_id FROM operator_drafts"))
+        self.assertEqual(len(drafts), 1)
+        self.assertEqual(self.repo.last_angle_body_hash("app-1"), first_draft.content_hash)
+
+        fresh = Brief.create(
+            project_id="app-1",
+            brief_id="ship-3",
+            facts=(Fact(text="dry-run still default and strangers can try it", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.repo.save_brief(fresh)
+        third = tick(self.repo, self.cfg, due=(), now="2026-08-13T07:00:00Z")
+        third_outcome = third["operator"]["outcomes"][0]
+        self.assertEqual(third_outcome["verdict"], "draft")
+        third_draft = self.repo.get_operator_draft("app-1", "ship-3")
+        assert third_draft is not None
+        self.assertNotEqual(third_draft.body, first_draft.body)
+        self.assertNotEqual(third_draft.content_hash, first_draft.content_hash)
+        self.assertTrue(third_draft.body.startswith("Show HN:"))
+        self.assertNotIn("Costume:", third_draft.body)
+
+    def test_drop_repeat_angle_is_body_hash_not_ids(self) -> None:
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="copy-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        decision = apply_brief(brief, now="2026-08-13T05:00:00Z")
+        assert decision.draft is not None
+        same = drop_repeat_angle(decision, angle_body_hash(decision.draft.body))
+        self.assertIsNone(same.draft)
+        self.assertEqual(same.score.verdict, Verdict.KILL)
+        self.assertEqual(same.score.reason, "same_angle_body")
+        other = drop_repeat_angle(decision, angle_body_hash("Show HN: a new body\n\n" + SHIP_PR))
+        self.assertIs(other.draft, decision.draft)
+        self.assertEqual(angle_body_hash("one"), angle_body_hash("one"))
+        self.assertNotEqual(angle_body_hash("one"), angle_body_hash("two"))
 
     def test_tick_kill_persists_score_without_draft_or_publish(self) -> None:
         brief = Brief.create(

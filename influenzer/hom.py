@@ -206,6 +206,11 @@ class Score:
         )
 
 
+def angle_body_hash(body: str) -> str:
+    """Hash of the wearable body only. Stack format stays; text must be new."""
+    return content_hash({"body": body})
+
+
 @dataclass(frozen=True)
 class Draft:
     """Costume-native copy for one arena. Never an auto-publish."""
@@ -223,18 +228,7 @@ class Draft:
     content_hash: str = ""
 
     def with_hash(self) -> "Draft":
-        payload = {
-            "project_id": self.project_id,
-            "brief_id": self.brief_id,
-            "draft_id": self.draft_id,
-            "arena": self.arena.value,
-            "costume": self.costume,
-            "angle": self.angle,
-            "body": self.body,
-            "wave_checklist": list(self.wave_checklist),
-            "canon_url": self.canon_url,
-            "created_at": self.created_at,
-        }
+        # Body only. Format of the stack stays; identical text is the same angle.
         return Draft(
             project_id=self.project_id,
             brief_id=self.brief_id,
@@ -246,7 +240,7 @@ class Draft:
             wave_checklist=self.wave_checklist,
             canon_url=self.canon_url,
             created_at=self.created_at,
-            content_hash=content_hash(payload),
+            content_hash=angle_body_hash(self.body),
         )
 
 
@@ -638,6 +632,23 @@ def apply_brief(brief: Brief, *, now: str | None = None) -> OperatorDecision:
     return OperatorDecision(brief=brief, score=score, draft=draft)
 
 
+def drop_repeat_angle(
+    decision: OperatorDecision,
+    previous_body_hash: str | None,
+) -> OperatorDecision:
+    """Identical body as the last angle is cisza. Costume stays; text must be new."""
+    draft = decision.draft
+    if draft is None or not previous_body_hash:
+        return decision
+    if angle_body_hash(draft.body) != previous_body_hash:
+        return decision
+    return OperatorDecision(
+        brief=decision.brief,
+        score=_kill(decision.brief, "same_angle_body"),
+        draft=None,
+    )
+
+
 def decision_to_dict(decision: OperatorDecision) -> dict[str, Any]:
     score = decision.score
     draft = decision.draft
@@ -745,12 +756,14 @@ __all__ = [
     "HomError",
     "OperatorDecision",
     "Score",
+    "angle_body_hash",
     "apply_brief",
     "brief_artifacts",
     "brief_from_mapping",
     "brief_to_mapping",
     "compose_draft",
     "decision_to_dict",
+    "drop_repeat_angle",
     "fact_from_mapping",
     "is_ship_artifact",
     "parse_facts_json",
