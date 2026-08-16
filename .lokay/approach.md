@@ -1,25 +1,21 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=57 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=56 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #57 — Pusta tawerna nie dostaje zaproszenia
+Issue: #56 — Martwe gwiazdki to nie historia
 
 ## Goal
 
-Discord bez podziału intencji (help / show / contribute / lounge) albo bez sygnału że jest ~10 builderów — cisza na tavern. Publiczny invite na pustkę to nie kostium.
+Jeśli fakty to tylko „N stars” / ranking bez instalacji, issue, albo życia po spike — score zabija kąt. Changelog wolno. Warsztat liczy użycie, nie trupa na tle.
 
 ## Files likely touched
 
-- `influenzer/playbook.py`
-- `influenzer/hom.py`
-- `influenzer/hom_draft.py`
-- `tests/test_e2e_gates.py`
-- `tests/test_hom_operator.py`
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python3 -m pytest tests/test_e2e_gates.py tests/test_hom_operator.py::ScoreBriefTests::test_discord_is_not_a_launch_arena tests/test_hom_operator.py::ScoreBriefTests::test_every_arena_has_a_fail_closed_gate tests/test_hom_draft.py::HomDraftCostumeTests::test_discord_cannot_be_dressed -q`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
