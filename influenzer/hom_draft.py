@@ -45,6 +45,7 @@ from influenzer.playbook import (
     tavern_reason,
     cafe_reason,
     letter_reason,
+    seminar_reason,
     has_cinema_package,
     has_fair_hook,
     has_fair_loop,
@@ -331,6 +332,8 @@ def _show_hn_title(one_liner: str) -> str | None:
 
 def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     """Seminar: Show HN title + tryable URL + first-comment backstory."""
+    if seminar_reason(bits.blob):
+        return None
     title_src = bits.one_liner.strip()
     if title_src.lower().startswith("show hn:"):
         title_src = title_src.split(":", 1)[1].strip()
@@ -607,6 +610,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))
+        or (score.arena is ArenaId.HN and seminar_reason(bits.blob))
     ):
         return None
     if unquotable_reason(triples):
@@ -645,6 +649,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(body))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(body))
+        or (score.arena is ArenaId.HN and seminar_reason(body))
     ):
         return None
     if looks_like_open_source_without_license(body):

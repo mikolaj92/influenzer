@@ -61,6 +61,7 @@ class InfluenzerInitDemoTests(unittest.TestCase):
             self.assertIsNotNone(project)
             assert project is not None
             self.assertEqual(project.kind, "builder")
+            self.assertEqual(project.brand.maintainer, "mikolaj92")
 
     def test_paid_campaign_requires_budget_and_disclosure(self) -> None:
         main(["--config", str(self.config), "init", "--home", str(self.home)])

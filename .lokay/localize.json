@@ -1,20 +1,21 @@
 {
   "paths": [
-    "tests/test_e2e_gates.py",
     "influenzer/playbook.py",
     "influenzer/hom.py",
-    "influenzer/hom_draft.py"
+    "influenzer/hom_draft.py",
+    "tests/test_e2e_gates.py",
+    "tests/test_product_improvements.py"
   ],
   "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": ["gate", "letter", "newsletter"],
+  "seed_paths": ["BrandProfile.maintainer"],
+  "matched_tokens": ["BrandProfile", "maintainer", "Product", "gate"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Issue #54 is the letter costume: give first, then maybe ask. Recs are adjacent.",
-    "Same fail-closed path as tavern/court/cafe: playbook reason + choose_arena seat + hom gate + dress refuse.",
-    "Seed localize listed only tests/test_e2e_gates.py; implementation must live with the siblings."
+    "BrandProfile.maintainer is a field, not a file. Seminar gate lives with the other arena dress/kill blocks.",
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__54-list-najpierw-daje-potem-ewentualnie-pro-e4c0a7db",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__53-show-hn-pisze-cz-owiek-nie-marka-80c934af",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

@@ -27,6 +27,7 @@ from influenzer.playbook import (
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
     LETTER_ASK_WITHOUT_GIFT_REASON,
+    SEMINAR_BRAND_VOICE_REASON,
     Verdict,
     cafe_reason,
     choose_arena,
@@ -41,6 +42,7 @@ from influenzer.playbook import (
     has_tavern_seed,
     has_workshop_life,
     letter_reason,
+    looks_like_brand_voice,
     looks_like_court_launch,
     looks_like_dead_star_count,
     looks_like_dead_star_story,
@@ -48,7 +50,9 @@ from influenzer.playbook import (
     looks_like_letter_ask,
     looks_like_letter_crush,
     looks_like_poll,
+    looks_like_seminar_first_person,
     looks_like_tavern_invite,
+    seminar_reason,
     tavern_reason,
     unquotable_reason,
 )
@@ -790,6 +794,79 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "letter")
         self.assertIn("local tick", draft.body.lower())
         self.assertIn("adjacent", draft.body.lower())
+        self.assertNotIn("Costume:", draft.body)
+
+    def test_show_hn_brand_voice_is_silence(self) -> None:
+        brands = (
+            "We at Product announced a local tick",
+            "we announced the operator",
+            "our team announced the demo",
+            "the company announced a working demo",
+            "ogłaszamy lokalny tick",
+        )
+        for idx, text in enumerate(brands):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_brand_voice(text))
+                self.assertEqual(seminar_reason(text), SEMINAR_BRAND_VOICE_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-brand-hn-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, SEMINAR_BRAND_VOICE_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.HN, f"{text}\n{SHIP_PR}"),
+                    (Verdict.KILL, SEMINAR_BRAND_VOICE_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        human = "I built a local tick that scores briefs"
+        self.assertTrue(looks_like_seminar_first_person(human))
+        self.assertFalse(looks_like_brand_voice(human))
+        self.assertIsNone(seminar_reason(human))
+        self.assertEqual(self.app.brand.maintainer, "mikolaj92")
+        self.assertEqual(self.builder.brand.maintainer, "mikolaj92")
+        alive = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-human-hn",
+            facts=(
+                Fact(text=human, artifact_url=SHIP_PR),
+                Fact(text="I struggled with a queue that never scored a brief"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.assertIsNone(_gate_violation(alive, ArenaId.HN, "\n".join((human, SHIP_PR))))
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "seminar")
+        self.assertTrue(draft.body.startswith("Show HN:"))
+        self.assertIn("I built", draft.body)
+        self.assertNotIn("We at Product", draft.body)
         self.assertNotIn("Costume:", draft.body)
 
 

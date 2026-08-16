@@ -144,9 +144,9 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         wave=(
             "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
-            "First comment = backstory. Camp the thread. Human username.",
+            "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
-            "Press-release tone dies here.",
+            "Press-release tone dies here. We at Product announced is silence.",
         ),
         canon_path="hn.md",
     ),
@@ -1907,6 +1907,48 @@ def looks_like_hn_title_overflow(text: str) -> bool:
     return len(f"{HN_TITLE_PREFIX}{title}") > HN_TITLE_LIMIT
 
 
+# Show HN writes as a person. Backstory and nick come from
+# BrandProfile.maintainer, first person. "We at Product announced"
+# is silence on seminar. Pair of #32/#51 (dress HN as a human).
+SEMINAR_BRAND_VOICE_REASON = "seminar_brand_voice"
+SEMINAR_BRAND_VOICE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwe\s+at\s+(?:the\s+)?(?:company|product|brand|startup|[A-Za-z][\w.-]{1,40})\s+announced\b|"
+    r"\bwe\s+announced\b|"
+    r"\bour\s+(?:team|company|product|brand)\s+announced\b|"
+    r"\bthe\s+company\s+announced\b|"
+    r"\bnasz(?:a|ej)?\s+(?:zesp[oó]ł|marka|produkt)\b|"
+    r"\bogłaszamy\b"
+    r")"
+)
+SEMINAR_FIRST_PERSON_RE = re.compile(
+    r"(?i)(?:"
+    r"\bI\s+(?:built|wrote|made|shipped|struggled|wanted|needed|ran|use|used)\b|"
+    r"\bI['’]m\b|"
+    r"\bI\s+am\b"
+    r")"
+)
+
+
+def looks_like_brand_voice(text: str) -> bool:
+    """True for We at Product / we announced. Seminar is a person, not a brand."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(SEMINAR_BRAND_VOICE_RE.search(cleaned))
+
+
+def looks_like_seminar_first_person(text: str) -> bool:
+    """True for I built / I struggled. Show HN backstory is first person."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(SEMINAR_FIRST_PERSON_RE.search(cleaned))
+
+
+def seminar_reason(text: str) -> str | None:
+    """Silence when seminar would speak as a brand, not the maintainer."""
+    if looks_like_brand_voice(text):
+        return SEMINAR_BRAND_VOICE_REASON
+    return None
+
+
 def looks_like_x_overflow(text: str, url: str | None = None) -> bool:
     """True when the agora body will not fit in 280. URL sits on its own line."""
     hook = _one_line(text)
@@ -3025,6 +3067,9 @@ __all__ = [
     "LETTER_ASK_WITHOUT_GIFT_REASON",
     "LETTER_ASK_RE",
     "LETTER_CRUSH_RE",
+    "SEMINAR_BRAND_VOICE_REASON",
+    "SEMINAR_BRAND_VOICE_RE",
+    "SEMINAR_FIRST_PERSON_RE",
     "CAFE_FEED_RE",
     "CAFE_PACK_RE",
     "CONTEST_RE",
@@ -3191,6 +3236,9 @@ __all__ = [
     "looks_like_letter_ask",
     "looks_like_letter_crush",
     "letter_reason",
+    "looks_like_brand_voice",
+    "looks_like_seminar_first_person",
+    "seminar_reason",
     "looks_like_dead_link",
     "looks_like_dead_release_asset",
     "looks_like_dead_star_count",
