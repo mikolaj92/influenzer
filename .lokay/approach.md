@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=70 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=69 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #70 — Limity areny są twarde: overflow = cisza
+Issue: #69 — Język kostiumu: Show HN i GitHub po angielsku
 
 ## Goal
 
-Limity areny są twarde. Overflow = cisza, nie obcięcie w pół słowa. X mieści się w 280. Tytuł Show HN krótki (jedna linia, bez bloga). Fold LinkedIn ~210 na insight. Dłuższe nie wychodzi.
+Język kostiumu. Show HN i GitHub ubierają się po angielsku (seminarium/warsztat OSS). List i dwór biorą język z profilu (u nas często polski). Polski Show HN albo angielski list do polskiej audience = cisza na tamtym kanale.
 
 ## Files likely touched
 

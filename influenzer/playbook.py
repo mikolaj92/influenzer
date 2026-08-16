@@ -91,7 +91,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Seed ICP: early 2+ line add (not echo) on people buyers already watch.",
             "Dwell: win the ~210-char fold; body must be finishable. Overflow is silence, not a mid-word clip.",
             "First 60–90 min: reply with new substance (re-entry).",
-            "Zero-click: insight in the post. No pitch in line one, no hashtag wall.",
+            "Zero-click: insight in the post. No pitch in line one, no hashtag wall. Language from the profile (audience). A foreign-language court is silence.",
         ),
         canon_path="linkedin.md",
     ),
@@ -126,7 +126,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. No shouty CAPS title, no emoji. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -139,7 +139,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory. Camp the thread. Human username.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -164,7 +164,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="letter",
         game="owned list plus habit plus recs graph",
         wave=(
-            "Named editor, one promise, cadence you can keep on a bad week.",
+            "Named editor, one promise, cadence you can keep on a bad week. Language from the profile (audience). A foreign-language letter is silence.",
             "Rent-to-own: social/GitHub feed the exportable list.",
             "No user-facing change means no email.",
             "Recs: adjacent, give first. Hygiene beats vanity size.",
@@ -1411,6 +1411,141 @@ def looks_like_emoji_title(text: str) -> bool:
     if title.lower().startswith("show hn:"):
         title = title.split(":", 1)[1].strip()
     return bool(title and _EMOJI_RE.search(title))
+
+
+# Costume language. Seminar/workshop dress English (OSS seminar). Letter/court
+# take language from the profile (audience). A Polish Show HN or an English
+# letter to a Polish audience is silence on that channel.
+_POLISH_MARKERS = (
+    "ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż",
+    "Ą", "Ć", "Ę", "Ł", "Ń", "Ó", "Ś", "Ź", "Ż",
+)
+_POLISH_WORD_RE = re.compile(
+    r"(?i)(?<![A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż])"
+    r"(?:"
+    r"i|oraz|orazże|ale|lecz|jednak|ponieważ|dlatego|któr(?:y|a|e|ych|emu|ym)|"
+    r"jest|są|był|była|było|będzie|może|można|trzeba|nie|tak|"
+    r"dla|od|do|na|po|przy|przez|bez|nad|pod|za|ze|we|ku|"
+    r"ten|ta|to|te|tego|tej|tych|tym|tymi|"
+    r"jak|gdy|kiedy|jeśli|jeżeli|że|czy|żeby|"
+    r"lokaln(?:y|a|e|ych)|kąt|kostium|cisza|brief|szkic|"
+    r"wydaliśmy|wystartowaliśmy|uruchomiliśmy|"
+    r"działa|działają|działać|"
+    r"projekt|narzędzie|wersja|"
+    r"możliwe|nowy|nowa|nowe|"
+    r"polski|polska|polskie|polską|polskiego"
+    r")"
+    r"(?![A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż])"
+)
+_ENGLISH_WORD_RE = re.compile(
+    r"(?i)(?<![A-Za-z])"
+    r"(?:"
+    r"the|and|or|but|with|from|this|that|these|those|"
+    r"is|are|was|were|be|been|being|"
+    r"for|not|you|your|our|we|they|their|"
+    r"can|will|just|into|about|over|under|"
+    r"local|tick|scores|briefs|emits|draft|"
+    r"shipped|launched|working|quickstart|"
+    r"strangers|click|run|demo|today"
+    r")"
+    r"(?![A-Za-z])"
+)
+_POLISH_AUDIENCE_RE = re.compile(
+    r"(?i)\b(?:"
+    r"pl|pol|polski|polska|polskie|polską|polskiego|"
+    r"poland|polish|pl-pl|pl_pl"
+    r")\b"
+)
+_ENGLISH_AUDIENCE_RE = re.compile(
+    r"(?i)\b(?:"
+    r"en|eng|english|en-us|en_us|en-gb|en_gb|"
+    r"builders?|customers?|developers?|devs?|"
+    r"users?|founders?|engineers?"
+    r")\b"
+)
+ENGLISH_COSTUME_ARENAS: frozenset[ArenaId] = frozenset({ArenaId.HN, ArenaId.GITHUB})
+PROFILE_LANGUAGE_ARENAS: frozenset[ArenaId] = frozenset(
+    {ArenaId.LINKEDIN, ArenaId.NEWSLETTER}
+)
+
+
+def _letters_only(text: str) -> str:
+    return "".join(ch for ch in text if ch.isalpha())
+
+
+def _has_polish_marker(text: str) -> bool:
+    return any(mark in text for mark in _POLISH_MARKERS)
+
+
+def looks_like_polish(text: str) -> bool:
+    """True when copy wears Polish letters or Polish function words."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    if not _letters_only(cleaned):
+        return False
+    if _has_polish_marker(cleaned):
+        return True
+    return bool(_POLISH_WORD_RE.search(cleaned))
+
+
+def looks_like_english(text: str) -> bool:
+    """True when copy is Latin letters without Polish dress."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    letters = _letters_only(cleaned)
+    if not letters:
+        return False
+    if looks_like_polish(cleaned):
+        return False
+    if any(ord(ch) > 127 for ch in letters):
+        return False
+    return True
+
+
+def profile_language(audience: str | None, voice: str | None = None) -> str | None:
+    """pl or en from the profile. Ambiguous audience is silence, not a guess."""
+    blob = " ".join(part for part in (audience, voice) if part)
+    if not blob.strip():
+        return None
+    polish = bool(_POLISH_AUDIENCE_RE.search(blob) or looks_like_polish(blob))
+    english = bool(_ENGLISH_AUDIENCE_RE.search(blob) or looks_like_english(blob))
+    if polish and not english:
+        return "pl"
+    if english and not polish:
+        return "en"
+    return None
+
+
+def costume_language_reason(
+    arena: ArenaId | str | None,
+    text: str,
+    *,
+    audience: str | None = None,
+    voice: str | None = None,
+) -> str | None:
+    """Silence when the costume wears the wrong language.
+
+    Show HN / GitHub dress English. Letter / court take the profile language.
+    Missing profile language on letter/court is silence, not a guess.
+    """
+    if arena is None:
+        return None
+    key = arena if isinstance(arena, ArenaId) else ArenaId(arena)
+    cleaned = text or ""
+    if not _letters_only(_URL_IN_TEXT_RE.sub(" ", cleaned)):
+        return None
+    if key in ENGLISH_COSTUME_ARENAS:
+        if looks_like_english(cleaned) and not looks_like_polish(cleaned):
+            return None
+        return "costume_language"
+    if key in PROFILE_LANGUAGE_ARENAS:
+        wanted = profile_language(audience, voice)
+        if wanted is None:
+            return "costume_language"
+        if wanted == "pl":
+            return None if looks_like_polish(cleaned) else "costume_language"
+        if wanted == "en":
+            return None if looks_like_english(cleaned) else "costume_language"
+        return "costume_language"
+    return None
 
 
 # Hard arena limits. Overflow is silence, not a mid-word clip.
