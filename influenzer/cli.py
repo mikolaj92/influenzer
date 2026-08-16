@@ -204,17 +204,17 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     scan.add_argument(
         "--if-due",
         action="store_true",
-        help="only survey when the coarse window elapsed (same as brief scan-due)",
+        help="only survey on Monday (Europe/Warsaw) when this Monday has no look yet",
     )
     scan.add_argument(
         "--window-days",
         type=int,
         default=7,
-        help="coarse cadence in days when --if-due (default 7)",
+        help="ignored; rhythm is Monday Europe/Warsaw, not a day interval",
     )
     scan_due = brief_sub.add_parser(
         "scan-due",
-        help="same as scan only when the coarse window elapsed; else silence",
+        help="same as scan only on Monday (Europe/Warsaw) when this Monday has no look; else silence",
     )
     scan_due.add_argument("--project-id", required=True)
     scan_due.add_argument("--repo", required=True, help="owner/name of a public GitHub repo")
@@ -222,7 +222,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
         "--window-days",
         type=int,
         default=7,
-        help="coarse cadence in days (default 7)",
+        help="ignored; rhythm is Monday Europe/Warsaw, not a day interval",
     )
     show_brief = brief_sub.add_parser("show", help="show a brief, score, and draft if any")
     show_brief.add_argument("--project-id", required=True)
@@ -244,7 +244,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
         "--window-days",
         type=int,
         default=7,
-        help="coarse cadence in days for scan-due (default 7)",
+        help="ignored; rhythm is Monday Europe/Warsaw, not a day interval",
     )
 
     watch = sub.add_parser(

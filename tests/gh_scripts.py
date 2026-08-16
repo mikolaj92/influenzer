@@ -8,7 +8,7 @@ from typing import Sequence
 
 from github_survey import GhCall, classify_gh_argv
 
-NOW = "2026-08-13T06:00:00Z"
+NOW = "2026-08-17T06:00:00Z"
 REPO = "mikolaj92/demo"
 SHIP_PR = "https://github.com/mikolaj92/demo/pull/12"
 SHIP_RELEASE = "https://github.com/mikolaj92/demo/releases/tag/v0.1.0"

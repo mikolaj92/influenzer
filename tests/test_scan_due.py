@@ -24,6 +24,7 @@ from influenzer.scan_due import (
     last_scan_at,
     main as scan_due_main,
     scan_github_if_due,
+    window_elapsed,
 )
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
@@ -173,7 +174,7 @@ class ScanDueTests(unittest.TestCase):
                 tryable=True,
                 source=SOURCE,
                 status="processed",
-                created_at="2026-08-12T06:00:00Z",
+                created_at="2026-08-17T05:00:00Z",
             )
         )
         out, fake = self._due(ship_script())
@@ -223,14 +224,24 @@ class ScanDueTests(unittest.TestCase):
         self.assertTrue(fake.calls)
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
 
-    def test_window_days_override(self) -> None:
-        self.repo.record_github_scan("app-1", REPO, scanned_at="2026-08-10T06:00:00Z")
-        blocked, fake_blocked = self._due(ship_script(), window_days=7)
-        self.assertEqual(blocked["reason"], "not due")
-        self.assertEqual(fake_blocked.calls, [])
-        opened, fake_open = self._due(ship_script(), window_days=2)
-        self.assertEqual(opened["status"], "ok")
-        self.assertTrue(fake_open.calls)
+    def test_window_days_does_not_open_a_wednesday(self) -> None:
+        self.repo.record_github_scan("app-1", REPO, scanned_at="2026-08-05T06:00:00Z")
+        fake = ScriptedGh(ship_script())
+        with (
+            patch("subprocess.run", side_effect=AssertionError("scan-due must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("scan-due must not fetch")),
+        ):
+            wed = scan_github_if_due(
+                self.repo,
+                project_id="app-1",
+                repo_slug=REPO,
+                gh=fake,
+                now="2026-08-12T06:00:00Z",
+                window_days=1,
+            )
+        self.assertEqual(wed["status"], "noop")
+        self.assertEqual(wed["reason"], "not due")
+        self.assertEqual(fake.calls, [])
 
     def test_other_repo_watermark_does_not_block(self) -> None:
         self.repo.record_github_scan("app-1", "other/repo", scanned_at=NOW)
@@ -271,8 +282,36 @@ class ScanDueTests(unittest.TestCase):
         self.assertTrue(fake.calls)
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
 
-    def test_default_window_is_seven_days(self) -> None:
+    def test_default_window_flag_still_exists(self) -> None:
         self.assertEqual(DEFAULT_WINDOW_DAYS, 7)
+
+    def test_monday_calendar_not_rolling_168h(self) -> None:
+        self.assertFalse(window_elapsed(None, "2026-08-12T06:00:00Z"))
+        self.assertFalse(window_elapsed("2026-08-05T06:00:00Z", "2026-08-12T06:00:00Z"))
+        self.assertTrue(window_elapsed(None, NOW))
+        self.assertTrue(window_elapsed("2026-08-10T06:00:00Z", NOW))
+        self.assertFalse(window_elapsed(NOW, NOW))
+        self.assertFalse(window_elapsed(NOW, "2026-08-17T18:00:00Z"))
+        self.assertFalse(window_elapsed(None, "2026-08-16T21:30:00Z"))
+        self.assertTrue(window_elapsed(None, "2026-08-16T22:00:00Z"))
+
+    def test_not_monday_first_look_is_silence_without_gh(self) -> None:
+        fake = ScriptedGh(ship_script())
+        with (
+            patch("subprocess.run", side_effect=AssertionError("scan-due must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("scan-due must not fetch")),
+        ):
+            out = scan_github_if_due(
+                self.repo,
+                project_id="app-1",
+                repo_slug=REPO,
+                gh=fake,
+                now="2026-08-12T06:00:00Z",
+            )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "not due")
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
 
 class ScanDueCLIFAlaTests(unittest.TestCase):
