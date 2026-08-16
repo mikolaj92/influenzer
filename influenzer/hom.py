@@ -39,6 +39,7 @@ from influenzer.playbook import (
     is_video_host_url,
     looks_like_bot_bump_week,
     looks_like_commit_noise,
+    looks_like_monday_without_history,
     looks_like_contest,
     looks_like_dunk,
     looks_like_foreign_wave,
@@ -614,6 +615,17 @@ def score_brief(brief: Brief) -> Score:
         if verdict is Verdict.CHANGELOG_ONLY:
             return _changelog(brief, reason)
         return _kill(brief, reason)
+    if looks_like_monday_without_history(
+        story_kind=brief.story_kind,
+        preferred_arena=chosen,
+        tryable=brief.tryable,
+        artifact_urls=brief_artifacts(brief),
+        facts=_fact_triples(brief),
+        blob=blob,
+    ):
+        if is_social_arena(chosen):
+            return _kill(brief, "monday_without_history")
+        return _changelog(brief, "monday_without_history")
     if is_social_arena(chosen):
         if not _enough_social_substance(brief):
             return _changelog(brief, "thin_brief")

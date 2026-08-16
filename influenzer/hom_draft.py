@@ -57,6 +57,7 @@ from influenzer.playbook import (
     looks_like_x_overflow,
     show_hn_title_text,
     looks_like_bot_bump_week,
+    looks_like_monday_without_history,
     looks_like_contest,
     looks_like_dunk,
     looks_like_foreign_wave,
@@ -546,6 +547,14 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             kinds=tuple(fact.kind for fact in brief.facts),
         )
         or _bot_bump_week_bits(bits)
+        or looks_like_monday_without_history(
+            story_kind=brief.story_kind,
+            preferred_arena=score.arena or brief.preferred_arena,
+            tryable=brief.tryable,
+            artifact_urls=brief_artifacts(brief),
+            facts=triples,
+            blob=bits.blob,
+        )
     ):
         return None
     if unquotable_reason(triples):

@@ -1,21 +1,24 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=65 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=64 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #65 — Look jest idempotentny: dwa ticki = jeden brief
+Issue: #64 — Poniedziałek bez historii to cisza, nie recap
 
 ## Goal
 
-Look jest idempotentny. Dwa ticki w ten sam poniedziałek = najwyżej jeden brief i jeden kąt. Drugi przebieg widzi już zrobiony look i milczy, bez drugiego gh i bez wyścigu na admit.
+Poniedziałek bez historii to cisza, nie recap. Look bez ship/tryable i bez prawdziwego feedbacku nie produkuje kąta ani „weekly update”. Changelog może zostać w repo. Społecznie — milczenie.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — fail-closed Monday/history detector
+- `influenzer/hom.py` — score: no ship/tryable and no real feedback = changelog or social kill
+- `influenzer/hom_draft.py` — dress refuses a recap even if score says draft
+- `tests/test_hom_operator.py` / `tests/test_hom_draft.py`
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `uv run python -m unittest tests.test_hom_operator tests.test_hom_draft`
 
 ## Non-goals
 
