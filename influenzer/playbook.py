@@ -183,6 +183,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
             "Seed about 10 builders before a public invite.",
             "Celebrate merges here; decisions merge on the repo.",
             "Durable Q&A goes to Discussions, not Discord search.",
+            "Empty tavern is silence. Public invite only with the split and ~10 builders.",
         ),
         canon_path="discord.md",
     ),
@@ -350,13 +351,15 @@ def choose_arena(
     """One primary arena. A living github/hn stack keeps that costume.
 
     We sit on github (feedback) and hn (camp). Preferred X / YouTube /
-    shorts / Discord / Bluesky without a listener is not a first costume
-    — ship goes where we sit. Court is insight from the work, never a
-    launch channel: preferred LinkedIn sits only when the brief does not
-    claim ship. GitHub is the website. HN only when there is a clickable
-    demo and no stack already chose the other costume. Shopping while the
-    window lives is not a new pick — the caller kills an explicit change;
-    this keeps the locked costume when preferred is empty.
+    shorts / Bluesky without a listener is not a first costume — ship
+    goes where we sit. Court is insight from the work, never a launch
+    channel: preferred LinkedIn sits only when the brief does not claim
+    ship. Preferred Discord sits so an empty tavern can be silence —
+    public invite only with intent split and ~10 builders. GitHub is the
+    website. HN only when there is a clickable demo and no stack already
+    chose the other costume. Shopping while the window lives is not a
+    new pick — the caller kills an explicit change; this keeps the locked
+    costume when preferred is empty.
     """
     locked = parse_stack_arena(stack_arena)
     if locked is not None:
@@ -374,6 +377,9 @@ def choose_arena(
             )
         except ValueError:
             wanted = None
+    # #57: empty tavern is silence. Sit so a public invite on emptiness dies.
+    if wanted is ArenaId.DISCORD:
+        return ArenaId.DISCORD
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
         return ArenaId.LINKEDIN
@@ -1418,7 +1424,11 @@ class ArenaGate:
 
 
 ARENA_GATES: dict[ArenaId, ArenaGate] = {
-    ArenaId.DISCORD: ArenaGate(reason="discord_pre_pmf", always_kill=True),
+    ArenaId.DISCORD: ArenaGate(
+        reason="discord_pre_pmf",
+        min_facts=2,
+        allowed_story_kinds=frozenset({StoryKind.MAJOR}),
+    ),
     ArenaId.HN: ArenaGate(
         reason="hn_not_tryable",
         require_tryable=True,
@@ -1890,6 +1900,56 @@ def court_reason(text: str, *, claims_ship: bool = False) -> str | None:
         return COURT_NOT_A_LAUNCH_REASON
     if not has_court_insight(text):
         return "court_not_ready"
+    return None
+
+
+# Empty tavern is silence. A public invite without the help/show/contribute/
+# lounge split, or without ~10 builders, is not a costume. Pair of #38
+# (decisions stay on GitHub) and #52 (durable Q&A is Discussions).
+EMPTY_TAVERN_REASON = "discord_pre_pmf"
+TAVERN_INTENT_RE = re.compile(
+    r"(?i)(?="
+    r".*\bhelp\b)(?=.*\bshow\b)(?=.*\bcontribute\b)(?=.*\blounge\b)"
+)
+TAVERN_SEED_RE = re.compile(
+    r"(?i)(?:"
+    r"~?\s*10\s+builders?|"
+    r"about\s+10\s+builders?|"
+    r"seed(?:ed)?\s+(?:about\s+)?10\s+builders?|"
+    r"ok\.\s*10\s+builder\u00f3w|"
+    r"oko\u0142o\s+10\s+builder"
+    r")"
+)
+TAVERN_INVITE_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:public\s+)?invite\b|"
+    r"\bzaproszen|"
+    r"discord\.gg/|"
+    r"discord\.com/invite/"
+    r")"
+)
+
+
+def looks_like_tavern_invite(text: str) -> bool:
+    """True for a public Discord invite. Empty tavern is not a costume."""
+    cleaned = text or ""
+    return bool(TAVERN_INVITE_RE.search(cleaned))
+
+
+def has_tavern_intent_split(text: str) -> bool:
+    """True when help / show / contribute / lounge are all named."""
+    return bool(TAVERN_INTENT_RE.search(text or ""))
+
+
+def has_tavern_seed(text: str) -> bool:
+    """True when ~10 builders are already in the room."""
+    return bool(TAVERN_SEED_RE.search(text or ""))
+
+
+def tavern_reason(text: str) -> str | None:
+    """Silence when Discord would invite into an empty tavern."""
+    if not has_tavern_intent_split(text) or not has_tavern_seed(text):
+        return EMPTY_TAVERN_REASON
     return None
 
 
@@ -2720,6 +2780,7 @@ __all__ = [
     "COURT_PITCH_RE",
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
+    "EMPTY_TAVERN_REASON",
     "CONTEST_RE",
     "FAIR_CTA_RE",
     "FAIR_HOOK_RE",
@@ -2807,6 +2868,8 @@ __all__ = [
     "has_named_subreddit",
     "has_quote_mark",
     "has_real_feedback",
+    "has_tavern_intent_split",
+    "has_tavern_seed",
     "is_blog_host_url",
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
@@ -2866,7 +2929,9 @@ __all__ = [
     "looks_like_linkedin_fold_overflow",
     "looks_like_x_overflow",
     "looks_like_superlative",
+    "looks_like_tavern_invite",
     "show_hn_title_text",
+    "tavern_reason",
     "looks_like_store_pitch",
     "looks_like_launch_pitch",
     "looks_like_dead_link",

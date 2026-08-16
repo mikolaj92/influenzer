@@ -3685,7 +3685,8 @@ class ScoreBriefTests(unittest.TestCase):
         from influenzer.playbook import ARENA_GATES
 
         self.assertEqual(set(ARENA_GATES), set(ARENAS))
-        self.assertTrue(ARENA_GATES[ArenaId.DISCORD].always_kill)
+        self.assertFalse(ARENA_GATES[ArenaId.DISCORD].always_kill)
+        self.assertEqual(ARENA_GATES[ArenaId.DISCORD].reason, "discord_pre_pmf")
         self.assertNotIn(ArenaId.GITHUB, SOCIAL_ARENAS)
 
     def test_scoring_is_deterministic(self) -> None:
