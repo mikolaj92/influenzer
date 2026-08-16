@@ -31,6 +31,7 @@ from influenzer.playbook import (
     tavern_reason,
     cafe_reason,
     letter_reason,
+    seminar_reason,
     has_cinema_package,
     has_fair_hook,
     has_named_subreddit,
@@ -514,6 +515,10 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         letter_fail = letter_reason(blob)
         if letter_fail:
             return Verdict.KILL, letter_fail
+    if arena is ArenaId.HN:
+        seminar_fail = seminar_reason(blob)
+        if seminar_fail:
+            return Verdict.KILL, seminar_fail
     if gate.require_clickable_url and not _has_clickable_url(brief):
         return Verdict.KILL, gate.reason
     if gate.require_ship_artifact and not any(is_ship_artifact(url) for url in brief_artifacts(brief)):
