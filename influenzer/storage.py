@@ -9,6 +9,7 @@ import re
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Iterator, Mapping, TextIO
 
@@ -20,7 +21,7 @@ from .domain import (
 from .domain import content_hash
 from .hom import Brief, Draft, Score, angle_body_hash, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
-from .playbook import ArenaId, StoryKind, Verdict
+from .playbook import ArenaId, StoryKind, Verdict, is_social_arena
 
 
 class StorageError(RuntimeError):
@@ -300,6 +301,39 @@ class StateRepository:
                 {"repo": repo_slug, "started_at": started_at},
                 conn=c,
             )
+
+    def claim_github_look(
+        self,
+        project_id: str,
+        repo_slug: str,
+        *,
+        started_at: str,
+        due: Callable[[], str | None],
+    ) -> str | None:
+        """CAS: first writer of this Monday look wins. Loser is silence, no second gh.
+
+        ``due`` is re-checked under BEGIN IMMEDIATE so two ticks cannot both
+        decide the window is open. A lost race (already looking) is silence,
+        not a second gh. Leftover crash-resume stays outside this claim.
+        Another project's leftover looking is a half-open look.
+        """
+        with self.transaction() as c:
+            self._require_project(c, project_id)
+            blocked = due()
+            if blocked:
+                return blocked
+            latest = self._latest_look(repo_slug)
+            if latest is not None and latest[0] == "in_progress":
+                if latest[1] and latest[1] != project_id:
+                    return "half_open_look"
+                return "not due"
+            self._event(
+                project_id,
+                "github.looking",
+                {"repo": repo_slug, "started_at": started_at},
+                conn=c,
+            )
+            return None
 
     def record_github_scan(self, project_id: str, repo_slug: str, *, scanned_at: str) -> None:
         """Append a github.scanned domain event for this project+repo. No new table."""
@@ -779,6 +813,65 @@ class StateRepository:
                 ),
             )
             self._event(brief.project_id, event_type, brief_to_mapping(brief), conn=c)
+
+    def admit_brief(self, brief: Brief, *, event_type: str = "brief.ingested") -> str | None:
+        """CAS: first writer of this story wins. A race is silence, not a second brief.
+
+        Re-checks pending brief, social draft, same brief_id, and same ship
+        artifact under BEGIN IMMEDIATE. IntegrityError on the unique key is
+        the same silence.
+        """
+        with self.transaction() as c:
+            self._require_project(c, brief.project_id)
+            pending = c.execute(
+                "SELECT 1 FROM briefs WHERE project_id=? AND status=? LIMIT 1",
+                (brief.project_id, "pending"),
+            ).fetchone()
+            if pending is not None:
+                return "pending_brief"
+            drafts = c.execute(
+                "SELECT arena FROM operator_drafts WHERE project_id=? AND coalesce(gate_verdict, '') != ?",
+                (brief.project_id, "hold"),
+            )
+            for row in drafts:
+                if is_social_arena(row["arena"]):
+                    return "social_draft"
+            existing = c.execute(
+                "SELECT 1 FROM briefs WHERE project_id=? AND brief_id=?",
+                (brief.project_id, brief.brief_id),
+            ).fetchone()
+            if existing is not None:
+                return "already_told"
+            wanted = {fact.artifact_url for fact in brief.facts if fact.artifact_url}
+            if wanted:
+                for row in c.execute("SELECT facts_json FROM briefs"):
+                    try:
+                        facts = parse_facts_json(row["facts_json"])
+                    except (TypeError, ValueError):
+                        continue
+                    for fact in facts:
+                        if fact.artifact_url and fact.artifact_url in wanted:
+                            return "already_told"
+            try:
+                c.execute(
+                    "INSERT INTO briefs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        brief.project_id,
+                        brief.brief_id,
+                        _json(brief_to_mapping(brief)["facts"]),
+                        brief.story_kind.value,
+                        int(brief.claims_ship),
+                        int(brief.tryable),
+                        None if brief.preferred_arena is None else brief.preferred_arena.value,
+                        brief.source,
+                        brief.status,
+                        brief.created_at,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                return "already_told"
+            self._event(brief.project_id, event_type, brief_to_mapping(brief), conn=c)
+            return None
 
     def get_brief(self, project_id: str, brief_id: str) -> Brief | None:
         row = self.conn.execute(

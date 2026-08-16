@@ -6,6 +6,8 @@ look: a second brief from the same git is silence, even with another project_id.
 Crash mid-look resumes; it does not start from zero. Look already done and
 look in progress are two states. A second gh on a half-open look is an error.
 Pending brief after a crash is score+angle only, no second survey/gh.
+Two ticks the same Monday are one look. A race on admit is CAS silence,
+not a second brief.
 
 Does not call gh. Does not survey GitHub. Does not score. Does not publish.
 Never opens runtime.db.
@@ -169,9 +171,11 @@ def admit_pack(
     if not any(is_ship_artifact(fact.artifact_url) for fact in brief.facts):
         return host_silence("not_tryable", project_id=project_id, repo_slug=slug)
     try:
-        repo.save_brief(brief, event_type="brief.scanned")
+        raced = repo.admit_brief(brief, event_type="brief.scanned")
     except StorageError:
         return host_silence("already_told", project_id=project_id, repo_slug=slug)
+    if raced:
+        return host_silence(raced, project_id=project_id, repo_slug=slug)
     return ok(
         published=False,
         project_id=brief.project_id,

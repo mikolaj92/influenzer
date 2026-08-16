@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=66 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=65 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #66 — Crash w połowie przebiegu wznawia, nie zaczyna od zera
+Issue: #65 — Look jest idempotentny: dwa ticki = jeden brief
 
 ## Goal
 
-Crash w połowie przebiegu wznawia, nie zaczyna od zera. Pending brief po padzie → tylko score+kąt, bez drugiego survey/gh. Look „już zrobiony” i look „w trakcie” to dwa stany. Drugi gh na półotwartą historię = błąd.
+Look jest idempotentny. Dwa ticki w ten sam poniedziałek = najwyżej jeden brief i jeden kąt. Drugi przebieg widzi już zrobiony look i milczy, bez drugiego gh i bez wyścigu na admit.
 
 ## Files likely touched
 
