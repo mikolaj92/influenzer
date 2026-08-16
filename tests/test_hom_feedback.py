@@ -99,6 +99,24 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
+    def test_archived_repo_look_is_silence(self) -> None:
+        out = self._run(feedback_question_script(repo=GhCall(0, repo_json(archived=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_disabled_repo_look_is_silence_not_a_museum_launch(self) -> None:
+        out = self._run(feedback_question_script(repo=GhCall(0, repo_json(disabled=True))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "archived_repo")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
     def test_noise_is_silence_and_writes_no_brief(self) -> None:
         out = self._run(feedback_noise_script())
         self.assertEqual(out["status"], "noop")

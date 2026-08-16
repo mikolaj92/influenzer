@@ -1,29 +1,28 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=76 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=75 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #76 — URL artefaktu tylko z zaufanego hosta
+Issue: #75 — Zarchiwizowane repo jest martwe, nie launchujemy muzeum
 
 ## Goal
 
-URL artefaktu tylko z zaufanego hosta (github.com i to co sami allowlistujemy). Inny host nie jest tryable i nie jest Show HN. Żadnych skracaczy, UTM-farm, „kliknij tu”.
+Zarchiwizowane albo disabled repo jest martwe. Watch na archived → look milczy. Nie launchujemy muzeum.
 
 ## Files likely touched
 
-- `github_pack/classify.py` — tryable README+URL must be https on github.com (or an explicit allowlist). Shortener / UTM-farm / “kliknij tu” is silence.
-- `github_pack/pack.py` — pack stays silent when the README/homepage URL is off-allowlist.
-- `influenzer/playbook.py` — score-side host/UTM/shortener/click-here predicates.
-- `influenzer/hom.py` / `influenzer/hom_draft.py` — not tryable, not Show HN.
-- `tests/test_github_pack.py`, `tests/test_hom_operator.py`
+- `github_survey/survey.py` — fail-closed on `isArchived` / disabled meta before a look is a feast
+- `influenzer/brief_scan.py`, `influenzer/brief_admit.py`, `influenzer/hom_feedback.py` — watch/scan/admit stay silent
+- `influenzer/playbook.py`, `influenzer/hom.py`, `influenzer/hom_draft.py` — kill / undress a museum launch
 
 ## Test plan
 
-- `python -m unittest tests.test_github_pack tests.test_hom_operator`
+- `tests/test_github_survey.py`, `tests/test_brief_admit.py`, `tests/test_hom_feedback.py`
+- `tests/test_hom_operator.py`, `tests/test_hom_draft.py`
 
 ## Non-goals
 
-- (none stated)
+- Do not start a collection job. Do not launch, publish, or clone.
 
 ## Notes
 

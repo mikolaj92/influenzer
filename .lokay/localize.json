@@ -1,9 +1,8 @@
 {
   "paths": [
-    "influenzer/host.py",
-    "github_pack/pack.py",
+    "github_survey/survey.py",
     "influenzer",
-    "influenzer/adapters/spike_scores.json",
+    "influenzer/hom_watch.py",
     "influenzer/__init__.py",
     "influenzer/adapters/__init__.py",
     "influenzer/adapters/base.py",
@@ -31,7 +30,7 @@
     "influenzer/hom_outbox.py",
     "influenzer/hom_pass.py",
     "influenzer/hom_verdict.py",
-    "influenzer/hom_watch.py",
+    "influenzer/host.py",
     "influenzer/migrations.py",
     "influenzer/playbook.py",
     "influenzer/policy.py",
@@ -39,14 +38,15 @@
     "influenzer/scheduler.py",
     "influenzer/security.py",
     "influenzer/storage.py",
-    "influenzer/tick.py"
+    "influenzer/tick.py",
+    "influenzer/tick_all.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "host",
-    "pack",
-    "score",
+    "Watch",
+    "survey",
+    "watch",
     "influenzer"
   ],
   "notes": [
@@ -54,7 +54,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__76-url-artefaktu-tylko-z-zaufanego-hosta-93e44e71",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__75-zarchiwizowane-repo-jest-martwe-nie-laun-50e075ba",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

@@ -26,6 +26,7 @@ from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
     StoryKind,
     is_social_arena,
+    looks_like_archived_repo,
     looks_like_empty_repo,
     looks_like_failed_ci,
     looks_like_fork,
@@ -109,6 +110,12 @@ def admit_pack(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if bool(payload.get("isEmpty")) or looks_like_empty_repo(fact_blob):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if (
+        bool(payload.get("isArchived"))
+        or bool(payload.get("isDisabled"))
+        or looks_like_archived_repo(fact_blob)
+    ):
+        return host_silence("archived_repo", project_id=project_id, repo_slug=slug)
     if looks_like_pending_ci(fact_blob):
         return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
     if looks_like_failed_ci(fact_blob):

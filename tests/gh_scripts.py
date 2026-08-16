@@ -45,6 +45,8 @@ def repo_json(
     private: bool = False,
     fork: bool = False,
     empty: bool = False,
+    archived: bool = False,
+    disabled: bool = False,
     description: str = "Local operator with a working install",
 ) -> str:
     return json.dumps(
@@ -53,6 +55,8 @@ def repo_json(
             "isPrivate": private,
             "isFork": fork,
             "isEmpty": empty,
+            "isArchived": archived,
+            "isDisabled": disabled,
             "url": f"https://github.com/{REPO}",
             "description": description,
             "homepageUrl": "",
