@@ -18,7 +18,7 @@ from .domain import (
     PublicationAttempt, AccountStatus, PlanStatus, AttemptStatus,
 )
 from .domain import content_hash
-from .hom import Brief, Draft, Score, brief_to_mapping, parse_facts_json
+from .hom import Brief, Draft, Score, angle_body_hash, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
 from .playbook import ArenaId, StoryKind, Verdict
 
@@ -829,6 +829,14 @@ class StateRepository:
             created_at=row["created_at"],
             content_hash=row["content_hash"],
         )
+
+    def last_angle_body_hash(self, project_id: str | None = None) -> str | None:
+        """Body hash of the newest stored angle. Held still counts as ostatni kąt."""
+        drafts = self.list_operator_drafts(project_id, include_held=True)
+        if not drafts:
+            return None
+        last = max(drafts, key=lambda draft: (draft.created_at, draft.draft_id))
+        return angle_body_hash(last.body)
 
     def persist_operator_decision(
         self,
