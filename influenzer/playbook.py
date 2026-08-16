@@ -167,7 +167,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="letter",
         game="owned list plus habit plus recs graph",
         wave=(
-            "Named editor, one promise, cadence you can keep on a bad week. Language from the profile (audience). A foreign-language letter is silence.",
+            "Named editor from BrandProfile (display_name / maintainer), first and last name. we / the team is silence. A given name without a surname is silence. Language from the profile (audience). A foreign-language letter is silence.",
             "Rent-to-own: social/GitHub feed the exportable list.",
             "No user-facing change means no email. Weekly update without a ship or real public feedback is silence, not a recap.",
             "Recs: adjacent, give first. Hygiene beats vanity size.",
@@ -358,7 +358,8 @@ def choose_arena(
     invite only with intent split and ~10 builders. Preferred Bluesky
     sits so an artifact-only cafe can be silence — pack onboarduje,
     feed trzyma. Preferred newsletter sits so subscribe / our launch
-    without a gift can be silence — give first, recs are adjacent.
+    without a gift, or a letter without a surname, can be silence —
+    give first, sign First Last from the profile, recs are adjacent.
     GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
     Shopping while the window lives is not a new pick — the caller
@@ -387,7 +388,7 @@ def choose_arena(
     # #55: pack without a feed is half the game. Sit so artifact-only cafe dies.
     if wanted is ArenaId.BLUESKY:
         return ArenaId.BLUESKY
-    # #54: letter gives first. Sit so subscribe / our launch without a gift dies.
+    # #54/#51: letter gives first and signs a surname. Sit so nameless we/team dies.
     if wanted is ArenaId.NEWSLETTER:
         return ArenaId.NEWSLETTER
     # #58: court is not a launch channel. Ship stays on github/hn.
@@ -2141,8 +2142,68 @@ def has_letter_gift(text: str) -> bool:
     return False
 
 
+# Letter dresses from BrandProfile (display_name / maintainer), not "we" /
+# "the team". A given name without a surname is silence on the letter.
+# Pair of #30/#45 (owned list, named editor).
+LETTER_WITHOUT_SURNAME_REASON = "letter_without_surname"
+LETTER_TEAM_VOICE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwe\b|"
+    r"\bour\s+team\b|"
+    r"\bthe\s+team\b|"
+    r"\bzespo(?:l|łu|łem|le|[łl])\b|"
+    r"\bmy\s+(?:w|z|od)\b"
+    r")"
+)
+# Two capitalized name tokens: letters, optional hyphen/apostrophe inside.
+# "Mikolaj" / a GitHub login is not a surname. "Mikolaj Nowak" is.
+# "From Mikolaj" / "My App" are not a named editor.
+_LETTER_NAME_TOKEN = (
+    r"[A-ZÀ-ÖØ-ÞĄĆĘŁŃÓŚŹŻ][A-Za-zÀ-ÖØ-öø-ÿĄĆĘŁŃÓŚŹŻąćęłńóśźż''-]{1,40}"
+)
+LETTER_SURNAME_RE = re.compile(rf"\b({_LETTER_NAME_TOKEN})\s+({_LETTER_NAME_TOKEN})\b")
+_LETTER_NAME_STOP = frozenset(
+    {
+        "from",
+        "signed",
+        "dear",
+        "hello",
+        "hi",
+        "best",
+        "thanks",
+        "thank",
+        "regards",
+        "the",
+        "our",
+        "my",
+        "we",
+        "team",
+        "app",
+        "local",
+        "tick",
+    }
+)
+
+
+def looks_like_letter_team_voice(text: str) -> bool:
+    """True for we / the team. A letter is one named editor, not a chorus."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(LETTER_TEAM_VOICE_RE.search(cleaned))
+
+
+def has_letter_surname(text: str) -> bool:
+    """True when copy carries First Last from the profile, not a lone given name."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    for match in LETTER_SURNAME_RE.finditer(cleaned):
+        first, last = match.group(1).casefold(), match.group(2).casefold()
+        if first in _LETTER_NAME_STOP or last in _LETTER_NAME_STOP:
+            continue
+        return True
+    return False
+
+
 def letter_reason(text: str) -> str | None:
-    """Silence when the letter only asks, asks first, or recs crush."""
+    """Silence when the letter only asks, asks first, recs crush, or has no surname."""
     if looks_like_letter_crush(text):
         return LETTER_ASK_WITHOUT_GIFT_REASON
     first: str | None = None
@@ -2157,6 +2218,8 @@ def letter_reason(text: str) -> str | None:
         first = cleaned
     if first is None:
         return LETTER_ASK_WITHOUT_GIFT_REASON
+    if looks_like_letter_team_voice(text) or not has_letter_surname(text):
+        return LETTER_WITHOUT_SURNAME_REASON
     return None
 
 
@@ -3067,6 +3130,9 @@ __all__ = [
     "LETTER_ASK_WITHOUT_GIFT_REASON",
     "LETTER_ASK_RE",
     "LETTER_CRUSH_RE",
+    "LETTER_WITHOUT_SURNAME_REASON",
+    "LETTER_TEAM_VOICE_RE",
+    "LETTER_SURNAME_RE",
     "SEMINAR_BRAND_VOICE_REASON",
     "SEMINAR_BRAND_VOICE_RE",
     "SEMINAR_FIRST_PERSON_RE",
@@ -3162,6 +3228,7 @@ __all__ = [
     "has_fair_hook",
     "has_fair_loop",
     "has_letter_gift",
+    "has_letter_surname",
     "has_monday_history",
     "has_named_subreddit",
     "has_quote_mark",
@@ -3235,6 +3302,7 @@ __all__ = [
     "looks_like_launch_pitch",
     "looks_like_letter_ask",
     "looks_like_letter_crush",
+    "looks_like_letter_team_voice",
     "letter_reason",
     "looks_like_brand_voice",
     "looks_like_seminar_first_person",
