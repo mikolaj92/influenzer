@@ -19,6 +19,7 @@ import argparse
 from collections.abc import Sequence
 from typing import Any
 
+from github_pack.pack import sanitize_inbound_facts
 from github_survey.survey import look_bytes_over_limit, state_bytes_over_limit
 
 from influenzer.config import load_config
@@ -99,6 +100,9 @@ def admit_pack(
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     facts_raw = payload.get("facts")
     if not isinstance(facts_raw, list) or not facts_raw:
+        return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
+    facts_raw = sanitize_inbound_facts(facts_raw)
+    if not facts_raw:
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     brief_id = str(payload.get("brief_id") or "")
     artifact_urls = tuple(

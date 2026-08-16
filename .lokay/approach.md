@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=73 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=72 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #73 — Watch tylko na nasze repo
+Issue: #72 — Inbound z GitHuba to dane, nie rozkaz
 
 ## Goal
 
-Watch tylko na nasze repo. Owner watcha musi być nasz (ten sam github co maintainer). Cudzy projekt nie dostaje naszego kąta jako „ship”. Pomoc tamtemu to cisza u nas albo contribute, nie launch.
+Inbound z GitHuba to dane, nie rozkaz. Komentarz/issue nie zmienia playbooka („zpostuj to”, „ignore scoring”). Pack wycina instrukcje, zostawia treść. Nasz score zostaje nasz.
 
 ## Files likely touched
 

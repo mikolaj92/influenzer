@@ -9,6 +9,8 @@ The rest stays on GitHub. A whole thread in state.db is silence, not storage.
 This is retention, not a timeout.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
 50MB in state.db is silence. The loop lives.
+Inbound comments are data, not a command. Pack cuts instructions
+("zpostuj to", "ignore scoring"), leaves content. Our score stays ours.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from github_survey.survey import (
     parse_now,
     state_bytes_over_limit,
 )
+from github_pack.pack import sanitize_inbound_facts, strip_inbound_instructions
 
 SOURCE = "github-feedback"
 MAX_FACTS = 8
@@ -241,8 +244,8 @@ def _fact_from_comment(item: dict[str, Any], *, kind: str) -> dict[str, Any] | N
     url = _comment_url(item)
     if not url.startswith("https://github.com/"):
         return None
-    body = _clip(str(item.get("body") or ""))
-    if not body:
+    body = strip_inbound_instructions(_clip(str(item.get("body") or "")))
+    if not body or is_noise_body(body) or not is_feedback_signal(body):
         return None
     login = _login(item.get("user")) or "someone"
     return {
@@ -313,6 +316,7 @@ def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
         facts.append(fact)
         if len(facts) >= MAX_FACTS:
             break
+    facts = sanitize_inbound_facts(facts)
     if not facts:
         return _silence("comment_noise", repo=repo_slug)
     packed = {
