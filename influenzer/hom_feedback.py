@@ -179,9 +179,11 @@ def admit_feedback(
     except (HomError, ValueError):
         return host_silence("scan_failed", project_id=project_id, repo_slug=slug)
     try:
-        repo.save_brief(brief, event_type="brief.feedback")
+        raced = repo.admit_brief(brief, event_type="brief.feedback")
     except StorageError:
         return host_silence("already_told", project_id=project_id, repo_slug=slug)
+    if raced:
+        return host_silence(raced, project_id=project_id, repo_slug=slug)
     return ok(
         published=False,
         project_id=brief.project_id,

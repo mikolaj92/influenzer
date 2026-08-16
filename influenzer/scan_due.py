@@ -22,6 +22,9 @@ A clock that goes backward is silence, not a second look. Look is monotonic.
 Two watches on the same repo are one look. A second brief or angle from the
 same git is silence, even with another project_id. That is the machine lock,
 not a second survey.
+Two ticks the same Monday are one look. The second run sees the done look
+and stays silent: no second gh, no second brief. A race on scan/admit is
+CAS silence.
 Crash mid-look resumes; it does not start from zero. Look already done
 and look in progress are two states. A second gh on a half-open look
 is an error. Pending brief after a crash is score+angle only, no second
@@ -228,7 +231,22 @@ def scan_github_if_due(
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     if repo.look_state(slug) != "in_progress":
-        repo.record_github_look(project_id, slug, started_at=clock)
+        raced = repo.claim_github_look(
+            project_id,
+            slug,
+            started_at=clock,
+            due=lambda: scan_due_reason(
+                repo,
+                project_id=project_id,
+                repo_slug=slug,
+                now=clock,
+                window_days=window_days,
+            ),
+        )
+        if raced:
+            if raced == "half_open_look":
+                return host_error(raced, project_id=project_id, repo_slug=slug)
+            return host_silence(raced, project_id=project_id, repo_slug=slug)
     try:
         out = scan_github(
             repo,
