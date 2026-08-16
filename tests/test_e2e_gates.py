@@ -26,6 +26,7 @@ from influenzer.playbook import (
     COURT_NOT_A_LAUNCH_REASON,
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
+    LETTER_ASK_WITHOUT_GIFT_REASON,
     Verdict,
     cafe_reason,
     choose_arena,
@@ -35,13 +36,17 @@ from influenzer.playbook import (
     has_cafe_pack,
     has_court_insight,
     has_fair_loop,
+    has_letter_gift,
     has_tavern_intent_split,
     has_tavern_seed,
     has_workshop_life,
+    letter_reason,
     looks_like_court_launch,
     looks_like_dead_star_count,
     looks_like_dead_star_story,
     looks_like_fair_cta,
+    looks_like_letter_ask,
+    looks_like_letter_crush,
     looks_like_poll,
     looks_like_tavern_invite,
     tavern_reason,
@@ -699,6 +704,93 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "workshop")
         self.assertIn("pip install", draft.body.lower())
         self.assertIn("issue #4", draft.body.lower())
+
+    def test_letter_without_a_gift_is_silence(self) -> None:
+        empties = (
+            "subscribe to our list",
+            "our launch is next week",
+            "join the newsletter",
+            "zapisz się na listę",
+            "crush the competitor",
+            "subscribe, then strangers can click and run the demo today",
+        )
+        for idx, text in enumerate(empties):
+            with self.subTest(text=text):
+                self.assertEqual(letter_reason(text), LETTER_ASK_WITHOUT_GIFT_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-empty-letter-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.NEWSLETTER,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.NEWSLETTER,
+                        claims_ship=True,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=True,
+                    ),
+                    ArenaId.NEWSLETTER,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LETTER_ASK_WITHOUT_GIFT_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.NEWSLETTER,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.NEWSLETTER].wave,
+                    canon_url=ARENAS[ArenaId.NEWSLETTER].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.NEWSLETTER, f"{text}\n{SHIP_PR}"),
+                    (Verdict.KILL, LETTER_ASK_WITHOUT_GIFT_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        gift = "Local tick scores briefs and emits a draft"
+        ask = "subscribe if you want the next cut"
+        rec = "adjacent tool in the same niche, not a crush"
+        living = (gift, rec, ask)
+        self.assertTrue(has_letter_gift(gift))
+        self.assertTrue(looks_like_letter_ask(ask))
+        self.assertFalse(looks_like_letter_crush(rec))
+        self.assertIsNone(letter_reason("\n".join(living)))
+        self.assertFalse(has_letter_gift("subscribe to our list"))
+        self.assertFalse(looks_like_letter_ask("follow the README to run the demo"))
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-living-letter",
+            facts=(
+                Fact(text=gift, artifact_url=SHIP_PR),
+                Fact(text=rec),
+                Fact(text=ask),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.NEWSLETTER,
+        )
+        self.assertIsNone(_gate_violation(alive, ArenaId.NEWSLETTER, "\n".join((gift, rec, ask, SHIP_PR))))
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.NEWSLETTER)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "letter")
+        self.assertIn("local tick", draft.body.lower())
+        self.assertIn("adjacent", draft.body.lower())
+        self.assertNotIn("Costume:", draft.body)
 
 
 if __name__ == "__main__":
