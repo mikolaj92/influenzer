@@ -18,6 +18,9 @@ Angle comes from the canonical source, not a copy. Helping upstream is
 silence here, not our launch.
 An empty repo is not a website. No tree or no README is silence. This is
 not README-without-a-GIF: here there is not even a card.
+A private repo is not a website. isPrivate is silence, even when the
+owner is ours. Watch on private is silence, not a 404 loop. Workshop
+is a public README.
 A template repo is not a product. isTemplate, or generate-from-template
 without an own ship, is silence. Show HN from boilerplate is silence.
 An archived or disabled repo is dead. Watch on a museum is silence.
@@ -47,6 +50,7 @@ from influenzer.playbook import (
     looks_like_failed_ci,
     looks_like_fork,
     looks_like_pending_ci,
+    looks_like_private_repo,
     looks_like_template,
 )
 
@@ -150,6 +154,26 @@ def repo_is_empty(gh: GhRunner | None, repo_slug: str) -> bool:
     return isinstance(data, dict) and bool(data.get("isEmpty"))
 
 
+def repo_is_private(gh: GhRunner | None, repo_slug: str) -> bool:
+    """True when gh says isPrivate. Owner does not matter. A lock is not a site."""
+    slug = (repo_slug or "").strip()
+    if not slug or invalid_repo_reason(slug):
+        return False
+    runner = look_only_gh(gh, slug)
+    try:
+        call = runner(["repo", "view", slug, "--json", "isPrivate"])
+    except (OSError, TypeError, ValueError):
+        return False
+    raw = getattr(call, "stdout", "") or ""
+    if not isinstance(raw, str) or not raw.strip():
+        return False
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    return isinstance(data, dict) and bool(data.get("isPrivate"))
+
+
 def repo_is_archived(gh: GhRunner | None, repo_slug: str) -> bool:
     """True when gh says isArchived. A museum is not a launch."""
     slug = (repo_slug or "").strip()
@@ -226,6 +250,27 @@ def _payload_is_empty_repo(payload: dict[str, Any]) -> bool:
         return True
     bits.append(readme_text)
     return looks_like_empty_repo("\n".join(bits))
+
+
+def _payload_is_private(payload: dict[str, Any]) -> bool:
+    if bool(payload.get("isPrivate")):
+        return True
+    if payload.get("reason") == "private_repo":
+        return True
+    survey = payload.get("survey")
+    if not isinstance(survey, dict):
+        return False
+    meta = survey.get("meta")
+    bits: list[str] = []
+    if isinstance(meta, dict):
+        if bool(meta.get("isPrivate")) or bool(meta.get("is_private")):
+            return True
+        visibility = str(meta.get("visibility") or "").strip().casefold()
+        if visibility == "private":
+            return True
+        bits.append(str(meta.get("description") or ""))
+    bits.append(str(survey.get("readme_text") or ""))
+    return looks_like_private_repo("\n".join(bits))
 
 
 def _payload_ci_bits(payload: dict[str, Any]) -> str:
@@ -327,6 +372,8 @@ def scan_github(
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if repo_is_empty(runner, slug):
         return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+    if repo_is_private(runner, slug):
+        return host_silence("private_repo", project_id=project_id, repo_slug=slug)
     if repo_is_template(runner, slug):
         return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
     if repo_is_archived(runner, slug):
@@ -337,6 +384,8 @@ def scan_github(
             return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
         if _payload_is_empty_repo(surveyed):
             return host_silence("empty_repo_not_a_site", project_id=project_id, repo_slug=slug)
+        if _payload_is_private(surveyed):
+            return host_silence("private_repo", project_id=project_id, repo_slug=slug)
         if _payload_is_template(surveyed):
             return host_silence("template_not_a_product", project_id=project_id, repo_slug=slug)
         if _payload_is_archived(surveyed):
@@ -357,6 +406,7 @@ __all__ = [
     "repo_is_archived",
     "repo_is_empty",
     "repo_is_fork",
+    "repo_is_private",
     "repo_is_template",
     "scan_github",
 ]

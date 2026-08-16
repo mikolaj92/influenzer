@@ -75,6 +75,7 @@ from influenzer.playbook import (
     looks_like_issues_disabled,
     looks_like_fork,
     looks_like_empty_repo,
+    looks_like_private_repo,
     looks_like_archived_repo,
     looks_like_login_gate,
     looks_like_shortener,
@@ -502,6 +503,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (is_social_arena(score.arena) and looks_like_issues_disabled(bits.blob))
         or looks_like_fork(bits.blob)
         or looks_like_empty_repo(bits.blob)
+        or looks_like_private_repo(bits.blob)
         or looks_like_archived_repo(bits.blob)
         or looks_like_server_splash(bits.blob)
         or looks_like_bot_bump_week(
@@ -535,6 +537,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (is_social_arena(score.arena) and looks_like_issues_disabled(body))
         or looks_like_fork(body)
         or looks_like_empty_repo(body)
+        or looks_like_private_repo(body)
         or looks_like_archived_repo(body)
         or looks_like_server_splash(body)
     ):
