@@ -683,10 +683,13 @@ class PlaybookCopyTests(unittest.TestCase):
     def test_model_in_frame_is_prompt_dump_or_i_asked_chatgpt(self) -> None:
         dumps = (
             "I asked ChatGPT how to score a brief",
+            "I asked the model how to score a brief",
+            "I asked an LLM for a Show HN",
             "we asked ChatGPT for a launch angle",
             "asked ChatGPT to write the Show HN",
             "I prompted Claude for a one-liner",
             "I used Gemini to draft the post",
+            "as ChatGPT I would ship the local tick",
             "as an AI I would ship the local tick",
             "as an AI language model I scored the brief",
             "as a language model I cannot click the demo",
@@ -695,6 +698,8 @@ class PlaybookCopyTests(unittest.TestCase):
             "ChatGPT said the local tick is ready",
             "according to ChatGPT the install works",
             "here's the prompt I used for the launch",
+            "Prompt: write a Show HN for the local tick",
+            "my ChatGPT prompt for the launch",
             "prompt dump of the local tick",
             "ChatGPT conversation about the local tick",
             "conversation with the model about the local tick",
