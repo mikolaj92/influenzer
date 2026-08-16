@@ -1,18 +1,20 @@
 {
   "paths": [
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": [
-    "gate"
-  ],
+  "matched_tokens": ["gate", "court", "linkedin"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Repo tree entries considered: 137.",
+    "Refined after inspection: court-not-launch gate lives in playbook + score + dress."
   ],
   "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__58-dw-r-nie-jest-kana-em-launchu-3902ebdf",
-  "wrote": false,
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

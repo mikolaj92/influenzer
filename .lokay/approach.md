@@ -11,19 +11,23 @@ Dwór nie jest kanałem launchu. `claims_ship` / Show-HN energia nie idzie na Li
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — court is not a launch channel; preferred LinkedIn sits only without `claims_ship`
+- `influenzer/hom.py` — score LinkedIn through `court_reason`
+- `influenzer/hom_draft.py` — refuse a leaked court/launch draft
+- `tests/test_e2e_gates.py` — fail-closed e2e for ship/Show-HN on court vs insight
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python -m unittest tests.test_e2e_gates tests.test_hom_operator.PlaybookCopyTests tests.test_hom_draft.HomDraftCostumeTests.test_linkedin_fold_is_insight_first_and_under_210 -v`
 
 ## Non-goals
 
-- (none stated)
+- Not #33 (fold without pitch) and not #26 (launch window).
+- Do not make LinkedIn a first launch costume. Ship stays on github/hn.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Localize listed only `tests/test_e2e_gates.py`; inspection put the gate in playbook + score + dress.
