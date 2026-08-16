@@ -63,10 +63,37 @@ class SurveySilenceTests(unittest.TestCase):
         self.assertNotIn("brief_id", out)
         self.assertNotIn("project_id", out)
 
-    def test_auth_failure_is_silence(self) -> None:
+    def test_auth_failure_is_empty_look_not_loop_death(self) -> None:
         out = self._survey({"repo": GhCall(1, "", "gh: To get started with GitHub CLI, run: gh auth login")})
         self.assertEqual(out["status"], "noop")
-        self.assertEqual(out["reason"], "gh_auth")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+        self.assertNotIn("brief_id", out)
+
+    def test_rate_limit_is_empty_look_not_loop_death(self) -> None:
+        out = self._survey({"repo": GhCall(1, "", "HTTP 429: API rate limit exceeded")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+
+    def test_network_pad_is_empty_look_not_loop_death(self) -> None:
+        out = self._survey({"repo": GhCall(1, "", "Get \"https://api.github.com/user\": dial tcp: lookup api.github.com: no such host")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+
+    def test_oserror_from_runner_is_empty_look_not_crash(self) -> None:
+        def boom(_argv: object) -> GhCall:
+            raise OSError("network is unreachable")
+
+        with patch("subprocess.run", side_effect=AssertionError("survey must not call subprocess")):
+            out = survey_public_repo(REPO, gh=boom, now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
 
     def test_empty_survey_is_silence(self) -> None:
         out = self._survey(

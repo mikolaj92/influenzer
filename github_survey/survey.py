@@ -16,6 +16,9 @@ An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
 50MB in state.db is silence. The loop lives.
+Pad gh (auth, network, rate) is empty, not death of the loop. Survey
+returns empty and the interval sleeps. Provider fail-closed, not a
+crash-in-the-middle-of-state.
 """
 
 from __future__ import annotations
@@ -44,6 +47,9 @@ from github_survey.gh import (
     required_json,
     run_gh,
 )
+
+# Auth, network, rate, or a generic gh pad. Empty look, interval sleeps.
+_PROVIDER_PADS = frozenset({"gh_auth", "gh_error", "gh_rate", "gh_network", "scan_failed"})
 
 LOOKBACK_DAYS = 7
 MAX_PAGES = 2
@@ -433,6 +439,13 @@ def _silence(reason: str, *, repo: str) -> dict[str, Any]:
     return {"status": "noop", "ok": True, "reason": reason, "repo": repo}
 
 
+def provider_pad_reason(reason: str | None) -> str | None:
+    """Auth, network, rate, or a generic gh pad is empty. Interval lives."""
+    if reason in _PROVIDER_PADS:
+        return "empty_survey"
+    return reason
+
+
 def _truthy_meta(meta: dict[str, Any], *keys: str) -> bool:
     for key in keys:
         value = meta.get(key)
@@ -517,7 +530,7 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, "empty_survey"
     meta, reason = required_json(repo_call)
     if reason:
-        return None, reason
+        return None, provider_pad_reason(reason)
     if not isinstance(meta, dict):
         return None, "empty_survey"
     visibility = str(meta.get("visibility") or "").strip().casefold()
@@ -533,7 +546,7 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, "empty_survey"
     prs_raw, reason = required_json(prs_call)
     if reason:
-        return None, reason
+        return None, provider_pad_reason(reason)
     if not isinstance(prs_raw, list):
         return None, "empty_survey"
 
@@ -555,7 +568,7 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, "empty_survey"
     rel_raw, reason = required_json(rel_call)
     if reason:
-        return None, reason
+        return None, provider_pad_reason(reason)
     if not isinstance(rel_raw, list):
         return None, "empty_survey"
 
@@ -608,12 +621,11 @@ def survey_public_repo(
     clock = parse_now(now)
     try:
         survey, reason = collect_survey(slug, gh=runner, now=clock)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except Exception:
+        # Auth, network, rate, or a malformed pad. Empty look. Interval lives.
         return _silence("empty_survey", repo=slug)
-    except (OSError, TypeError, ValueError):
-        return _silence("scan_failed", repo=slug)
     if reason:
-        return _silence(reason, repo=slug)
+        return _silence(provider_pad_reason(reason) or reason, repo=slug)
     assert survey is not None
     if not survey["releases"] and not survey["prs"] and not survey["tags"]:
         return _silence("empty_survey", repo=slug)

@@ -403,7 +403,7 @@ def scan_github(
         if _payload_has_failed_ci(surveyed):
             return host_silence("failed_ci_not_tryable", project_id=project_id, repo_slug=slug)
         packed = pack_survey(surveyed)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except Exception:
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     return admit_pack(repo, packed, project_id=project_id, now=now or utc_now())
 

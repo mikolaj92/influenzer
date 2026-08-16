@@ -190,6 +190,28 @@ class CollectFeedbackTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "gh_missing")
 
+    def test_auth_failure_is_empty_look_not_loop_death(self) -> None:
+        out = self._collect({"repo": GhCall(1, "", "gh: To get started with GitHub CLI, run: gh auth login")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("facts", out)
+
+    def test_rate_limit_is_empty_look_not_loop_death(self) -> None:
+        out = self._collect({"repo": GhCall(1, "", "HTTP 429: API rate limit exceeded")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+
+    def test_network_pad_is_empty_look_not_loop_death(self) -> None:
+        out = self._collect({"repo": GhCall(1, "", "Get https://api.github.com: connection refused")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_feedback")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+
     def test_private_repo_is_silence(self) -> None:
         out = self._collect(
             {

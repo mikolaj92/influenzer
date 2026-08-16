@@ -194,7 +194,7 @@ def scan_github_if_due(
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     try:
         out = scan_github(repo, project_id=project_id, repo_slug=slug, gh=gh, now=clock)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except Exception:
         out = host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     repo.record_github_scan(project_id, slug, scanned_at=clock)
     return out

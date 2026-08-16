@@ -120,6 +120,16 @@ class ScanDueTests(unittest.TestCase):
         self.assertEqual(self.repo.list_briefs("app-1"), [])
         self.assertFalse(second["published"])
 
+    def test_rate_limit_from_gh_is_empty_look_not_exception(self) -> None:
+        out, fake = self._due({"repo": GhCall(1, "", "HTTP 429: API rate limit exceeded")})
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertTrue(fake.calls)
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertIsNotNone(last_scan_at(self.repo, "app-1", REPO))
+
     def test_bad_json_from_gh_is_empty_look_not_exception(self) -> None:
         out, fake = self._due({"repo": GhCall(0, "not-json")})
         self.assertEqual(out["status"], "noop")
