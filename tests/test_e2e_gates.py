@@ -27,6 +27,7 @@ from influenzer.playbook import (
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
     LETTER_ASK_WITHOUT_GIFT_REASON,
+    HN_CAMP_REASON,
     LETTER_WITHOUT_SURNAME_REASON,
     SEMINAR_BRAND_VOICE_REASON,
     Verdict,
@@ -1049,6 +1050,58 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertIn("I built", draft.body)
         self.assertNotIn("We at Product", draft.body)
         self.assertNotIn("Costume:", draft.body)
+
+    def test_after_show_hn_score_does_not_pick_hn_again(self) -> None:
+        human = "I built a local tick that scores briefs"
+        first = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-first-show",
+            facts=(
+                Fact(text=human, artifact_url=SHIP_PR),
+                Fact(text="I struggled with a queue that never scored a brief"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        first_score = score_brief(first)
+        self.assertEqual(first_score.verdict, Verdict.DRAFT)
+        self.assertEqual(first_score.arena, ArenaId.HN)
+        first_draft = compose_draft(first, first_score)
+        assert first_draft is not None
+        self.assertTrue(first_draft.body.startswith("Show HN:"))
+
+        again = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-second-show",
+            facts=(
+                Fact(text="I built a second local tick that scores briefs", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(again, stack_arena=ArenaId.HN)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, HN_CAMP_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(again, score))
+        leaked = Score(
+            brief_id=again.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        leaked_draft = compose_draft(again, leaked)
+        assert leaked_draft is not None
+        self.assertTrue(leaked_draft.body.startswith("Show HN:"))
+        self.assertIn("A second Show is silence", " ".join(ARENAS[ArenaId.HN].wave))
 
 
 if __name__ == "__main__":

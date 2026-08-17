@@ -43,6 +43,7 @@ from influenzer.playbook import (
     is_ship_artifact_url,
     is_social_arena,
     is_store_host_url,
+    hn_camp_reason,
     parse_stack_arena,
     stack_costume_reason,
     is_tryable_artifact_url,
@@ -675,6 +676,9 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _changelog(brief, "decision_not_user_facing")
 
     locked = parse_stack_arena(stack_arena)
+    camped = hn_camp_reason(locked)
+    if camped:
+        return _kill(brief, camped)
     mismatch = stack_costume_reason(brief.preferred_arena, locked)
     if mismatch:
         return _kill(brief, mismatch)

@@ -26,6 +26,7 @@ from influenzer.hom import (
 from influenzer.playbook import (
     ARENAS,
     CANON_URL,
+    HN_CAMP_REASON,
     LIVING_STACK_REASON,
     SOCIAL_ARENAS,
     STACK_ARENAS,
@@ -34,6 +35,8 @@ from influenzer.playbook import (
     StoryKind,
     Verdict,
     choose_arena,
+    hn_camp_reason,
+    is_hn_camp_arena,
     living_stack_arena,
     stack_costume_reason,
     is_blog_host_url,
@@ -143,6 +146,11 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertEqual(STACK_HOURS, 48)
         self.assertEqual(STACK_ARENAS, frozenset({ArenaId.GITHUB, ArenaId.HN}))
         self.assertEqual(LIVING_STACK_REASON, "living_stack")
+        self.assertEqual(HN_CAMP_REASON, "hn_camp")
+        self.assertTrue(is_hn_camp_arena(ArenaId.HN))
+        self.assertFalse(is_hn_camp_arena(ArenaId.GITHUB))
+        self.assertEqual(hn_camp_reason(ArenaId.HN), HN_CAMP_REASON)
+        self.assertIsNone(hn_camp_reason(ArenaId.GITHUB))
 
     def test_choose_arena_keeps_living_github_or_hn_costume(self) -> None:
         self.assertEqual(
@@ -1826,17 +1834,30 @@ class ScoreBriefTests(unittest.TestCase):
 
     def test_shopping_another_arena_while_the_stack_lives_is_silence(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.X)
-        score = score_brief(brief, stack_arena=ArenaId.HN)
+        score = score_brief(brief, stack_arena=ArenaId.GITHUB)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, LIVING_STACK_REASON)
         self.assertIsNone(score.arena)
         self.assertIsNone(compose_draft(brief, score))
 
     def test_same_github_or_hn_costume_on_a_living_stack_is_kept(self) -> None:
+        brief = self._brief(preferred_arena=ArenaId.GITHUB)
+        score = score_brief(brief, stack_arena=ArenaId.GITHUB)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.GITHUB)
+
+    def test_open_hn_stack_does_not_pick_a_second_show(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.HN)
         score = score_brief(brief, stack_arena=ArenaId.HN)
-        self.assertEqual(score.verdict, Verdict.DRAFT)
-        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, HN_CAMP_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+        shop = self._brief(preferred_arena=ArenaId.X)
+        shop_score = score_brief(shop, stack_arena=ArenaId.HN)
+        self.assertEqual(shop_score.verdict, Verdict.KILL)
+        self.assertEqual(shop_score.reason, HN_CAMP_REASON)
+        self.assertIsNone(compose_draft(shop, shop_score))
 
     def test_major_tryable_ship_drafts_one_hn_arena(self) -> None:
         brief = self._brief(
@@ -3979,7 +4000,7 @@ class TickBriefPathTests(unittest.TestCase):
             story_kind=StoryKind.MAJOR,
             claims_ship=True,
             tryable=True,
-            preferred_arena=ArenaId.HN,
+            preferred_arena=ArenaId.GITHUB,
         )
         self.repo.save_brief(first)
         first_out = tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
@@ -3995,7 +4016,7 @@ class TickBriefPathTests(unittest.TestCase):
             story_kind=StoryKind.MAJOR,
             claims_ship=True,
             tryable=True,
-            preferred_arena=ArenaId.HN,
+            preferred_arena=ArenaId.GITHUB,
         )
         self.repo.save_brief(copy)
         again = tick(self.repo, self.cfg, due=(), now="2026-08-13T06:00:00Z")
@@ -4015,7 +4036,7 @@ class TickBriefPathTests(unittest.TestCase):
             story_kind=StoryKind.MAJOR,
             claims_ship=True,
             tryable=True,
-            preferred_arena=ArenaId.HN,
+            preferred_arena=ArenaId.GITHUB,
         )
         self.repo.save_brief(fresh)
         third = tick(self.repo, self.cfg, due=(), now="2026-08-13T07:00:00Z")
@@ -4025,8 +4046,39 @@ class TickBriefPathTests(unittest.TestCase):
         assert third_draft is not None
         self.assertNotEqual(third_draft.body, first_draft.body)
         self.assertNotEqual(third_draft.content_hash, first_draft.content_hash)
-        self.assertTrue(third_draft.body.startswith("Show HN:"))
+        self.assertFalse(third_draft.body.startswith("Show HN:"))
         self.assertNotIn("Costume:", third_draft.body)
+
+    def test_second_show_on_a_living_hn_stack_is_camp_not_a_repeat_angle(self) -> None:
+        first = Brief.create(
+            project_id="app-1",
+            brief_id="show-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.repo.save_brief(first)
+        first_out = tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
+        self.assertEqual(first_out["operator"]["outcomes"][0]["arena"], "hn")
+        self.assertEqual(self.repo.living_stack_arena("app-1", "2026-08-13T06:00:00Z"), ArenaId.HN)
+
+        copy = Brief.create(
+            project_id="app-1",
+            brief_id="show-2",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.repo.save_brief(copy)
+        again = tick(self.repo, self.cfg, due=(), now="2026-08-13T06:00:00Z")
+        outcome = again["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "kill")
+        self.assertEqual(outcome["reason"], HN_CAMP_REASON)
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "show-2"))
 
     def test_drop_repeat_angle_is_body_hash_not_ids(self) -> None:
         brief = Brief.create(

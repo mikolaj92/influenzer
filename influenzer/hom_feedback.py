@@ -58,7 +58,9 @@ from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping
 from influenzer.playbook import (
+    HN_CAMP_REASON,
     StoryKind,
+    is_hn_camp_arena,
     looks_like_archived_repo,
     looks_like_empty_repo,
     looks_like_fork,
@@ -129,6 +131,8 @@ def admit_feedback(
     if bool(payload.get("isArchived")) or bool(payload.get("isDisabled")):
         return host_silence("archived_repo", project_id=project_id, repo_slug=slug)
     blocked = open_story_reason(repo, project_id)
+    if blocked == "social_draft" and is_hn_camp_arena(repo.living_stack_arena(project_id, now)):
+        return host_silence(HN_CAMP_REASON, project_id=project_id, repo_slug=slug)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     if repo.list_operator_drafts(project_id):
@@ -212,6 +216,15 @@ def collect_and_admit(
         return target
     pid, slug = target
     blocked = open_story_reason(repo, pid)
+    if blocked == "social_draft" and is_hn_camp_arena(repo.living_stack_arena(pid, now)):
+        packed = collect_feedback(slug, gh=look_declared_gh(slug, gh) if gh is not None else None, now=now)
+        if packed.get("status") != "ok":
+            return host_silence(
+                str(packed.get("reason") or HN_CAMP_REASON),
+                project_id=pid,
+                repo_slug=slug,
+            )
+        return host_silence(HN_CAMP_REASON, project_id=pid, repo_slug=slug)
     if blocked:
         return host_silence(blocked, project_id=pid, repo_slug=slug)
     if repo.list_operator_drafts(pid):

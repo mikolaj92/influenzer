@@ -144,7 +144,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         wave=(
             "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
-            "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. Human username. Brand voice is silence.",
+            "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
             "Press-release tone dies here. We at Product announced is silence.",
         ),
@@ -228,10 +228,12 @@ def parse_arena(value: str | None) -> ArenaId | None:
 # Next look keeps that costume. Hold or a dead window can change it. Shopping is silence.
 # #61: we sit on github (feedback) and hn (camp). X/LI/YT/shorts/discord/bsky
 # without a listener are not a first costume. Ship goes where we sit.
+# #50: after Show HN, sit in the thread. Score does not pick HN again.
 STACK_HOURS = 48
 STACK_ARENAS: frozenset[ArenaId] = frozenset({ArenaId.GITHUB, ArenaId.HN})
 PRIMARY_ARENAS: frozenset[ArenaId] = STACK_ARENAS
 LIVING_STACK_REASON = "living_stack"
+HN_CAMP_REASON = "hn_camp"
 
 
 def is_stack_arena(arena: ArenaId | str | None) -> bool:
@@ -310,6 +312,18 @@ def living_stack_arena(
     if moment < start or moment - start < timedelta(hours=STACK_HOURS):
         return locked
     return None
+
+
+def hn_camp_reason(stack_arena: ArenaId | str | None) -> str | None:
+    """After Show HN, sit in the thread. A second Show is silence."""
+    if parse_stack_arena(stack_arena) is ArenaId.HN:
+        return HN_CAMP_REASON
+    return None
+
+
+def is_hn_camp_arena(arena: ArenaId | str | None) -> bool:
+    """True when this costume is the open Show HN. Camp, do not Show again."""
+    return parse_stack_arena(arena) is ArenaId.HN
 
 
 def stack_costume_reason(
@@ -3148,6 +3162,7 @@ __all__ = [
     "ENGAGEMENT_BAIT_RE",
     "HASHTAG_RE",
     "HIRE_FUNDRAISE_RE",
+    "HN_CAMP_REASON",
     "HN_STORY_KINDS",
     "HN_TITLE_LIMIT",
     "HN_TITLE_PREFIX",
@@ -3330,6 +3345,8 @@ __all__ = [
     "parse_arena",
     "parse_stack_arena",
     "parse_stack_clock",
+    "hn_camp_reason",
+    "is_hn_camp_arena",
     "living_stack_arena",
     "stack_costume_reason",
     "quote_without_sourced_excerpt",
