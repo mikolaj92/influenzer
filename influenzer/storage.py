@@ -21,7 +21,14 @@ from .domain import (
 from .domain import content_hash
 from .hom import Brief, Draft, Score, angle_body_hash, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
-from .playbook import ArenaId, StoryKind, Verdict, is_social_arena, living_stack_arena as stack_arena_of
+from .playbook import (
+    ArenaId,
+    StoryKind,
+    Verdict,
+    is_social_arena,
+    living_stack_arena as stack_arena_of,
+    parse_stack_arena,
+)
 
 
 class StorageError(RuntimeError):
@@ -817,25 +824,40 @@ class StateRepository:
     def admit_brief(self, brief: Brief, *, event_type: str = "brief.ingested") -> str | None:
         """CAS: first writer of this story wins. A race is silence, not a second brief.
 
-        Re-checks pending brief, social draft, same brief_id, and same ship
-        artifact under BEGIN IMMEDIATE. IntegrityError on the unique key is
+        Re-checks pending brief, social draft, living 48h stack, same brief_id,
+        and same ship artifact under BEGIN IMMEDIATE. The lock is this
+        state.db, not one project_id. IntegrityError on the unique key is
         the same silence.
         """
         with self.transaction() as c:
             self._require_project(c, brief.project_id)
             pending = c.execute(
-                "SELECT 1 FROM briefs WHERE project_id=? AND status=? LIMIT 1",
-                (brief.project_id, "pending"),
+                "SELECT 1 FROM briefs WHERE status=? LIMIT 1",
+                ("pending",),
             ).fetchone()
             if pending is not None:
                 return "pending_brief"
-            drafts = c.execute(
-                "SELECT arena FROM operator_drafts WHERE project_id=? AND coalesce(gate_verdict, '') != ?",
-                (brief.project_id, "hold"),
+            drafts = list(
+                c.execute(
+                    "SELECT project_id, arena, created_at FROM operator_drafts "
+                    "WHERE coalesce(gate_verdict, '') != ?",
+                    ("hold",),
+                )
             )
             for row in drafts:
                 if is_social_arena(row["arena"]):
                     return "social_draft"
+            stacked = [row for row in drafts if parse_stack_arena(row["arena"])]
+            if stacked and stack_arena_of(
+                ((row["arena"], row["created_at"]) for row in stacked),
+                brief.created_at,
+            ):
+                oldest = min(
+                    stacked,
+                    key=lambda row: (str(row["created_at"] or ""), str(row["arena"] or "")),
+                )
+                if oldest["project_id"] != brief.project_id:
+                    return "living_stack"
             existing = c.execute(
                 "SELECT 1 FROM briefs WHERE project_id=? AND brief_id=?",
                 (brief.project_id, brief.brief_id),
@@ -987,13 +1009,30 @@ class StateRepository:
         last = max(drafts, key=lambda draft: (draft.created_at, draft.draft_id))
         return angle_body_hash(last.body)
 
-    def living_stack_arena(self, project_id: str, now: str | None) -> ArenaId | None:
-        """Open github/hn costume while the 48h window from the first draft lives."""
-        drafts = self.list_operator_drafts(project_id)
-        return stack_arena_of(
-            ((draft.arena, draft.created_at) for draft in drafts),
+    def living_stack(self, now: str | None) -> tuple[str | None, ArenaId | None]:
+        """Owner and costume of the open github/hn stack on this state.db."""
+        stacked = [
+            draft
+            for draft in self.list_operator_drafts()
+            if parse_stack_arena(draft.arena) is not None
+        ]
+        arena = stack_arena_of(
+            ((draft.arena, draft.created_at) for draft in stacked),
             now,
         )
+        if arena is None or not stacked:
+            return None, None
+        oldest = min(stacked, key=lambda draft: (draft.created_at, draft.draft_id))
+        return oldest.project_id, arena
+
+    def living_stack_arena(self, project_id: str | None, now: str | None) -> ArenaId | None:
+        """Open github/hn costume while the 48h window from the first draft lives.
+
+        Lock is this state.db, not one project_id. A stack on any project is
+        the machine's stack. ``project_id`` is accepted for callers and ignored.
+        """
+        _owner, arena = self.living_stack(now)
+        return arena
 
     def persist_operator_decision(
         self,

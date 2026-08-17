@@ -220,11 +220,11 @@ def scan_due_reason(
     if foreign:
         return foreign
     if current_look_state(repo, slug) == "in_progress":
-        blocked = open_story_reason(repo, project_id)
+        blocked = open_story_reason(repo, project_id, clock)
         if blocked:
             return blocked
         return None
-    blocked = open_story_reason(repo, project_id)
+    blocked = open_story_reason(repo, project_id, clock)
     if blocked:
         return blocked
     last = last_scan_at(repo, project_id, slug)

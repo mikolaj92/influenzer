@@ -380,7 +380,7 @@ def scan_github(
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
         return host_silence(foreign, project_id=project_id, repo_slug=slug)
-    blocked = open_story_reason(repo, project_id)
+    blocked = open_story_reason(repo, project_id, now)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     leftover = repo.look_state(slug)
