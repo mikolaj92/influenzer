@@ -229,7 +229,8 @@ def parse_arena(value: str | None) -> ArenaId | None:
 # silence — not a second social angle, even after verdict pass. Hold or a dead
 # window can change it. Shopping is silence. #63: format stays because we do
 # not emit a second costume. #61: we sit on github (feedback) and hn (camp).
-# X/LI/YT/shorts/discord/bsky without a listener are not a first costume.
+# X/shorts without a listener are not a first costume. Preferred YT sits so
+# a cut without title+promise is silence — not a Show HN. Discord/bsky sit.
 # Ship goes where we sit. #50: after Show HN, sit in the thread. Score does
 # not pick HN again.
 STACK_HOURS = 48
@@ -371,9 +372,11 @@ def choose_arena(
     Score/scan do not emit a second social angle while the window lives —
     this only names the locked costume. Changelog or silence is the caller.
 
-    We sit on github (feedback) and hn (camp). Preferred X / YouTube /
-    shorts without a listener is not a first costume — ship goes where
-    we sit. Court is insight from the work, never a launch channel:
+    We sit on github (feedback) and hn (camp). Preferred shorts without
+    a listener is not a first costume — ship goes where we sit. Preferred
+    YouTube sits so a cut without a title+promise pair (one message in
+    0.5s) is silence — not a Show HN, not hey-guys, not a logo intro.
+    Court is insight from the work, never a launch channel:
     preferred LinkedIn sits only when the brief does not claim ship.
     Preferred Discord sits so an empty tavern can be silence — public
     invite only with intent split and ~10 builders. Preferred Bluesky
@@ -427,6 +430,10 @@ def choose_arena(
     # to github/HN when tryable; not tryable sits so x_empty_feed kills.
     if wanted is ArenaId.X and (parent_post or not tryable):
         return ArenaId.X
+    # #37: cinema without title+promise is silence. Sit so a labeled
+    # package or a fair hook is not a YouTube cut.
+    if wanted is ArenaId.YOUTUBE:
+        return ArenaId.YOUTUBE
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
         return ArenaId.LINKEDIN
@@ -1222,7 +1229,20 @@ WORKSHOP_LIFE_RE = re.compile(
     r")"
 )
 SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
-CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\.5s)\b")
+CINEMA_MISSING_PACKAGE_REASON = "cinema_missing_package"
+# Cinema package is title+thumb / tytuł+obietnica, one message in 0.5s.
+# The word title, kind=package, a poster, or a fair 1-3s hook is not this.
+# Pair of #36 (fair hook) and #31 (named sub): a label is not the pair.
+CINEMA_PACKAGE_RE = re.compile(
+    r"(?i)(?:"
+    r"\btitle\s*(?:plus|\+|and|/)\s*thumb(?:nail)?(?:\s+in\s+0\s*[,.]\s*5s)?\b|"
+    r"\btitle\s+and\s+promise\b|"
+    r"\btytu[lł]\s*(?:\+|i|oraz)\s*(?:obietnic\w*|miniatur\w*|thumb(?:nail)?)\b|"
+    r"\bone\s+message\s+in\s+0\s*[,.]\s*5s\b|"
+    r"\b0\s*[,.]\s*5s\s+(?:title|package|thumb|pair)\b|"
+    r"\bpackage\s+(?:first|in\s+0\s*[,.]\s*5s)\b"
+    r")"
+)
 # Cafe: starter pack onboarduje, custom feed trzyma. Artifact alone (#35)
 # is reach without retention. A GitHub pack / news feed / empty X feed
 # is not this costume. Pair of #35 (artifact, not vibe).
@@ -1676,7 +1696,7 @@ ARENA_GATES: dict[ArenaId, ArenaGate] = {
         ),
     ),
     ArenaId.YOUTUBE: ArenaGate(
-        reason="cinema_missing_package",
+        reason=CINEMA_MISSING_PACKAGE_REASON,
         require_package=True,
         allowed_story_kinds=frozenset(
             {StoryKind.MAJOR, StoryKind.HARD_ISSUE, StoryKind.FAILURE}
@@ -3397,7 +3417,15 @@ def reddit_reason(text: str) -> str | None:
 
 
 def has_cinema_package(text: str) -> bool:
-    return bool(CINEMA_PACKAGE_RE.search(text))
+    """True when the cut names title+thumb / tytuł+obietnica in 0.5s. A label is not."""
+    return bool(CINEMA_PACKAGE_RE.search(text or ""))
+
+
+def cinema_package_reason(text: str) -> str | None:
+    """Silence on a cinema cut without the title+promise pair. kind=package is not proof."""
+    if has_cinema_package(text):
+        return None
+    return CINEMA_MISSING_PACKAGE_REASON
 
 
 def has_fair_hook(text: str) -> bool:
@@ -3430,10 +3458,12 @@ def looks_like_cinema_end(text: str) -> bool:
 
 
 def cinema_end_reason(text: str) -> str | None:
-    """Silence when cinema would thank, ask to subscribe, or roll an outro-logo."""
+    """Silence when cinema would thank, ask to subscribe, roll an outro-logo,
+    or go out without the title+promise pair. A labeled package is not the pair.
+    """
     if looks_like_cinema_end(text):
         return CINEMA_ANNOUNCES_END_REASON
-    return None
+    return cinema_package_reason(text)
 
 
 def fair_loop_reason(text: str, *, kinds: Iterable[str] = ()) -> str | None:
@@ -3487,6 +3517,7 @@ __all__ = [
     "CAFE_PACK_RE",
     "CINEMA_ANNOUNCES_END_REASON",
     "CINEMA_END_RE",
+    "CINEMA_MISSING_PACKAGE_REASON",
     "CONTEST_RE",
     "FAIR_CTA_RE",
     "FAIR_HOOK_RE",
@@ -3579,6 +3610,7 @@ __all__ = [
     "cafe_artifact_reason",
     "cafe_reason",
     "cinema_end_reason",
+    "cinema_package_reason",
     "court_reason",
     "feedback_excerpt_texts",
     "fair_hook_reason",
