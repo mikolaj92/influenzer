@@ -2701,6 +2701,84 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("cta", draft.body.lower())
         self.assertNotIn("Costume:", draft.body)
 
+    def test_reddit_without_disclosure_is_undressable_even_when_score_says_draft(self) -> None:
+        empties = (
+            (
+                Fact(text="timeouts looked like success in r/SideProject", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            (
+                Fact(text="I built a local tick in r/SideProject"),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            (
+                Fact(text="bez ujawnienia, native self-post in r/SideProject", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+        )
+        for facts in empties:
+            with self.subTest(text=facts[0].text):
+                brief = _ship_brief(
+                    preferred_arena=ArenaId.REDDIT,
+                    claims_ship=False,
+                    facts=facts,
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.REDDIT,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.REDDIT].wave,
+                    canon_url=ARENAS[ArenaId.REDDIT].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "reddit",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.REDDIT].wave),
+                            "canon_url": ARENAS[ArenaId.REDDIT].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("Show HN:", dumped)
+                self.assertNotIn("Costume:", dumped)
+
+    def test_reddit_with_disclosure_and_repo_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.REDDIT,
+            facts=(
+                Fact(text="I built a local tick that scores briefs", artifact_url=SHIP_PR),
+                Fact(text="native self-post in r/SideProject"),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.REDDIT,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.REDDIT].wave,
+            canon_url=ARENAS[ArenaId.REDDIT].canon_url,
+        )
+        draft = dress_brief(brief, fake)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.REDDIT)
+        self.assertEqual(draft.costume, "village")
+        self.assertIn("I built", draft.body)
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertIn("r/SideProject", draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_every_arena_dresser_refuses_the_label_dump(self) -> None:
         from influenzer.hom_draft import _DRESSERS, _FORBIDDEN_IN_BODY
 
@@ -2712,7 +2790,7 @@ class HomDraftCostumeTests(unittest.TestCase):
                 Fact(kind="package", text="title plus thumb in 0.5s: one-angle operator tick"),
                 Fact(kind="hook", text="hook in 1-3s: brief in, draft out"),
                 Fact(text="last frame into first; rewatch is the signal"),
-                Fact(text="I struggled with timeouts looking like success in r/SideProject"),
+                Fact(text="I built a local tick; this is my project in r/SideProject"),
                 Fact(text="Mikolaj Nowak"),
             ),
         )

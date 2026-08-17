@@ -3100,10 +3100,11 @@ def has_named_subreddit(text: str) -> bool:
 # Pair of #49 (disclose) and #31 (named room).
 REDDIT_NO_ROOM_REASON = "reddit_no_room"
 REDDIT_NO_DISCLOSURE_REASON = "reddit_no_disclosure"
+REDDIT_UNDISCLOSED_RE = re.compile(r"(?i)\bbez\s+ujawnien")
 REDDIT_DISCLOSE_RE = re.compile(
     r"(?i)(?:"
     r"\bdisclos(?:e|ure|ing)\b|"
-    r"\bujawni|"
+    r"\bujawni(?:am|amy|enie|ć)\b|"
     r"\bthis is (?:my|our|mine)\b|"
     r"\bI (?:built|wrote|made|shipped)\b|"
     r"\bmy (?:project|tool|repo|app)\b|"
@@ -3119,6 +3120,8 @@ REDDIT_DISCLOSE_RE = re.compile(
 def looks_like_reddit_disclose(text: str) -> bool:
     """True for I built / this is my project / disclose. Affiliation must be said."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    if REDDIT_UNDISCLOSED_RE.search(cleaned):
+        return False
     return bool(REDDIT_DISCLOSE_RE.search(cleaned))
 
 

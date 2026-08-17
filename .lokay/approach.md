@@ -11,11 +11,15 @@ Draft na village: native self-post, disclose że to nasze, repo na dole albo w p
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — sit preferred Reddit; `reddit_reason` requires named room + disclose + repo
+- `influenzer/hom.py` — village gate uses `reddit_reason`
+- `influenzer/hom_draft.py` — dress Reddit is silence without disclosure
+- `tests/test_e2e_gates.py` — one village story: no disclose = kill; disclose+repo = draft
+- `tests/test_hom_draft.py` — leaked Reddit score still undressable without ujawnienie
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `pytest tests/test_e2e_gates.py tests/test_hom_draft.py` plus the existing named-room score test
 
 ## Non-goals
 
