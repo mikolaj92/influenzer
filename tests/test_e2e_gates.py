@@ -1806,7 +1806,67 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "seminar")
         self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertIn("I built", draft.body)
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertIn("I struggled", draft.body)
+        self.assertEqual(len(draft.body.split("\n\n")), 3)
         self.assertNotIn("We at Product", draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
+    def test_show_hn_is_title_url_and_backstory_or_silence(self) -> None:
+        human = "I built a local tick that scores briefs"
+        backstory = "I struggled with a queue that never scored a brief"
+        extra = "Patches stay changelog-only"
+        title_only = Brief.create(
+            project_id="app-1",
+            brief_id="b-hn-title-only",
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+                Fact(text=human),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(title_only)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNone(compose_draft(title_only, score))
+        leaked = Score(
+            brief_id=title_only.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(compose_draft(title_only, leaked))
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-hn-three-fields",
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+                Fact(text=human),
+                Fact(text=backstory),
+                Fact(text=extra),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        draft = compose_draft(alive, score_brief(alive))
+        assert draft is not None
+        self.assertEqual(draft.costume, "seminar")
+        self.assertEqual(
+            draft.body,
+            f"Show HN: {human}\n\n{SHIP_PR}\n\n{backstory}",
+        )
+        self.assertNotIn(extra, draft.body)
+        self.assertNotIn("please upvote", draft.body.lower())
+        self.assertNotIn("waitlist", draft.body.lower())
         self.assertNotIn("Costume:", draft.body)
 
     def test_reddit_without_named_sub_is_not_village(self) -> None:

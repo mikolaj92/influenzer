@@ -377,6 +377,16 @@ def _show_hn_title(one_liner: str) -> str | None:
     return dressed
 
 
+def _hn_backstory(bits: CopyBits) -> str | None:
+    """First leftover fact is the first comment. A dump of the rest is a blog."""
+    title = bits.one_liner.strip()
+    for text in bits.rest:
+        cleaned = text.strip()
+        if cleaned and cleaned != title:
+            return cleaned
+    return None
+
+
 def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     """Seminar: Show HN title + tryable URL + first-comment backstory."""
     if seminar_reason(bits.blob):
@@ -409,11 +419,12 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     title = _show_hn_title(bits.one_liner)
     if title is None:
         return None
-    parts = [title, url]
-    backstory = _join_rest(bits)
-    if backstory:
-        parts.append(backstory)
-    return _body_or_none("\n\n".join(parts))
+    backstory = _hn_backstory(bits)
+    if not backstory:
+        return None
+    if looks_like_waitlist(backstory) or looks_like_solicit_gesture(backstory):
+        return None
+    return _body_or_none("\n\n".join((title, url, backstory)))
 
 
 def _dress_x(bits: CopyBits, score: Score) -> str | None:

@@ -64,33 +64,37 @@ class HomDraftCostumeTests(unittest.TestCase):
     def test_hn_title_wears_the_human_fact_not_the_ship_artifact_stub(self) -> None:
         """README demo ingest: --artifact-url inserts kind=artifact text='ship artifact' first."""
         human = "Local tick scores briefs and emits a draft"
+        backstory = "Dry-run still default"
         brief = _ship_brief(
             preferred_arena=ArenaId.HN,
             facts=(
                 Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
                 Fact(kind="signal", text=human),
+                Fact(kind="signal", text=backstory),
             ),
         )
         decision = apply_brief(brief)
         assert decision.draft is not None
         body = decision.draft.body
-        self.assertEqual(body, f"Show HN: {human}\n\n{SHIP_PR}")
+        self.assertEqual(body, f"Show HN: {human}\n\n{SHIP_PR}\n\n{backstory}")
         self.assertNotIn("Show HN: ship artifact", body)
         self.assertNotEqual(body.splitlines()[0].casefold(), "show hn: ship artifact")
         self.assertNotIn("Costume:", body)
 
     def test_hn_readme_demo_repo_root_wears_human_fact_and_repo_url(self) -> None:
         human = "Local tick scores briefs and emits a draft"
+        backstory = "Dry-run still default"
         brief = _ship_brief(
             preferred_arena=ArenaId.HN,
             facts=(
                 Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_REPO),
                 Fact(kind="signal", text=human),
+                Fact(kind="signal", text=backstory),
             ),
         )
         decision = apply_brief(brief)
         assert decision.draft is not None
-        self.assertEqual(decision.draft.body, f"Show HN: {human}\n\n{SHIP_REPO}")
+        self.assertEqual(decision.draft.body, f"Show HN: {human}\n\n{SHIP_REPO}\n\n{backstory}")
         self.assertNotIn("/pull/1", decision.draft.body)
         self.assertNotIn("Show HN: ship artifact", decision.draft.body)
 
@@ -111,6 +115,67 @@ class HomDraftCostumeTests(unittest.TestCase):
             decision.draft.body,
             f"Show HN: {human}\n\n{SHIP_PR}\n\n{backstory}",
         )
+
+    def test_hn_without_backstory_is_undressable_even_when_score_says_draft(self) -> None:
+        human = "Local tick scores briefs and emits a draft"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+                Fact(kind="signal", text=human),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.HN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.HN].wave,
+            canon_url=ARENAS[ArenaId.HN].canon_url,
+        )
+        self.assertIsNone(dress_brief(brief, fake))
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(brief),
+                "score": {
+                    "brief_id": brief.brief_id,
+                    "verdict": "draft",
+                    "reason": "one_angle",
+                    "arena": "hn",
+                    "angle": "what shipped and why a stranger should try it",
+                    "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                    "canon_url": ARENAS[ArenaId.HN].canon_url,
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "noop")
+        self.assertIsNone(payload["body"])
+        dumped = json.dumps(payload)
+        self.assertNotIn("Show HN:", dumped)
+        self.assertNotIn(human, dumped)
+
+    def test_hn_first_comment_is_backstory_not_a_blog_dump(self) -> None:
+        human = "Local tick scores briefs and emits a draft"
+        backstory = "Dry-run still default"
+        extra = "Patches stay changelog-only"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+                Fact(kind="signal", text=human),
+                Fact(kind="signal", text=backstory),
+                Fact(kind="signal", text=extra),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertEqual(
+            decision.draft.body,
+            f"Show HN: {human}\n\n{SHIP_PR}\n\n{backstory}",
+        )
+        self.assertNotIn(extra, decision.draft.body)
+        self.assertEqual(len(decision.draft.body.split("\n\n")), 3)
 
     def test_github_ship_tryable_is_readme_shaped_with_artifact_url(self) -> None:
         brief = _ship_brief(preferred_arena=ArenaId.GITHUB)
