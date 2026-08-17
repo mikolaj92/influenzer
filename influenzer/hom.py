@@ -97,10 +97,12 @@ from influenzer.playbook import (
     looks_like_click_here,
     looks_like_server_splash,
     looks_like_roadmap,
+    looks_like_event,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
     looks_like_waitlist,
+    EVENT_NOT_A_SHIP,
     PRESS_RELEASE_REASON,
     WORSE_CLONE_REASON,
     ranking_urls_only,
@@ -671,6 +673,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "roadmap_not_a_ship")
         return _changelog(brief, "roadmap_not_a_ship")
+    if looks_like_event(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, EVENT_NOT_A_SHIP)
+        return _changelog(brief, EVENT_NOT_A_SHIP)
     if looks_like_superlative(blob) and not (
         brief.tryable and any(is_ship_artifact(url) for url in brief_artifacts(brief))
     ):

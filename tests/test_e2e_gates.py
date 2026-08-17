@@ -97,8 +97,10 @@ from influenzer.playbook import (
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
     looks_like_press_release,
+    looks_like_event,
     looks_like_waitlist,
     looks_like_worse_clone,
+    EVENT_NOT_A_SHIP,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -384,6 +386,87 @@ class OrderedLiveGateTests(unittest.TestCase):
         alive = Brief.create(
             project_id="app-1",
             brief_id="b-waitlist-alive",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
+
+    def test_event_is_not_a_ship_on_hn_x_or_shorts(self) -> None:
+        vapor = (
+            "webinar Thursday",
+            "join us Thursday",
+            "meetup next week",
+            "add it to the calendar",
+            "wydarzenie w czwartek",
+            "dołącz w czwartek",
+        )
+        self.assertFalse(looks_like_event(""))
+        self.assertFalse(looks_like_event("   "))
+        self.assertFalse(looks_like_event("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_event("as soon as you install, the local tick scores"))
+        self.assertFalse(looks_like_event("calendar year 2026 on the README"))
+        arenas = (ArenaId.HN, ArenaId.X, ArenaId.SHORTS)
+        for idx, text in enumerate(vapor):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_event(text))
+            for arena in arenas:
+                with self.subTest(text=text, arena=arena.value):
+                    brief = Brief.create(
+                        project_id="app-1",
+                        brief_id=f"b-event-{arena.value}-{idx}",
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                        story_kind="major",
+                        claims_ship=True,
+                        tryable=True,
+                        preferred_arena=arena,
+                    )
+                    score = score_brief(brief)
+                    self.assertEqual(score.verdict, Verdict.KILL)
+                    self.assertEqual(score.reason, EVENT_NOT_A_SHIP)
+                    self.assertIsNone(score.arena)
+                    self.assertIsNone(compose_draft(brief, score))
+                    leaked = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-event-changelog",
+            facts=(Fact(text="join us Thursday", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, EVENT_NOT_A_SHIP)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(quiet, score))
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-event-alive",
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="strangers can click and run the demo today"),
