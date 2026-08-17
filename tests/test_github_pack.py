@@ -12,9 +12,13 @@ from github_pack.classify import (
     looks_like_merged_pr_fact,
     readme_tryable_url,
 )
+from github_pack.pack import README_WITHOUT_DEMO_REASON, readme_has_visible_demo
 from github_survey import GhCall, survey_public_repo
 
 from tests.gh_scripts import NOW, REPO, SHIP_RELEASE, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
+
+INSTALLABLE = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n"
+VISIBLE_DEMO = INSTALLABLE + "\n![demo](docs/demo.gif)\n"
 
 
 class HeuristicTests(unittest.TestCase):
@@ -99,8 +103,36 @@ class PackSilenceTests(unittest.TestCase):
             )
         )
 
+    def test_text_only_readme_is_changelog_not_a_launch(self) -> None:
+        self.assertFalse(readme_has_visible_demo(INSTALLABLE))
+        self.assertFalse(readme_has_visible_demo("# Demo\n\n![ci](https://img.shields.io/github/stars/mikolaj92/demo)\n"))
+        self.assertFalse(readme_has_visible_demo("# Demo\n\n![logo](docs/logo.png)\n"))
+        self.assertTrue(readme_has_visible_demo(VISIBLE_DEMO))
+        self.assertTrue(readme_has_visible_demo("# Demo\n\n<img src=\"docs/screen.png\" alt=\"screenshot\">\n"))
+        self.assertTrue(
+            readme_has_visible_demo(
+                "# Demo\n\n![demo](https://github.com/user-attachments/assets/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)\n"
+            )
+        )
+        out = self._pack(ship_script(readme=GhCall(0, b64_readme(INSTALLABLE))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], README_WITHOUT_DEMO_REASON)
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("facts", out)
+        badge = self._pack(
+            ship_script(
+                readme=GhCall(
+                    0,
+                    b64_readme(INSTALLABLE + "\n![ci](https://img.shields.io/github/stars/mikolaj92/demo)\n"),
+                )
+            )
+        )
+        self.assertEqual(badge["status"], "noop")
+        self.assertEqual(badge["reason"], README_WITHOUT_DEMO_REASON)
+
     def test_readme_url_outside_trusted_host_is_not_tryable(self) -> None:
-        installable = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n"
+        installable = INSTALLABLE
         untrusted = (
             "https://example.com/demo",
             "https://bit.ly/try-this",

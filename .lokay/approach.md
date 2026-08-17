@@ -1,25 +1,24 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=49 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=48 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #49 — Reddit bez ujawnienia to spam
+Issue: #48 — README bez dema to martwa witryna
 
 ## Goal
 
-Draft na village: native self-post, disclose że to nasze, repo na dole albo w pierwszym komentarzu. Bez tego — cisza, nawet gdy sub jest nazwany (#31).
+Kąt GitHub (warsztat) wymaga na jednym ekranie: one-liner, widoczne demo (GIF/screenshot), działający quickstart. Sam tekst bez obrazu → changelog, nie launch.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — sit preferred Reddit; `reddit_reason` requires named room + disclose + repo
-- `influenzer/hom.py` — village gate uses `reddit_reason`
-- `influenzer/hom_draft.py` — dress Reddit is silence without disclosure
-- `tests/test_e2e_gates.py` — one village story: no disclose = kill; disclose+repo = draft
-- `tests/test_hom_draft.py` — leaked Reddit score still undressable without ujawnienie
+- `github_pack/pack.py` — fail closed when a ship README has no visible demo (GIF/screenshot).
+- `tests/test_github_pack.py` — pack silence vs launch for text-only vs GIF README.
+- `tests/test_e2e_gates.py` — workshop launch still drafts only with a visible demo.
+- `tests/gh_scripts.py` — default ship fixture is a one-screen README (quickstart + GIF).
 
 ## Test plan
 
-- `pytest tests/test_e2e_gates.py tests/test_hom_draft.py` plus the existing named-room score test
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 

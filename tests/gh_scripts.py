@@ -96,7 +96,7 @@ def ship_script(**overrides: GhCall) -> dict[str, GhCall]:
             ),
         ),
         "tags": GhCall(0, json.dumps([{"name": "v0.1.0"}])),
-        "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n")),
+        "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n")),
     }
     script.update(overrides)
     return script
