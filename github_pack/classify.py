@@ -56,6 +56,24 @@ _EVENT_RE = re.compile(
     r"(?:poniedzia[lł]ek|wtorek|[sś]rod[eę]|czwartek|pi[aą]tek)\b"
     r")"
 )
+_CALENDAR_FILLER_RE = re.compile(
+    r"(?i)(?:"
+    r"\bhappy\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekend|holidays?)\b"
+    r"|\bhappy\s+new\s+year\b"
+    r"|\bmerry\s+christmas\b"
+    r"|\bseason['’]?s\s+greetings\b"
+    r"|\b(?:repo(?:sitory)?|project)\s+(?:birthday|anniversary)\b"
+    r"|\bbirthday\s+of\s+(?:the\s+)?(?:repo(?:sitory)?|project)\b"
+    r"|\b(?:repo(?:sitory)?|project)\s+turns\s+\d+\b"
+    r"|\burodzin(?:y|om|ach)?\s+(?:repo(?:zytorium)?|projektu)\b"
+    r"|\brocznic[aeyę]\s+(?:repo(?:zytorium)?|projektu)\b"
+    r"|\bweso[lł]ych\s+[sś]wi[aą]t\b"
+    r"|\bz\s+okazji\s+[sś]wi[aą]t\b"
+    r"|\bmi[lł]ego\s+(?:pi[aą]tku|weekendu)\b"
+    r"|\btgif\b"
+    r"|\b[sś]wi[eę]t(?:a|o)\b"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -88,6 +106,13 @@ def looks_like_event(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_EVENT_RE.search(text))
+
+
+def looks_like_calendar_filler(text: str) -> bool:
+    """True for a holiday, repo birthday, or happy Friday. A calendar does not write."""
+    if not text or not text.strip():
+        return False
+    return bool(_CALENDAR_FILLER_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

@@ -1,39 +1,34 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=142 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=143 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #142 — Prompt i I asked ChatGPT nie są kątem
+Issue: #143 — Kalendarz nie pisze za nas
 
 ## Goal
 
-Prompt i „I asked ChatGPT” nie są kątem. Dump rozmowy z modelem, „as an AI” = cisza. HoM nie jest modelem w kadrze.
-
-Neighbor of #117 (AI-powered slogan without proof). This issue is the model in the frame, not the slogan.
+Holiday / repo birthday / happy Friday copy is silence, not a product.
+Neighbor of #138 (event is not a ship: meetup/webinar) and #131 (world
+commentary). This is the date as a greeting, not a tryable drop.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_model_in_frame`, model-chat hosts, `unquotable_reason`
-- `influenzer/hom.py` — score kill `model_in_frame`
-- `influenzer/hom_draft.py` — undressable even when a fake score says draft
-- `tests/test_hom_operator.py`
-- `tests/test_hom_draft.py`
-- `tests/test_e2e_gates.py`
+- `influenzer/playbook.py` — `looks_like_calendar_filler`, reason, regex
+- `influenzer/hom.py` — score kills calendar filler
+- `influenzer/hom_draft.py` — dress refuses calendar filler
+- `github_pack/classify.py` / `github_pack/pack.py` — pack silences it
+- `influenzer/brief_admit.py` — admit silences it
+- tests: operator, draft, e2e, pack, admit
 
 ## Test plan
 
-- Detector: I asked ChatGPT / I asked the model / as an AI / Prompt: dump / zapytałem model / paste this prompt into ChatGPT / zrzut rozmowy z modelem / chat.openai.com = silence
-- Negative: AI-powered slogan, "prompt the operator", Claude Shannon, GPT tokenizer still draft
-- Dress refuses a model dump even when score is forced to DRAFT
-- Superlative (#117) still works independently
+- Detector matches holiday / repo birthday / happy Friday / Polish święta
+- Detector misses product copy, "shipped Friday", "calendar year", "happy path"
+- Score kills; leaked draft still dresses to None
+- Pack and admit stay silent
 
 ## Non-goals
 
-- Do not kill an honest "AI-powered" slogan that already has a tryable artifact (#117)
-- Do not change arena seating / costume choice
-- No collector / no live publish
-
-## Notes
-
-- Same fail-closed shape as #141 (poll) and #132 (private conversation).
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Do not widen #138 meetup/webinar event gate
+- Do not invent holiday-calendar posts
+- Do not treat a Friday ship as filler

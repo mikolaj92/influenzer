@@ -99,9 +99,11 @@ from influenzer.playbook import (
     looks_like_tavern_invite,
     looks_like_press_release,
     looks_like_event,
+    looks_like_calendar_filler,
     looks_like_waitlist,
     looks_like_worse_clone,
     EVENT_NOT_A_SHIP,
+    CALENDAR_FILLER_REASON,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -483,6 +485,53 @@ class OrderedLiveGateTests(unittest.TestCase):
         draft = compose_draft(alive, score)
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
+
+    def test_calendar_filler_is_silence_not_an_angle(self) -> None:
+        greetings = (
+            "happy Friday",
+            "repo birthday",
+            "urodziny repo",
+            "wesołych świąt",
+        )
+        self.assertFalse(looks_like_calendar_filler(""))
+        self.assertFalse(looks_like_calendar_filler("   "))
+        self.assertFalse(looks_like_calendar_filler("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_calendar_filler("shipped Friday after the timeout fix"))
+        self.assertFalse(looks_like_calendar_filler("calendar year 2026 on the README"))
+        for idx, text in enumerate(greetings):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_calendar_filler(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    CALENDAR_FILLER_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-calendar-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CALENDAR_FILLER_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
 
     def test_press_release_tone_is_changelog_or_silence_not_an_angle(self) -> None:
         phrases = (

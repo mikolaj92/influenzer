@@ -1,35 +1,25 @@
 {
   "paths": [
-    "influenzer/hom_draft.py",
-    "influenzer/hom_feedback.py",
-    "influenzer/hom_outbox.py",
-    "influenzer/hom_pass.py",
-    "influenzer/hom_verdict.py",
-    "influenzer/hom_watch.py",
+    "influenzer/playbook.py",
     "influenzer/hom.py",
-    "skills/influenzer-hom",
-    "tests/test_hom_draft.py",
-    "tests/test_hom_feedback.py",
+    "influenzer/hom_draft.py",
+    "influenzer/brief_admit.py",
+    "github_pack/classify.py",
+    "github_pack/pack.py",
     "tests/test_hom_operator.py",
-    "tests/test_hom_outbox.py",
-    "tests/test_hom_pass.py",
-    "tests/test_hom_verdict.py",
-    "tests/test_hom_watch.py",
-    "tests/test_e2e_gates.py"
+    "tests/test_hom_draft.py",
+    "tests/test_e2e_gates.py",
+    "tests/test_github_pack.py",
+    "tests/test_brief_admit.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": [
-    "HoM",
-    "influenzer",
-    "gate"
-  ],
+  "matched_tokens": ["kalendarz", "święta", "urodziny", "friday", "holiday"],
   "notes": [
-    "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Holiday / repo birthday / happy Friday is calendar filler, not a meetup (#138) and not world commentary (#131).",
+    "Fail closed at score, dress, pack, and admit."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__142-prompt-i-i-asked-chatgpt-nie-s-k-tem-f16118e0",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__143-kalendarz-nie-pisze-za-nas-690c7b41",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
