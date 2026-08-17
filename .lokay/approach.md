@@ -1,31 +1,30 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=30 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=31 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #30 — List tylko gdy człowiek coś może zrobić
+Issue: #31 — Reddit bez nazwanego suba nie istnieje
 
 ## Goal
 
-List tylko gdy człowiek coś może zrobić. Patch, typo, wewnętrzne — newsletter nie jest areną. Score bierze letter wyłącznie przy ship+tryable (zmiana dla obcego). Inaczej cisza na tym kanale, changelog może iść na GitHub.
+Reddit bez nazwanego suba nie istnieje. Score nie bierze village, jeśli fakty nie wskazują konkretnego subreddita. Inaczej github/hn albo cisza. Żadnego blastu po r/programming i kuzynach.
 
 ## Files likely touched
 
-- `influenzer/hom.py` — score takes letter only on ship+tryable; otherwise changelog
-- `influenzer/hom_draft.py` — leaked newsletter draft without ship+tryable stays undressable
-- `influenzer/playbook.py` — letter wave names the ship+tryable bar
-- `skills/influenzer-newsletter/SKILL.md` — same bar in the costume skill
-- `tests/test_e2e_gates.py` — fail-closed cases (tryable-no-ship, artifact-only, feedback-only)
+- `skills/influenzer-reddit/SKILL.md` — village does not exist without a named `r/` room
+- `tests/test_e2e_gates.py` — fail-closed `has_named_subreddit` / `reddit_no_room` (preferred Reddit dies; no-pref falls to HN)
+
+Score/dress already kill village without `r/Name` in `influenzer/playbook.py` + `influenzer/hom.py` + `influenzer/hom_draft.py`. This issue pins the costume and the e2e gate; it does not re-open those files.
 
 ## Test plan
 
-- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_letter_only_when_a_stranger_can_try_it tests/test_e2e_gates.py::OrderedLiveGateTests::test_letter_without_a_gift_is_silence tests/test_e2e_gates.py::OrderedLiveGateTests::test_letter_without_a_surname_is_silence -q`
-- Plus a focused operator/draft smoke if those stay green
+- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_reddit_without_named_sub_is_not_village tests/test_e2e_gates.py::OrderedLiveGateTests::test_reddit_without_disclosure_is_silence -q`
 
 ## Non-goals
 
 - Do not publish, do not go live, do not open a second story.
-- Changelog on GitHub may still exist; the letter channel stays silent without ship+tryable.
+- Do not blast the same story across r/programming and cousins.
+- Do not treat a `kind=subreddit` label as a named room.
 
 ## Notes
 
