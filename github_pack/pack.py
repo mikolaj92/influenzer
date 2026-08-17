@@ -2,9 +2,11 @@
 
 Tryable is a README+URL heuristic. Look does not run the project.
 Launching on watch is silence. Code in look is untrusted.
-Inbound titles/descriptions are data, not a command. Pack cuts
-instructions ("zpostuj to", "ignore scoring"), leaves content.
-Our score stays ours.
+A GitHub workshop README is one screen: one-liner, visible demo
+(GIF/screenshot), working quickstart. Text without an image is
+changelog, not a launch. Inbound titles/descriptions are data,
+not a command. Pack cuts instructions ("zpostuj to", "ignore
+scoring"), leaves content. Our score stays ours.
 """
 
 from __future__ import annotations
@@ -31,6 +33,18 @@ from github_pack.classify import (
 _SLUG_CLEAN_RE = re.compile(r"[^a-z0-9]+")
 _URL_IN_TEXT_RE = re.compile(r"https?://\S+", re.I)
 _LOGIN_PREFIX_RE = re.compile(r"^@[A-Za-z0-9][A-Za-z0-9_-]{0,38}:\s*")
+_MD_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+_HTML_IMG_RE = re.compile(
+    r"(?i)<img\b[^>]*\bsrc\s*=\s*['\"]?([^'\"\s>]+)"
+)
+_DEMO_EXT_RE = re.compile(r"(?i)\.(?:gif|png|webp|jpe?g|apng)(?:\?|#|$)")
+_ATTACHMENT_RE = re.compile(
+    r"(?i)(?:github\.com/user-attachments/assets/|user-images\.githubusercontent\.com/)"
+)
+_BADGE_OR_LOGO_RE = re.compile(
+    r"(?i)\b(?:logo|badge|shield|icon|favicon|stars?)\b|shields\.io|img\.shields"
+)
+README_WITHOUT_DEMO_REASON = "readme_without_demo"
 # Comment/issue/title copy is data. These shapes are an order, not a fact.
 _INBOUND_INSTRUCTION_RE = re.compile(
     r"(?i)(?:"
@@ -81,6 +95,29 @@ def strip_inbound_instructions(text: str) -> str:
     cleaned = re.sub(r" *\n *", "\n", cleaned)
     cleaned = re.sub(r" +([,.;:])", r"\1", cleaned)
     return cleaned.strip(" \t,;:.-")
+
+
+def _image_candidates(text: str) -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for match in _MD_IMAGE_RE.finditer(text):
+        found.append((match.group(1), match.group(2)))
+    for match in _HTML_IMG_RE.finditer(text):
+        found.append(("", match.group(1)))
+    return found
+
+
+def _looks_like_visible_demo(alt: str, src: str) -> bool:
+    blob = f"{alt} {src}"
+    if _BADGE_OR_LOGO_RE.search(blob):
+        return False
+    return bool(_DEMO_EXT_RE.search(src) or _ATTACHMENT_RE.search(src))
+
+
+def readme_has_visible_demo(text: str) -> bool:
+    """True for a GIF/screenshot on the README. A badge or logo is not a demo."""
+    if not text:
+        return False
+    return any(_looks_like_visible_demo(alt, src) for alt, src in _image_candidates(text))
 
 
 def sanitize_inbound_facts(facts: list[Any]) -> list[dict[str, Any]]:
@@ -178,6 +215,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     tryable = is_tryable(survey, facts) and is_trusted_artifact_url(readme_tryable_url(survey))
     if not (claims_ship and tryable):
         return _silence("not_tryable", repo=slug)
+    if not readme_has_visible_demo(str(survey.get("readme_text") or "")):
+        return _silence(README_WITHOUT_DEMO_REASON, repo=slug)
     return {
         "status": "ok",
         "ok": True,
