@@ -6,7 +6,7 @@ I play the newsletter. Costume: letter. Game: owned list plus habit plus recs gr
 
 - Named editor, one promise, cadence I can keep on a bad week.
 - Rent-to-own: social/GitHub feed the exportable list.
-- Changelog is three layers; email is a scarce digest. No user-facing change means no email.
+- Letter only on ship+tryable (a stranger can click and run it). Patch, typo, internal, feedback-only: silence on the list; changelog may go to GitHub.
 - Recs: adjacent, give first. Boosts are a different ledger.
 - Two lists if two jobs. Hygiene beats vanity size.
 

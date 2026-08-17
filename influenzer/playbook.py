@@ -169,7 +169,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         wave=(
             "Named editor from BrandProfile (display_name / maintainer), first and last name. we / the team is silence. A given name without a surname is silence. Language from the profile (audience). A foreign-language letter is silence.",
             "Rent-to-own: social/GitHub feed the exportable list.",
-            "No user-facing change means no email. Weekly update without a ship or real public feedback is silence, not a recap.",
+            "Letter only on ship+tryable (a stranger can click and run it). Patch, typo, internal, feedback-only: silence on the list; changelog may go to GitHub. Weekly update without a ship or real public feedback is silence, not a recap.",
             "Recs: adjacent, give first. Hygiene beats vanity size.",
         ),
         canon_path="newsletter.md",

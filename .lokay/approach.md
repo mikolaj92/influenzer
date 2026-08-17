@@ -1,29 +1,31 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=29 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=30 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #29 — Ton notki prasowej nie idzie na kąt społeczny
+Issue: #30 — List tylko gdy człowiek coś może zrobić
 
 ## Goal
 
-Ton notki prasowej umiera. Jeśli brief/draft brzmi jak PR (we’re excited, announcement, unveiling, delighted to share) — score nie daje kąta społecznego. HN/GitHub/X: kill albo changelog. Kostium zostaje warsztatem/seminarium, nie komunikatem.
+List tylko gdy człowiek coś może zrobić. Patch, typo, wewnętrzne — newsletter nie jest areną. Score bierze letter wyłącznie przy ship+tryable (zmiana dla obcego). Inaczej cisza na tym kanale, changelog może iść na GitHub.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — broaden press-release detector to we’re excited / announcement / unveiling / delighted to share.
-- `influenzer/hom.py` — score PR tone as kill (ship/social) or changelog, never a social angle. GitHub included.
-- `influenzer/hom_draft.py` — dress stays fail-closed even if score leaks draft.
-- `tests/test_hom_operator.py`, `tests/test_e2e_gates.py`, `tests/test_hom_draft.py` — HN/GitHub/X kill, workshop changelog, leaked draft undressable.
-- `skills/influenzer-hom/SKILL.md`, `skills/influenzer-hn/SKILL.md` — costume stays workshop/seminar, not a komunikat.
+- `influenzer/hom.py` — score takes letter only on ship+tryable; otherwise changelog
+- `influenzer/hom_draft.py` — leaked newsletter draft without ship+tryable stays undressable
+- `influenzer/playbook.py` — letter wave names the ship+tryable bar
+- `skills/influenzer-newsletter/SKILL.md` — same bar in the costume skill
+- `tests/test_e2e_gates.py` — fail-closed cases (tryable-no-ship, artifact-only, feedback-only)
 
 ## Test plan
 
-- `python -m unittest tests.test_hom_operator.ScoreBriefTests.test_press_release_tone_on_hn_is_killed tests.test_hom_operator.ScoreBriefTests.test_press_release_tone_is_kill_or_changelog_not_a_social_angle tests.test_e2e_gates.OrderedLiveGateTests.test_press_release_tone_is_changelog_or_silence_not_an_angle tests.test_hom_draft.HomDraftCostumeTests.test_press_release_tone_is_undressable_even_when_score_says_draft`
+- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_letter_only_when_a_stranger_can_try_it tests/test_e2e_gates.py::OrderedLiveGateTests::test_letter_without_a_gift_is_silence tests/test_e2e_gates.py::OrderedLiveGateTests::test_letter_without_a_surname_is_silence -q`
+- Plus a focused operator/draft smoke if those stay green
 
 ## Non-goals
 
-- (none stated)
+- Do not publish, do not go live, do not open a second story.
+- Changelog on GitHub may still exist; the letter channel stays silent without ship+tryable.
 
 ## Notes
 

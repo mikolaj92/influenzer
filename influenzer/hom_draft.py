@@ -666,7 +666,13 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.X and not has_parent_post(triples))
         or (score.arena is ArenaId.X and agora_reason(triples))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
-        or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))
+        or (
+            score.arena is ArenaId.NEWSLETTER
+            and (
+                letter_reason(bits.blob)
+                or not (brief.claims_ship and brief.tryable)
+            )
+        )
         or (score.arena is ArenaId.REDDIT and reddit_reason(bits.blob))
         or (score.arena is ArenaId.HN and seminar_reason(bits.blob))
         or (score.arena is ArenaId.YOUTUBE and cinema_end_reason(bits.blob))

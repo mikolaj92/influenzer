@@ -1,46 +1,32 @@
 {
   "paths": [
-    "influenzer/brief_admit.py",
-    "influenzer/adapters/fake_provider.py",
+    "influenzer/hom.py",
     "influenzer/hom_draft.py",
-    "skills/influenzer-hn",
-    "skills/influenzer-x",
-    "github_pack/pack.py",
-    "influenzer/adapters/child_worker.py",
-    "influenzer/adapters/contract.py",
-    "influenzer/adapters/platforms.py",
-    "influenzer/brief_scan.py",
-    "tools/hygiene_check.py",
-    "skills/influenzer-hom/SKILL.md",
-    "tests/test_x_handoff.py",
-    "tests/test_adapter_contract.py",
-    "tests/test_brief_admit.py",
-    "tests/test_brief_scan_cli.py",
-    "tests/test_fake_provider.py",
-    "tests/test_hom_draft.py",
-    "tests/test_e2e_gates.py",
-    "HN/GitHub/X"
+    "influenzer/playbook.py",
+    "skills/influenzer-newsletter",
+    "tests/test_e2e_gates.py"
   ],
-  "source": "deterministic",
+  "source": "refined-after-inspection",
   "seed_paths": [
-    "HN/GitHub/X"
+    "skills/influenzer-newsletter",
+    "tests/test_e2e_gates.py"
   ],
   "matched_tokens": [
-    "brief",
-    "draft",
-    "HN",
-    "kill",
+    "newsletter",
+    "letter",
+    "Letter",
     "Influenzer",
     "influenzer",
     "gate",
-    "X"
+    "tryable",
+    "ship"
   ],
   "notes": [
-    "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Deterministic seed pointed at the newsletter skill and e2e gates.",
+    "Score takes letter only on ship+tryable; that gate lives in hom.py / hom_draft.py / playbook.py.",
+    "Skill and e2e tests stay in scope so the costume and fail-closed cases stay aligned."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__29-ton-notki-prasowej-nie-idzie-na-k-t-spo-7fac0d1c",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__30-list-tylko-gdy-cz-owiek-co-mo-e-zrobi-10d5243f",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
