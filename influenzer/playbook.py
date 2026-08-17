@@ -591,8 +591,22 @@ RANKING_DUMP_RE = re.compile(
     r")"
 )
 
+# A waitlist is not a ship. Coming soon / join the list / sign up to get
+# access is not tryable and not Show HN. HN/X/shorts stay silent;
+# changelog may keep the date. Empty copy is not a demo. Pair of #40.
 WAITLIST_RE = re.compile(
-    r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
+    r"(?i)(?:"
+    r"\bwaitlists?\b"
+    r"|\bcoming\s+soon\b"
+    r"|\bjoin\s+(?:the|our|my)\s+(?:beta|waitlists?|lists?|mailing\s+lists?)\b"
+    r"|\bsign\s*[- ]?up\s+to\s+get\s+(?:early\s+)?access\b"
+    r"|\bsign\s*[- ]?up\s+for\s+(?:(?:early\s+)?access|(?:the|our|my)\s+(?:beta|waitlists?|lists?))\b"
+    r"|\bget\s+on\s+(?:the|our|my)\s+(?:beta|waitlists?|lists?)\b"
+    r"|\bget\s+early\s+access\b"
+    r"|\brequest\s+(?:early\s+)?access\b"
+    r"|\blanding\s+page\b"
+    r"|\bno\s+demo\b"
+    r")"
 )
 # Pending / yellow CI is not green. The look stays silent: not a ship, not
 # "it is broken". We do not know the result, so we do not lie. Failed CI
@@ -2480,6 +2494,9 @@ def looks_like_monday_without_history(
 
 
 def looks_like_waitlist(text: str) -> bool:
+    """True for a waitlist / coming soon / join-the-list page. That is not a ship."""
+    if not text or not text.strip():
+        return False
     return bool(WAITLIST_RE.search(text))
 
 
