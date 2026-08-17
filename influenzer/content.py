@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from influenzer.domain import ContentRevision, ContentStatus, DomainError, content_hash, utc_now
+from influenzer.domain import (
+    EVENT_NOT_A_SHIP,
+    ContentRevision,
+    ContentStatus,
+    DomainError,
+    content_hash,
+    looks_like_event,
+    utc_now,
+)
 from influenzer.storage import StateRepository
 
 
@@ -23,6 +31,8 @@ def create_revision(
 ) -> ContentRevision:
     if not body.strip():
         raise ContentError("body must not be empty")
+    if looks_like_event(body):
+        raise ContentError(EVENT_NOT_A_SHIP)
     source_digest = content_hash({"source": source, "body": body})
     return ContentRevision(
         project_id=project_id,
@@ -40,5 +50,7 @@ def create_revision(
 def persist_revision(repo: StateRepository, revision: ContentRevision) -> ContentRevision:
     if repo.get_project(revision.project_id) is None:
         raise ContentError(f"unknown project: {revision.project_id}")
+    if looks_like_event(revision.body):
+        raise ContentError(EVENT_NOT_A_SHIP)
     repo.save_content_revision(revision)
     return revision

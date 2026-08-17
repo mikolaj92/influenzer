@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+from influenzer.domain import EVENT_NOT_A_SHIP, looks_like_event
 from influenzer.envelope import fail, planned, result
 
 
@@ -26,6 +27,8 @@ Handler = Callable[[AdapterRequest], AdapterResult]
 
 
 def dry_run_publish(request: AdapterRequest, *, planned_id: str | None = None) -> AdapterResult:
+    if looks_like_event(request.body):
+        return fail(EVENT_NOT_A_SHIP, failure_class="terminal")
     if not request.dry_run:
         return fail("live path requires explicit platform handler", failure_class="terminal")
     return planned(
@@ -40,6 +43,8 @@ def dry_run_publish(request: AdapterRequest, *, planned_id: str | None = None) -
 
 
 def run_adapter(handler: Handler, request: AdapterRequest) -> AdapterResult:
+    if looks_like_event(request.body):
+        return fail(EVENT_NOT_A_SHIP, failure_class="terminal")
     if request.dry_run:
         # Harness guarantees no secret material is required for dry-run.
         safe = AdapterRequest(

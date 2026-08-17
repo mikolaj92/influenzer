@@ -10,6 +10,7 @@ from influenzer.adapters.registry import get_adapter
 from influenzer.config import Config
 from influenzer.content import create_revision
 from influenzer.domain import (
+    EVENT_NOT_A_SHIP,
     AttemptStatus,
     ContentStatus,
     PlanStatus,
@@ -18,13 +19,14 @@ from influenzer.domain import (
     PolicyVersion,
     PublicationAttempt,
     PublishPlan,
+    looks_like_event,
     transition_attempt,
     transition_plan,
     utc_now,
 )
 from influenzer.envelope import noop, planned, result
-from influenzer.hom import apply_brief, decision_to_dict, drop_repeat_angle
-from influenzer.playbook import CANON_URL
+from influenzer.hom import Brief, OperatorDecision, Score, apply_brief, decision_to_dict, drop_repeat_angle
+from influenzer.playbook import CANON_URL, Verdict
 from influenzer.policy import evaluate_policy
 from influenzer.storage import StateRepository
 
@@ -46,6 +48,27 @@ def resolve_live_intent(*, scheduler: bool, cli_live: bool, config: Config) -> b
     return bool(cli_live)
 
 
+def _brief_is_event(brief: Brief) -> bool:
+    texts = [fact.text for fact in brief.facts]
+    texts.extend(fact.kind for fact in brief.facts)
+    texts.extend(fact.artifact_url or "" for fact in brief.facts)
+    return looks_like_event(*texts)
+
+
+def _silence_event(brief: Brief) -> OperatorDecision:
+    """Webinar / meetup / calendar is cisza. A calendar is not an artifact."""
+    score = Score(
+        brief_id=brief.brief_id,
+        verdict=Verdict.KILL,
+        reason=EVENT_NOT_A_SHIP,
+        arena=None,
+        angle=None,
+        wave_checklist=(),
+        canon_url=CANON_URL,
+    ).with_hash()
+    return OperatorDecision(brief=brief, score=score, draft=None)
+
+
 def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
     """Ingested briefs → score → draft or explicit kill. Never publishes."""
     outcomes: list[dict[str, Any]] = []
@@ -58,6 +81,9 @@ def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
             ),
             repo.last_angle_body_hash(brief.project_id),
         )
+        draft_body = decision.draft.body if decision.draft is not None else ""
+        if _brief_is_event(brief) or looks_like_event(draft_body):
+            decision = _silence_event(brief)
         revision = None
         if decision.draft is not None:
             revision = create_revision(
@@ -125,6 +151,17 @@ def tick(
     outcomes: list[dict[str, Any]] = []
     for item in due:
         plan = item.plan
+        if looks_like_event(plan.body):
+            outcomes.append(
+                {
+                    "plan_id": plan.plan_id,
+                    "status": "denied",
+                    "reason": EVENT_NOT_A_SHIP,
+                    "mutated": False,
+                }
+            )
+            processed += 1
+            continue
 
         if not live:
             # Dry-run never claims plans or dispatches handlers. CLI --live is ignored.

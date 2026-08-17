@@ -17,11 +17,19 @@ from .domain import (
     BrandProfile, Campaign, CampaignKind, CampaignStatus, ContentRevision, ContentStatus,
     PlatformAccount, PolicyActivationGrant, PolicyVersion, Project, PublishPlan,
     PublicationAttempt, AccountStatus, PlanStatus, AttemptStatus,
+    EVENT_NOT_A_SHIP, looks_like_event,
 )
 from .domain import content_hash
 from .hom import Brief, Draft, Score, angle_body_hash, brief_to_mapping, parse_facts_json
 from .migrations import MigrationError, migrate
-from .playbook import ArenaId, StoryKind, Verdict, is_social_arena, living_stack_arena as stack_arena_of
+from .playbook import (
+    CANON_URL,
+    ArenaId,
+    StoryKind,
+    Verdict,
+    is_social_arena,
+    living_stack_arena as stack_arena_of,
+)
 
 
 class StorageError(RuntimeError):
@@ -1005,6 +1013,26 @@ class StateRepository:
         now: str,
     ) -> None:
         """Atomically record score, optional draft/revision, and mark the brief processed."""
+        event_bits = [fact.text for fact in brief.facts]
+        event_bits.extend(fact.kind for fact in brief.facts)
+        event_bits.extend(fact.artifact_url or "" for fact in brief.facts)
+        if draft is not None:
+            event_bits.append(draft.body)
+            event_bits.append(draft.angle)
+        if revision is not None:
+            event_bits.append(revision.body)
+        if looks_like_event(*event_bits):
+            score = Score(
+                brief_id=brief.brief_id,
+                verdict=Verdict.KILL,
+                reason=EVENT_NOT_A_SHIP,
+                arena=None,
+                angle=None,
+                wave_checklist=(),
+                canon_url=score.canon_url or CANON_URL,
+            ).with_hash()
+            draft = None
+            revision = None
         with self.transaction() as c:
             self._require_project(c, brief.project_id)
             row = c.execute(

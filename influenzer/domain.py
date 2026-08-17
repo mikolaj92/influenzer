@@ -341,7 +341,35 @@ class Campaign:
 ACTIVE_ATTEMPT = frozenset({AttemptStatus.PENDING, AttemptStatus.RUNNING, AttemptStatus.UNKNOWN})
 
 FOREIGN_OWNER = "foreign_owner"
+EVENT_NOT_A_SHIP = "event_not_a_ship"
+# A calendar is not a ship. Webinar / meetup / join us Thursday is cisza,
+# not an artifact. Pair of waitlist (#46, mailing list) and roadmap (#129,
+# coming Q3). This is the date on the wall, not a tryable drop.
+EVENT_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwebinars?\b"
+    r"|\bmeet[- ]?ups?\b"
+    r"|\bcalendars?\b"
+    r"|\bkalendarz(?:e|a|u|owi|em|ach)?\b"
+    r"|\bwydarzeni(?:e|a|u|em|om|ami|ach)\b"
+    r"|\bspotkani(?:e|a|u|em|om|ami|ach)\b"
+    r"|\boffice\s+hours\b"
+    r"|\blive[- ]?streams?\b"
+    r"|\bjoin\s+us\s+(?:this\s+|next\s+)?"
+    r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b"
+    r"|\bdo[lł][aą]cz(?:cie)?\s+(?:do\s+nas\s+)?(?:w\s+)?"
+    r"(?:poniedzia[lł]ek|wtorek|[sś]rod[eę]|czwartek|pi[aą]tek)\b"
+    r")"
+)
 _GITHUB_LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
+
+
+def looks_like_event(*texts: str | None) -> bool:
+    """True for webinar / meetup / calendar / join us Thursday. Not a ship."""
+    blob = "\n".join(part for part in texts if part and part.strip())
+    if not blob:
+        return False
+    return bool(EVENT_RE.search(blob))
 
 
 def github_owner(repo_slug: str) -> str | None:
