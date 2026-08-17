@@ -30,6 +30,7 @@ from influenzer.playbook import (
     ARENAS,
     ArenaId,
     BLUESKY_PACK_WITHOUT_FEED_REASON,
+    CINEMA_ANNOUNCES_END_REASON,
     COURT_NOT_A_LAUNCH_REASON,
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
@@ -44,6 +45,7 @@ from influenzer.playbook import (
     Verdict,
     cafe_reason,
     choose_arena,
+    cinema_end_reason,
     court_reason,
     fair_loop_reason,
     has_cafe_feed,
@@ -59,6 +61,7 @@ from influenzer.playbook import (
     has_workshop_life,
     letter_reason,
     looks_like_brand_voice,
+    looks_like_cinema_end,
     looks_like_court_launch,
     looks_like_dead_star_count,
     looks_like_dead_star_story,
@@ -525,6 +528,8 @@ class OrderedLiveGateTests(unittest.TestCase):
             "last frame into first, then subscribe",
             "rewatch the cut — link in bio",
             "ostatnia klatka w pierwszą i CTA",
+            "last frame into first, thanks for watching",
+            "rewatch the cut — outro-logo",
         )
         for idx, text in enumerate(both):
             with self.subTest(text=text):
@@ -591,6 +596,110 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertFalse(has_fair_loop("one loop per state.db"))
         self.assertFalse(has_fair_loop("event loop"))
         self.assertFalse(looks_like_fair_cta("follow the README to run the demo"))
+
+    def test_cinema_end_does_not_announce_the_end(self) -> None:
+        package = "title plus thumb in 0.5s: one-angle operator tick"
+        endings = (
+            "thanks for watching",
+            "like and subscribe",
+            "outro-logo",
+            "dzi\u0119kuj\u0119 za ogl\u0105danie",
+        )
+        for idx, text in enumerate(endings):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_cinema_end(text))
+                self.assertEqual(cinema_end_reason(text), CINEMA_ANNOUNCES_END_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-cinema-end-{idx}",
+                    facts=(
+                        Fact(kind="package", text=package, artifact_url=SHIP_PR),
+                        Fact(text=text),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.YOUTUBE,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
+                    canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.YOUTUBE, "\n".join((package, text))),
+                    (Verdict.KILL, CINEMA_ANNOUNCES_END_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        one_cta = "open the working demo after the cut"
+        self.assertFalse(looks_like_cinema_end(one_cta))
+        self.assertFalse(looks_like_cinema_end(package))
+        self.assertIsNone(cinema_end_reason("\n".join((package, one_cta))))
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-cinema-one-cta",
+            facts=(
+                Fact(kind="package", text=package, artifact_url=SHIP_PR),
+                Fact(text=one_cta),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        leaked = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.YOUTUBE,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
+            canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
+        )
+        self.assertIsNone(_gate_violation(brief, ArenaId.YOUTUBE, "\n".join((package, one_cta))))
+        draft = compose_draft(brief, leaked)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.YOUTUBE)
+        self.assertEqual(draft.costume, "cinema")
+        self.assertIn("0.5s", draft.body)
+        self.assertNotIn("thanks for watching", draft.body.lower())
+        self.assertNotIn("subscribe", draft.body.lower())
+        self.assertNotIn("outro", draft.body.lower())
+        self.assertFalse(looks_like_cinema_end("follow the README to run the demo"))
+        self.assertFalse(looks_like_fair_cta(one_cta))
+
+        both = "last frame into first, then subscribe"
+        self.assertTrue(has_fair_loop(both))
+        self.assertTrue(looks_like_fair_cta(both))
+        self.assertEqual(fair_loop_reason(both), "fair_cta_with_loop")
+        looped_ask = Brief.create(
+            project_id="app-1",
+            brief_id="b-cinema-loop-cta",
+            facts=(
+                Fact(kind="package", text=package, artifact_url=SHIP_PR),
+                Fact(text=both),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        leaked_both = Score(
+            brief_id=looped_ask.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.YOUTUBE,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
+            canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
+        )
+        self.assertEqual(
+            _gate_violation(looped_ask, ArenaId.YOUTUBE, "\n".join((package, both))),
+            (Verdict.KILL, "fair_cta_with_loop"),
+        )
+        self.assertIsNone(compose_draft(looped_ask, leaked_both))
 
     def test_court_is_not_a_launch_channel(self) -> None:
         launches = (

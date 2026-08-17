@@ -26,6 +26,7 @@ from influenzer.playbook import (
     arena_gate,
     arena_play,
     choose_arena,
+    cinema_end_reason,
     court_reason,
     fair_loop_reason,
     tavern_reason,
@@ -555,6 +556,12 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, gate.reason
     if gate.require_package and "package" not in kinds and not has_cinema_package(blob):
         return Verdict.KILL, gate.reason
+    if arena is ArenaId.YOUTUBE:
+        cinema_fail = cinema_end_reason(blob)
+        if cinema_fail:
+            return Verdict.KILL, cinema_fail
+        if fair_loop_reason(blob, kinds=kinds) == "fair_cta_with_loop":
+            return Verdict.KILL, "fair_cta_with_loop"
     if gate.require_hook and "hook" not in kinds and not has_fair_hook(blob):
         return Verdict.KILL, gate.reason
     if gate.require_loop or gate.forbid_cta_with_loop:

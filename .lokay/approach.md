@@ -1,32 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=43 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=42 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #43 — Nie reklamujemy gorszego klona
+Issue: #42 — Koniec odcinka nie ogłasza końca
 
 ## Goal
 
-Jeśli fakty mówią, że ktoś już to zrobił lepiej (albo „znowu wymyśliliśmy X”) — score zabija kąt społeczny. Changelog albo cisza. Albo pomóc tamtemu, albo mieć wyraźnie lepszy pomysł. To mandat, nie kostium.
+YouTube/Shorts: zero „thanks for watching”, like&subscribe, outro-logo. Jedno CTA albo pętla, nie oba. Inaczej cisza na cinema/fair.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `looks_like_worse_clone` detector + reason
-- `influenzer/hom.py` — score kills social / changelog otherwise
-- `influenzer/hom_draft.py` — leaked DRAFT still undressable
-- `tests/test_e2e_gates.py` — e2e lock for kill / changelog / better-idea draft
+- `influenzer/playbook.py` — cinema end detector (thanks / like&subscribe / outro-logo)
+- `influenzer/hom.py` — YouTube gate uses cinema_end_reason
+- `influenzer/hom_draft.py` — cinema dress is silence on an announced end
+- `tests/test_e2e_gates.py` — cinema/fair end-of-cut coverage
 
 ## Test plan
 
-- Run `tests/test_e2e_gates.py` plus the predecessor/dunk operator cases
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Do not dunk a predecessor (already covered).
-- Do not silence a named difference or an offer to help.
+- (none stated)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent refined the file list after inspection: localize seed was only the e2e test, but the mandate is a score-level gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.

@@ -1248,7 +1248,28 @@ FAIR_CTA_RE = re.compile(
     r"\bfollow\s+(?:for\s+more|and\s+subscribe)\b|"
     r"\bone\s+ask\b|"
     r"\bzapisz\s+si[eę]\b|"
-    r"\bcomment\s+(?:below|for)\b"
+    r"\bcomment\s+(?:below|for)\b|"
+    r"\bthanks?\s+for\s+(?:watching|tuning\s+in|viewing)\b|"
+    r"\bthank\s+you\s+for\s+(?:watching|tuning\s+in|viewing)\b|"
+    r"\bdzi[eę]k\w*\s+za\s+ogl[aą]d|"
+    r"\boutro(?:[- ]logo)?\b|"
+    r"\blogo[- ](?:outro|intro|end)\b|"
+    r"\bend[- ]?cards?\b"
+    r")"
+)
+# #42: cinema/fair end does not announce the end. Thanks-for-watching,
+# like-and-subscribe, and an outro-logo are silence. One CTA is not those.
+CINEMA_ANNOUNCES_END_REASON = "cinema_announces_end"
+CINEMA_END_RE = re.compile(
+    r"(?i)(?:"
+    r"\bthanks?\s+for\s+(?:watching|tuning\s+in|viewing)\b|"
+    r"\bthank\s+you\s+for\s+(?:watching|tuning\s+in|viewing)\b|"
+    r"\bdzi[eę]k\w*\s+za\s+ogl[aą]d|"
+    r"\blike\s*(?:and|&|,)\s*subscribe\b|"
+    r"\blajk\s*(?:i|&)\s*subskryb|"
+    r"\boutro(?:[- ]logo)?\b|"
+    r"\blogo[- ](?:outro|intro|end)\b|"
+    r"\bend[- ]?cards?\b"
     r")"
 )
 # A quotation mark is not a testimonial. No excerpt with a URL → no quotes.
@@ -3248,6 +3269,19 @@ def looks_like_fair_cta(text: str) -> bool:
     return bool(FAIR_CTA_RE.search(cleaned))
 
 
+def looks_like_cinema_end(text: str) -> bool:
+    """True for thanks-for-watching / subscribe / outro-logo. Cinema does not announce the end."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(CINEMA_END_RE.search(cleaned))
+
+
+def cinema_end_reason(text: str) -> str | None:
+    """Silence when cinema would thank, ask to subscribe, or roll an outro-logo."""
+    if looks_like_cinema_end(text):
+        return CINEMA_ANNOUNCES_END_REASON
+    return None
+
+
 def fair_loop_reason(text: str, *, kinds: Iterable[str] = ()) -> str | None:
     """Silence on a fair cut without a loop, or with CTA and loop together."""
     named = {kind.strip().lower() for kind in kinds if kind and kind.strip()}
@@ -3295,6 +3329,8 @@ __all__ = [
     "SEMINAR_FIRST_PERSON_RE",
     "CAFE_FEED_RE",
     "CAFE_PACK_RE",
+    "CINEMA_ANNOUNCES_END_REASON",
+    "CINEMA_END_RE",
     "CONTEST_RE",
     "FAIR_CTA_RE",
     "FAIR_HOOK_RE",
@@ -3381,6 +3417,7 @@ __all__ = [
     "arena_play",
     "choose_arena",
     "cafe_reason",
+    "cinema_end_reason",
     "court_reason",
     "feedback_excerpt_texts",
     "fair_loop_reason",
@@ -3433,6 +3470,7 @@ __all__ = [
     "looks_like_ranking_dump",
     "looks_like_thread",
     "looks_like_engagement_bait",
+    "looks_like_cinema_end",
     "looks_like_fair_cta",
     "looks_like_hashtag_wall",
     "looks_like_hire_fundraise",
