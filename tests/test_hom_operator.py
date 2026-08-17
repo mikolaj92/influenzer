@@ -54,6 +54,7 @@ from influenzer.playbook import (
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
+    FOUNDER_JOURNAL_REASON,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
     looks_like_bot_bump_week,
@@ -94,6 +95,7 @@ from influenzer.playbook import (
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
+    looks_like_founder_journal,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -877,6 +879,54 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_fog(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_founder_journal_is_desk_setup_not_a_product(self) -> None:
+        lifestyle = (
+            "desk setup for the local tick",
+            "desk tour of the standing desk",
+            "office tour before standup",
+            "workstation setup with two monitors",
+            "what's on my desk this week",
+            "tools I use to score briefs",
+            "tools we use every morning",
+            "gear I use for the demo",
+            "a day in the life of a local tick",
+            "day-in-the-life filming",
+            "morning routine before the demo",
+            "morning ritual with coffee",
+            "founder journal from the launch week",
+            "founder's diary",
+            "builder journal",
+            "dziennik założyciela",
+            "setup biurka",
+            "biurko setup",
+            "narzędzia których używam",
+            "moje narzędzia",
+            "dzień z życia",
+            "poranna rutyna",
+            "rutyna poranna",
+        )
+        for text in lifestyle:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_founder_journal(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    FOUNDER_JOURNAL_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "this morning we shipped the local tick",
+            "setup.py installs the CLI",
+            "we use the local tick to score briefs",
+            "routine scoring of briefs stays local",
+            "day in production after the timeout fix",
+            "journal the score reason in state.db",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_founder_journal(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_model_in_frame_is_prompt_dump_or_i_asked_chatgpt(self) -> None:
@@ -2889,6 +2939,28 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, FOG_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_founder_journal_is_killed(self) -> None:
+        lifestyle = (
+            "desk setup for the local tick",
+            "tools I use to score briefs",
+            "day in the life of a local tick",
+            "morning routine before the demo",
+            "dziennik założyciela",
+        )
+        for text in lifestyle:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, FOUNDER_JOURNAL_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 

@@ -1126,6 +1126,38 @@ FOG_RE = re.compile(
     r"|\bmg[lł]a\b"
     r")"
 )
+# A founder journal is not an angle. Desk setup / tools I use / day in
+# the life / morning routine is silence, not a product. Neighbor of
+# hire/fundraise (#130, we are hiring) and event (#138, meetup). Here it
+# is lifestyle, not a tryable drop. "setup.py" and "this morning we
+# shipped" stay.
+FOUNDER_JOURNAL_REASON = "founder_journal"
+FOUNDER_JOURNAL_RE = re.compile(
+    r"(?i)(?:"
+    r"\bdesk\s+setups?\b"
+    r"|\bdesk\s+tours?\b"
+    r"|\boffice\s+tours?\b"
+    r"|\bworkstation\s+setups?\b"
+    r"|\bwhat(?:['’]?s| is)\s+on\s+(?:my|our)\s+desk\b"
+    r"|\btools?\s+(?:i|we|they)\s+use[ds]?\b"
+    r"|\bgear\s+(?:i|we)\s+use[ds]?\b"
+    r"|\ba?\s*days?\s+in\s+(?:the|my|our|a)\s+life\b"
+    r"|\bday[- ]in[- ]the[- ]life\b"
+    r"|\bmorning\s+routines?\b"
+    r"|\bmorning\s+rituals?\b"
+    r"|\bfounder(?:['’]?s)?\s+(?:journal|diary|log)\b"
+    r"|\bbuilder(?:['’]?s)?\s+(?:journal|diary)\b"
+    r"|\bdziennik(?:u|iem|owi)?\s+za[lł]o[zż]yciel"
+    r"|\bsetup\s+biurk"
+    r"|\bbiurk(?:o|a)\s+(?:setup|tour)"
+    r"|\bnarz[eę]dzi(?:a|e)\s+(?:kt[oó]r(?:e|ych)\s+)?u[zż]ywam\b"
+    r"|\bnarz[eę]dzi(?:a|e)\s+(?:kt[oó]r(?:e|ych)\s+)?u[zż]ywamy\b"
+    r"|\bmoje\s+narz[eę]dzi"
+    r"|\bdzie[nń]\s+z\s+[zż]ycia\b"
+    r"|\bporann[aąe]\s+rutyn"
+    r"|\brutyna\s+porann"
+    r")"
+)
 # Press-release tone is not a social angle. We're excited / announcement /
 # unveiling / delighted to share is kill or changelog, never HN/GitHub/X.
 # Pair of seminar brand voice: we announced as a brand is also silence.
@@ -2970,6 +3002,14 @@ def looks_like_fog(text: str) -> bool:
     return bool(FOG_RE.search(cleaned))
 
 
+def looks_like_founder_journal(text: str) -> bool:
+    """True for desk setup / tools I use / day in the life / morning routine. Lifestyle is not a product."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(FOUNDER_JOURNAL_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3510,7 +3550,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3536,6 +3576,11 @@ def unquotable_reason(
             return FOG_REASON
     if extra and looks_like_fog(extra):
         return FOG_REASON
+    for _kind, text, _url in packed:
+        if looks_like_founder_journal(text):
+            return FOUNDER_JOURNAL_REASON
+    if extra and looks_like_founder_journal(extra):
+        return FOUNDER_JOURNAL_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3837,6 +3882,8 @@ __all__ = [
     "COUNTER_THANKS_RE",
     "FOG_REASON",
     "FOG_RE",
+    "FOUNDER_JOURNAL_REASON",
+    "FOUNDER_JOURNAL_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -3987,6 +4034,7 @@ __all__ = [
     "looks_like_calendar_filler",
     "looks_like_counter_thanks",
     "looks_like_fog",
+    "looks_like_founder_journal",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",

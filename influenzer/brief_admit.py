@@ -40,6 +40,7 @@ from influenzer.playbook import (
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
+    FOUNDER_JOURNAL_REASON,
     LIVING_STACK_REASON,
     SECRET_REASON,
     StoryKind,
@@ -50,6 +51,7 @@ from influenzer.playbook import (
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
+    looks_like_founder_journal,
     looks_like_failed_ci,
     looks_like_fork,
     looks_like_pending_ci,
@@ -187,6 +189,8 @@ def admit_pack(
         return host_silence(COUNTER_THANKS_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_fog(fact_blob):
         return host_silence(FOG_REASON, project_id=project_id, repo_slug=slug)
+    if looks_like_founder_journal(fact_blob):
+        return host_silence(FOUNDER_JOURNAL_REASON, project_id=project_id, repo_slug=slug)
     try:
         brief = brief_from_mapping(
             {

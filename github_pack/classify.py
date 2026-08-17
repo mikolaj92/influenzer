@@ -123,6 +123,32 @@ _FOG_RE = re.compile(
     r"|\bmg[lł]a\b"
     r")"
 )
+_FOUNDER_JOURNAL_RE = re.compile(
+    r"(?i)(?:"
+    r"\bdesk\s+setups?\b"
+    r"|\bdesk\s+tours?\b"
+    r"|\boffice\s+tours?\b"
+    r"|\bworkstation\s+setups?\b"
+    r"|\bwhat(?:['’]?s| is)\s+on\s+(?:my|our)\s+desk\b"
+    r"|\btools?\s+(?:i|we|they)\s+use[ds]?\b"
+    r"|\bgear\s+(?:i|we)\s+use[ds]?\b"
+    r"|\ba?\s*days?\s+in\s+(?:the|my|our|a)\s+life\b"
+    r"|\bday[- ]in[- ]the[- ]life\b"
+    r"|\bmorning\s+routines?\b"
+    r"|\bmorning\s+rituals?\b"
+    r"|\bfounder(?:['’]?s)?\s+(?:journal|diary|log)\b"
+    r"|\bbuilder(?:['’]?s)?\s+(?:journal|diary)\b"
+    r"|\bdziennik(?:u|iem|owi)?\s+za[lł]o[zż]yciel"
+    r"|\bsetup\s+biurk"
+    r"|\bbiurk(?:o|a)\s+(?:setup|tour)"
+    r"|\bnarz[eę]dzi(?:a|e)\s+(?:kt[oó]r(?:e|ych)\s+)?u[zż]ywam\b"
+    r"|\bnarz[eę]dzi(?:a|e)\s+(?:kt[oó]r(?:e|ych)\s+)?u[zż]ywamy\b"
+    r"|\bmoje\s+narz[eę]dzi"
+    r"|\bdzie[nń]\s+z\s+[zż]ycia\b"
+    r"|\bporann[aąe]\s+rutyn"
+    r"|\brutyna\s+porann"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -176,6 +202,13 @@ def looks_like_fog(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_FOG_RE.search(text))
+
+
+def looks_like_founder_journal(text: str) -> bool:
+    """True for desk setup / tools I use / day in the life / morning routine. Lifestyle is not a product."""
+    if not text or not text.strip():
+        return False
+    return bool(_FOUNDER_JOURNAL_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:
