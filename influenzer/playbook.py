@@ -1226,6 +1226,7 @@ CINEMA_PACKAGE_RE = re.compile(r"(?i)\b(?:title|thumb(?:nail)?|package|poster|0\
 # Cafe: starter pack onboarduje, custom feed trzyma. Artifact alone (#35)
 # is reach without retention. A GitHub pack / news feed / empty X feed
 # is not this costume. Pair of #35 (artifact, not vibe).
+BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON = "bluesky_vibe_without_artifact"
 BLUESKY_PACK_WITHOUT_FEED_REASON = "bluesky_pack_without_feed"
 CAFE_PACK_RE = re.compile(
     r"(?i)(?:"
@@ -1685,7 +1686,7 @@ ARENA_GATES: dict[ArenaId, ArenaGate] = {
         ),
     ),
     ArenaId.BLUESKY: ArenaGate(
-        reason="bluesky_vibe_without_artifact",
+        reason=BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
         require_ship_artifact=True,
         require_cafe_pack=True,
         require_cafe_feed=True,
@@ -2223,6 +2224,21 @@ def cafe_reason(text: str) -> str | None:
     if not has_cafe_pack(text) or not has_cafe_feed(text):
         return BLUESKY_PACK_WITHOUT_FEED_REASON
     return None
+
+
+def cafe_artifact_reason(
+    urls: tuple[str, ...] | list[str] = (),
+    *,
+    extra: str = "",
+) -> str | None:
+    """Silence when Bluesky would post without a repo/demo/release URL. Vibe is not enough."""
+    found = [str(url).strip() for url in urls if url and str(url).strip()]
+    if any(is_ship_artifact_url(url) for url in found):
+        return None
+    for match in _URL_IN_TEXT_RE.finditer(extra or ""):
+        if is_ship_artifact_url(match.group(0).rstrip(".,);")):
+            return None
+    return BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON
 
 
 # Letter gives first, then maybe asks. Subscribe / our launch without a
@@ -3436,6 +3452,7 @@ __all__ = [
     "EMPTY_TAVERN_REASON",
     "AGORA_NO_NEW_THOUGHT_REASON",
     "BLUESKY_PACK_WITHOUT_FEED_REASON",
+    "BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON",
     "LETTER_ASK_WITHOUT_GIFT_REASON",
     "LETTER_ASK_RE",
     "LETTER_CRUSH_RE",
@@ -3537,6 +3554,7 @@ __all__ = [
     "arena_play",
     "choose_arena",
     "agora_reason",
+    "cafe_artifact_reason",
     "cafe_reason",
     "cinema_end_reason",
     "court_reason",

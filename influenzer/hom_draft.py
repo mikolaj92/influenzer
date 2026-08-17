@@ -46,6 +46,7 @@ from influenzer.playbook import (
     court_reason,
     fair_loop_reason,
     tavern_reason,
+    cafe_artifact_reason,
     cafe_reason,
     letter_reason,
     reddit_reason,
@@ -576,11 +577,11 @@ def _dress_newsletter(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_bluesky(bits: CopyBits, score: Score) -> str | None:
-    """Newer cafe: pack onboarduje, feed trzyma. Artifact alone is half the game."""
+    """Newer cafe: artifact, not vibe. Pack onboarduje, feed trzyma."""
     if cafe_reason(bits.blob):
         return None
     url = bits.artifact_url
-    if not url:
+    if cafe_artifact_reason((url,) if url else ()):
         return None
     return _body_or_none(f"{_clip(bits.one_liner, 200)}\n\n{url}")
 
@@ -727,6 +728,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.X and not has_parent_post(triples))
         or (score.arena is ArenaId.X and agora_reason(triples))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
+        or (score.arena is ArenaId.BLUESKY and cafe_artifact_reason(brief_artifacts(brief)))
         or (
             score.arena is ArenaId.NEWSLETTER
             and (
@@ -787,6 +789,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.REDDIT and reddit_reason(body))
         or (score.arena is ArenaId.HN and seminar_reason(body))
         or (score.arena is ArenaId.YOUTUBE and cinema_end_reason(body))
+        or (score.arena is ArenaId.BLUESKY and cafe_artifact_reason(extra=body))
     ):
         return None
     if looks_like_open_source_without_license(body):

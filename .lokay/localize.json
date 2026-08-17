@@ -1,34 +1,24 @@
 {
   "paths": [
-    "influenzer/adapters/fake_provider.py",
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
     "influenzer/hom_draft.py",
-    "github_pack/pack.py",
-    "influenzer/adapters/child_worker.py",
-    "influenzer/adapters/contract.py",
-    "influenzer/adapters/platforms.py",
-    "tools/hygiene_check.py",
-    "skills/influenzer-x",
+    "skills/influenzer-bluesky",
     "skills/influenzer-hom/SKILL.md",
-    "tests/test_x_handoff.py",
-    "tests/test_adapter_contract.py",
-    "tests/test_fake_provider.py",
+    "tests/test_e2e_gates.py",
     "tests/test_hom_draft.py",
-    "tests/test_e2e_gates.py"
+    "tests/test_hom_operator.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": [
-    "draft",
-    "influenzer",
-    "gate",
-    "X"
-  ],
+  "matched_tokens": ["Bluesky", "Draft", "Pack", "feed", "influenzer", "gate"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Repo tree entries considered: 137.",
+    "Refined after inspection: score/dress cafe artifact gate lives in playbook/hom/hom_draft, not pack/feedback."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__34-parafia-nie-dostaje-punchline-u-z-x-d09f4afb",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__35-bluesky-bez-url-a-artefaktu-cisza-a2be1a68",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

@@ -10,7 +10,16 @@ from unittest.mock import patch
 
 from influenzer.hom import Brief, Fact, Score, apply_brief, brief_to_mapping, compose_draft, score_brief
 from influenzer.hom_draft import dress_brief, dress_payload, main as draft_main
-from influenzer.playbook import ARENAS, ArenaId, LIVING_STACK_REASON, StoryKind, Verdict, invented_metric_reason
+from influenzer.playbook import (
+    ARENAS,
+    ArenaId,
+    BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
+    LIVING_STACK_REASON,
+    StoryKind,
+    Verdict,
+    cafe_artifact_reason,
+    invented_metric_reason,
+)
 
 from tests.test_hom_operator import FEEDBACK_COMMENT, SHIP_PR, SHIP_RELEASE, SHIP_REPO
 
@@ -2856,6 +2865,64 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("thread", body.lower())
         self.assertIn(SHIP_PR, body)
         self.assertNotIn("Costume:", body)
+
+    def test_bluesky_without_artifact_url_is_undressable_even_when_score_says_draft(self) -> None:
+        living = (
+            "starter pack of 30 active accounts in the local-first niche",
+            "two custom feeds retain the same people",
+        )
+        almost = (
+            None,
+            "https://example.com/demo",
+            "https://bsky.app/profile/did:plc:demo/post/1",
+            "https://github.com/mikolaj92/influenzer/commit/abc",
+        )
+        fake = Score(
+            brief_id="b-empty-cafe-artifact",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.BLUESKY,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.BLUESKY].wave,
+            canon_url=ARENAS[ArenaId.BLUESKY].canon_url,
+        )
+        for idx, url in enumerate(almost):
+            with self.subTest(url=url):
+                self.assertEqual(
+                    cafe_artifact_reason((url,) if url else ()),
+                    BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
+                )
+                brief = _ship_brief(
+                    brief_id=f"b-empty-cafe-artifact-{idx}",
+                    preferred_arena=ArenaId.BLUESKY,
+                    claims_ship=False,
+                    facts=(
+                        Fact(text="vibe posting about the operator", artifact_url=url),
+                        Fact(text=living[0]),
+                        Fact(text=living[1]),
+                    ),
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "bluesky",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.BLUESKY].wave),
+                            "canon_url": ARENAS[ArenaId.BLUESKY].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("Costume:", dumped)
+                if url:
+                    self.assertNotIn(url, dumped)
 
     def test_bluesky_without_pack_and_feed_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(preferred_arena=ArenaId.BLUESKY)
