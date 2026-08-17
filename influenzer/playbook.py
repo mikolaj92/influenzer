@@ -379,7 +379,8 @@ def choose_arena(
     Court is insight from the work, never a launch channel:
     preferred LinkedIn sits only when the brief does not claim ship.
     Preferred Discord sits so an empty tavern can be silence — public
-    invite only with intent split and ~10 builders. Preferred Bluesky
+    invite only with intent split and ~10 builders. A decision does not
+    sit here: workshop on GitHub, never the tavern. Preferred Bluesky
     sits so an artifact-only cafe can be silence — pack onboarduje,
     feed trzyma. Preferred Reddit sits so a named room without
     disclosure or a repo at the bottom can be silence — native
@@ -412,12 +413,18 @@ def choose_arena(
             )
         except ValueError:
             wanted = None
+    kind = (
+        story_kind
+        if isinstance(story_kind, StoryKind) or story_kind is None
+        else StoryKind(story_kind)
+    )
     # #49/#31: village without disclosure is spam. Sit so a named room
     # without ujawnienie + repo is silence.
     if wanted is ArenaId.REDDIT:
         return ArenaId.REDDIT
     # #57: empty tavern is silence. Sit so a public invite on emptiness dies.
-    if wanted is ArenaId.DISCORD:
+    # #38: a decision is the workshop, never the tavern.
+    if wanted is ArenaId.DISCORD and kind is not StoryKind.DECISION:
         return ArenaId.DISCORD
     # #55: pack without a feed is half the game. Sit so artifact-only cafe dies.
     if wanted is ArenaId.BLUESKY:
@@ -437,11 +444,6 @@ def choose_arena(
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
         return ArenaId.LINKEDIN
-    kind = (
-        story_kind
-        if isinstance(story_kind, StoryKind) or story_kind is None
-        else StoryKind(story_kind)
-    )
     if (
         tryable
         and kind in {StoryKind.MAJOR, StoryKind.HARD_ISSUE}
