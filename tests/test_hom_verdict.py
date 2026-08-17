@@ -12,8 +12,10 @@ from unittest.mock import patch
 from influenzer.brief_admit import open_story_reason
 from influenzer.cli import main as cli_main
 from influenzer.config import Config, write_config
+from influenzer.hom import Brief, Fact, compose_draft, score_brief
 from influenzer.hom_outbox import emit_angle
 from influenzer.hom_verdict import apply_verdict, main as verdict_main
+from influenzer.playbook import ArenaId, LIVING_STACK_REASON, StoryKind, Verdict
 from influenzer.scan_due import scan_github_if_due
 from influenzer.storage import StateRepository
 
@@ -115,6 +117,56 @@ class HomVerdictTests(unittest.TestCase):
         )
         self.assertEqual(blocked["reason"], "social_draft")
         self.assertEqual(fake.calls, [])
+
+    def test_pass_on_github_stack_still_blocks_a_second_social_angle(self) -> None:
+        draft = _put_draft(
+            self.repo,
+            project_id="app-1",
+            brief_id="prior-github",
+            created_at=NOW,
+            body=f"## Quickstart\n\n{SHIP_PR}",
+            arena=ArenaId.GITHUB,
+        )
+        with (
+            patch("subprocess.run", side_effect=AssertionError("verdict must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("verdict must not fetch")),
+        ):
+            out = apply_verdict(self.repo, "pass", project_id="app-1")
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["verdict"], "pass")
+        self.assertFalse(out["published"])
+        self.assertEqual(self.repo.living_stack_arena("app-1", NOW), ArenaId.GITHUB)
+        self.assertEqual(open_story_reason(self.repo, "app-1", NOW), LIVING_STACK_REASON)
+        fake = ScriptedGh(ship_script())
+        blocked = scan_github_if_due(
+            self.repo,
+            project_id="app-1",
+            repo_slug=REPO,
+            gh=fake,
+            now=NOW,
+        )
+        self.assertEqual(blocked["status"], "noop")
+        self.assertEqual(blocked["reason"], LIVING_STACK_REASON)
+        self.assertEqual(fake.calls, [])
+        again = Brief.create(
+            project_id="app-1",
+            brief_id="second-github",
+            facts=(
+                Fact(text="a stranger can click and run the demo from the README", artifact_url=SHIP_PR),
+                Fact(text="Dry-run still default"),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        score = score_brief(again, stack_arena=self.repo.living_stack_arena("app-1", NOW))
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(again, score))
+        self.assertEqual(self.repo.get_operator_draft("app-1", "prior-github").draft_id, draft.draft_id)
+        self.assertIsNone(open_story_reason(self.repo, "app-1", "2026-08-19T06:00:00Z"))
 
     def test_hold_releases_so_scan_due_is_not_blocked(self) -> None:
         draft = _put_draft(

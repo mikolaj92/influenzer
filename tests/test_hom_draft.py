@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from influenzer.hom import Brief, Fact, Score, apply_brief, brief_to_mapping, compose_draft, score_brief
 from influenzer.hom_draft import dress_brief, dress_payload, main as draft_main
-from influenzer.playbook import ARENAS, ArenaId, StoryKind, Verdict, invented_metric_reason
+from influenzer.playbook import ARENAS, ArenaId, LIVING_STACK_REASON, StoryKind, Verdict, invented_metric_reason
 
 from tests.test_hom_operator import FEEDBACK_COMMENT, SHIP_PR, SHIP_RELEASE, SHIP_REPO
 
@@ -149,6 +149,13 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertEqual(patch_score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertIsNone(compose_draft(patch_brief, patch_score))
         self.assertIsNone(dress_brief(patch_brief, patch_score))
+
+        stacked = _ship_brief(preferred_arena=ArenaId.GITHUB)
+        stacked_score = score_brief(stacked, stack_arena=ArenaId.GITHUB)
+        self.assertEqual(stacked_score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(stacked_score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(compose_draft(stacked, stacked_score))
+        self.assertIsNone(dress_brief(stacked, stacked_score))
 
     def test_quote_without_excerpt_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(

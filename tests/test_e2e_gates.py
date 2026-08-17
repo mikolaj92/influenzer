@@ -1882,7 +1882,7 @@ class OrderedLiveGateTests(unittest.TestCase):
         workshop_score = score_brief(workshop)
         self.assertEqual(workshop_score.verdict, Verdict.DRAFT)
         self.assertEqual(workshop_score.arena, ArenaId.GITHUB)
-        workshop_draft = compose_draft(workshop, workshop_score)
+        workshop_draft = compose_draft(workshop, workshop_score, now="2026-08-17T06:00:00Z")
         assert workshop_draft is not None
         self.repo.conn.execute("DELETE FROM operator_drafts")
         self.repo.conn.execute("DELETE FROM operator_scores")
@@ -1921,7 +1921,7 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(again_score.reason, LIVING_STACK_REASON)
         self.assertIsNone(again_score.arena)
         self.assertIsNone(compose_draft(again, again_score))
-        self.assertIsNone(open_story_reason(self.repo, self.builder.project_id, "2026-08-19T06:00:00Z"))
+        self.assertIsNone(open_story_reason(self.repo, self.builder.project_id, "2026-08-19T06:00:01Z"))
 
 
 if __name__ == "__main__":

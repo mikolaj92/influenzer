@@ -13,12 +13,12 @@ from unittest.mock import patch
 
 from github_survey import GhCall
 
-from influenzer.brief_admit import SOURCE
+from influenzer.brief_admit import SOURCE, open_story_reason
 from influenzer.cli import main as cli_main
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.playbook import ArenaId, StoryKind
+from influenzer.playbook import ArenaId, LIVING_STACK_REASON, StoryKind
 from influenzer.scan_due import (
     DEFAULT_WINDOW_DAYS,
     last_scan_at,
@@ -216,6 +216,28 @@ class ScanDueTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "social_draft")
         self.assertEqual(fake.calls, [])
+
+    def test_living_github_stack_is_silence_without_gh(self) -> None:
+        pending = Brief.create(
+            project_id="app-1",
+            brief_id="prior-github",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        self.repo.save_brief(pending)
+        tick(self.repo, self.cfg, due=(), now=NOW)
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "prior-github"))
+        self.assertEqual(self.repo.living_stack_arena("app-1", NOW), ArenaId.GITHUB)
+        out, fake = self._due(ship_script())
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], LIVING_STACK_REASON)
+        self.assertEqual(fake.calls, [])
+        self.assertFalse(out["published"])
+        self.assertEqual(open_story_reason(self.repo, "app-1", NOW), LIVING_STACK_REASON)
+        self.assertIsNone(open_story_reason(self.repo, "app-1", "2026-08-19T06:00:00Z"))
 
     def test_stale_watermark_is_due_again(self) -> None:
         self.repo.record_github_scan("app-1", REPO, scanned_at="2026-08-01T06:00:00Z")
