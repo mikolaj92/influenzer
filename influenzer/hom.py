@@ -27,6 +27,7 @@ from influenzer.playbook import (
     arena_play,
     choose_arena,
     agora_reason,
+    has_parent_post,
     cinema_end_reason,
     court_reason,
     fair_loop_reason,
@@ -463,6 +464,7 @@ def _choose_arena(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> 
         private_repo=looks_like_private_repo(blob),
         archived_repo=looks_like_archived_repo(blob),
         server_splash=looks_like_server_splash(blob),
+        parent_post=has_parent_post(_fact_triples(brief)),
     )
 
 
@@ -510,6 +512,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "hn_title_overflow"
     if arena is ArenaId.X and title and looks_like_x_overflow(title, _proof_url_for_brief(brief)):
         return Verdict.KILL, "x_overflow"
+    if arena is ArenaId.X and not has_parent_post(_fact_triples(brief)):
+        return Verdict.KILL, gate.reason
     if arena is ArenaId.X:
         agora_fail = agora_reason(_fact_triples(brief))
         if agora_fail:

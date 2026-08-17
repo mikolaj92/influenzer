@@ -41,6 +41,7 @@ from influenzer.playbook import (
     Verdict,
     arena_play,
     agora_reason,
+    has_parent_post,
     cinema_end_reason,
     court_reason,
     fair_loop_reason,
@@ -633,6 +634,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             and court_reason(bits.blob, claims_ship=brief.claims_ship)
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
+        or (score.arena is ArenaId.X and not has_parent_post(triples))
         or (score.arena is ArenaId.X and agora_reason(triples))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))

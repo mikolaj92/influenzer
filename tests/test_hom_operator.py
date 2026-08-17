@@ -15,6 +15,7 @@ from influenzer.hom import (
     Brief,
     Fact,
     HomError,
+    Score,
     angle_body_hash,
     apply_brief,
     brief_from_mapping,
@@ -35,6 +36,7 @@ from influenzer.playbook import (
     StoryKind,
     Verdict,
     choose_arena,
+    has_parent_post,
     hn_camp_reason,
     is_hn_camp_arena,
     living_stack_arena,
@@ -172,6 +174,29 @@ class PlaybookCopyTests(unittest.TestCase):
             ArenaId.HN,
         )
         self.assertEqual(choose_arena(tryable=False, story_kind=StoryKind.MAJOR), ArenaId.GITHUB)
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.X,
+                tryable=True,
+                story_kind=StoryKind.MAJOR,
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.X,
+                tryable=True,
+                story_kind=StoryKind.MAJOR,
+                clickable=True,
+                parent_post=True,
+            ),
+            ArenaId.X,
+        )
+        self.assertEqual(
+            choose_arena(preferred_arena=ArenaId.X, tryable=False, story_kind=StoryKind.MAJOR),
+            ArenaId.X,
+        )
         self.assertEqual(
             living_stack_arena(((ArenaId.HN, "2026-08-13T05:00:00Z"),), "2026-08-14T04:59:59Z"),
             ArenaId.HN,
@@ -1885,7 +1910,17 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertNotIn("linkedin", decision.draft.body.lower().split("show hn:", 1)[0])
 
     def test_preferred_x_uses_agora_costume_not_hn(self) -> None:
-        brief = self._brief(preferred_arena=ArenaId.X)
+        brief = self._brief(
+            preferred_arena=ArenaId.X,
+            facts=(
+                Fact(
+                    kind="parent",
+                    text="Show HN about mikolaj92/influenzer",
+                    artifact_url="https://news.ycombinator.com/item?id=1",
+                ),
+                Fact(text="local tick scores briefs", artifact_url=SHIP_PR),
+            ),
+        )
         decision = apply_brief(brief)
         assert decision.draft is not None
         self.assertEqual(decision.draft.arena, ArenaId.X)
@@ -3765,17 +3800,28 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.draft.arena, ArenaId.YOUTUBE)
         self.assertEqual(decision.draft.costume, "cinema")
 
-    def test_thin_x_brief_without_artifact_is_changelog_only(self) -> None:
+    def test_thin_x_brief_without_a_parent_is_not_agora(self) -> None:
         brief = self._brief(
             claims_ship=False,
             tryable=True,
             preferred_arena=ArenaId.X,
             facts=(Fact(text="shipped it"),),
         )
+        self.assertFalse(
+            has_parent_post(tuple((fact.kind, fact.text, fact.artifact_url) for fact in brief.facts))
+        )
         score = score_brief(brief)
-        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
-        self.assertEqual(score.reason, "thin_brief")
-        self.assertIsNone(compose_draft(brief, score))
+        self.assertNotEqual(score.arena, ArenaId.X)
+        leaked = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.X,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.X].wave,
+            canon_url=ARENAS[ArenaId.X].canon_url,
+        )
+        self.assertIsNone(compose_draft(brief, leaked))
 
     def test_every_arena_has_a_fail_closed_gate(self) -> None:
         from influenzer.playbook import ARENA_GATES

@@ -1,25 +1,30 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=26 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=27 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #26 — Launch to jeden stos 24–48h, nie drugi kąt społeczny
+Issue: #27 — X nie dostaje pustego feedu
 
 ## Goal
 
-Launch to jeden stos 24–48h, nie tydzień kranika. Jeśli w oknie 48h jest już noszalny draft github/hn (nawet po verdict pass), kolejny scan/score nie puszcza drugiego kąta społecznego — changelog albo cisza. Jedna historia, jeden stos.
+X nie dostaje pustego feedu. Score nie wybiera X, chyba że brief ma URL posta-rodzica (reply, pożyczony heat). Ship bez wątku → github albo HN gdy tryable, inaczej cisza. Żadnego oryginału w pustkę.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — sit on X only with a parent-post URL; empty feed is not a first costume
+- `influenzer/hom.py` — pass parent proof into score; kill leaked X originals
+- `influenzer/hom_draft.py` — refuse to dress X without a parent URL
+- `skills/influenzer-x/SKILL.md`, `skills/influenzer-hom/SKILL.md` — no original into an empty feed
+- `tests/test_e2e_gates.py` — empty-feed original is github/HN or silence, not agora
+- `tests/test_hom_operator.py` / `tests/test_hom_draft.py` — preferred X without a thread no longer drafts an original
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `pytest tests/test_e2e_gates.py tests/test_hom_operator.py tests/test_hom_draft.py -q`
 
 ## Non-goals
 
-- (none stated)
+- No publish, no live, no second story. Small score block, not a new path.
 
 ## Notes
 

@@ -49,6 +49,7 @@ from influenzer.playbook import (
     agora_reason,
     cafe_reason,
     choose_arena,
+    has_parent_post,
     cinema_end_reason,
     court_reason,
     fair_loop_reason,
@@ -756,6 +757,7 @@ class OrderedLiveGateTests(unittest.TestCase):
                         tryable=True,
                         story_kind="major",
                         clickable=True,
+                        parent_post=True,
                     ),
                     ArenaId.X,
                 )
@@ -806,6 +808,54 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertIn(thought, draft.body)
         self.assertNotIn(parent_text, draft.body)
         self.assertNotIn("Costume:", draft.body)
+
+    def test_x_without_a_parent_url_is_not_an_empty_feed_original(self) -> None:
+        self.assertFalse(has_parent_post((("signal", "local tick scores briefs", SHIP_PR),)))
+        self.assertTrue(
+            has_parent_post(
+                (("parent", "Show HN about mikolaj92/influenzer", "https://x.com/m/status/1"),)
+            )
+        )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.X,
+                claims_ship=True,
+                tryable=True,
+                story_kind="major",
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-x-empty-feed",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.X,
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertNotEqual(score.arena, ArenaId.X)
+        leaked = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.X,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.X].wave,
+            canon_url=ARENAS[ArenaId.X].canon_url,
+        )
+        self.assertEqual(
+            _gate_violation(brief, ArenaId.X, "\n".join(fact.text for fact in brief.facts)),
+            (Verdict.KILL, "x_empty_feed"),
+        )
+        self.assertIsNone(compose_draft(brief, leaked))
 
     def test_court_is_not_a_launch_channel(self) -> None:
         launches = (
