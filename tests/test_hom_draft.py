@@ -914,6 +914,71 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("subtweet", decision.draft.body.lower())
         self.assertNotIn("you know who", decision.draft.body.lower())
 
+    def test_founder_journal_is_undressable_even_when_score_says_draft(self) -> None:
+        lifestyle = (
+            "desk setup for the local tick",
+            "tools I use to score briefs",
+            "day in the life of a local tick",
+            "morning routine before the demo",
+            "dziennik założyciela",
+        )
+        for text in lifestyle:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("desk setup", dumped.lower())
+                self.assertNotIn("tools i use", dumped.lower())
+                self.assertNotIn("day in the life", dumped.lower())
+                self.assertNotIn("morning routine", dumped.lower())
+                self.assertNotIn("dziennik", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
+
+    def test_product_copy_without_founder_journal_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="this morning we shipped the local tick"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("this morning we shipped", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("desk setup", decision.draft.body.lower())
+        self.assertNotIn("morning routine", decision.draft.body.lower())
+
     def test_thread_serial_is_undressable_even_when_score_says_draft(self) -> None:
         serials = (
             "1/7 local tick scores briefs",

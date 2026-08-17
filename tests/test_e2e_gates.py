@@ -102,12 +102,14 @@ from influenzer.playbook import (
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
+    looks_like_founder_journal,
     looks_like_waitlist,
     looks_like_worse_clone,
     EVENT_NOT_A_SHIP,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
+    FOUNDER_JOURNAL_REASON,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -620,6 +622,55 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, FOG_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_founder_journal_is_silence_not_an_angle(self) -> None:
+        lifestyle = (
+            "desk setup for the local tick",
+            "tools I use to score briefs",
+            "day in the life of a local tick",
+            "morning routine before the demo",
+            "dziennik założyciela",
+        )
+        self.assertFalse(looks_like_founder_journal(""))
+        self.assertFalse(looks_like_founder_journal("   "))
+        self.assertFalse(looks_like_founder_journal("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_founder_journal("this morning we shipped the local tick"))
+        self.assertFalse(looks_like_founder_journal("setup.py installs the CLI"))
+        self.assertFalse(looks_like_founder_journal("we use the local tick to score briefs"))
+        for idx, text in enumerate(lifestyle):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_founder_journal(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    FOUNDER_JOURNAL_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-journal-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, FOUNDER_JOURNAL_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(

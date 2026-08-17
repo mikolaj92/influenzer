@@ -102,6 +102,7 @@ from influenzer.playbook import (
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
+    looks_like_founder_journal,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -110,6 +111,7 @@ from influenzer.playbook import (
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
+    FOUNDER_JOURNAL_REASON,
     PRESS_RELEASE_REASON,
     WORSE_CLONE_REASON,
     ranking_urls_only,
@@ -690,6 +692,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, COUNTER_THANKS_REASON)
     if looks_like_fog(blob):
         return _kill(brief, FOG_REASON)
+    if looks_like_founder_journal(blob):
+        return _kill(brief, FOUNDER_JOURNAL_REASON)
     if looks_like_superlative(blob) and not (
         brief.tryable and any(is_ship_artifact(url) for url in brief_artifacts(brief))
     ):

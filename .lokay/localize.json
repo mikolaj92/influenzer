@@ -6,21 +6,22 @@
     "influenzer/brief_admit.py",
     "github_pack/classify.py",
     "github_pack/pack.py",
+    "tests/test_e2e_gates.py",
     "tests/test_hom_operator.py",
     "tests/test_hom_draft.py",
-    "tests/test_e2e_gates.py",
     "tests/test_brief_admit.py",
     "tests/test_github_pack.py"
   ],
-  "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": ["fog", "subtweet", "aluzja", "gate"],
+  "source": "deterministic+inspection",
+  "seed_paths": ["tools", "tools/hygiene_check.py", "tests/test_e2e_gates.py"],
+  "matched_tokens": ["tools", "gate"],
   "notes": [
+    "Deterministic localize matched tools/ from the phrase “tools I use”.",
+    "Inspection moved the gate onto the sibling fail-closed path used by #130/#138/#145.",
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Fog/allusion gate lands next to dunk (#116) and world commentary (#131).",
-    "Fail closed at score, dress, pack, and admit."
+    "Empty path list fails closed — run_agent must not start."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__145-mg-a-nie-jest-k-tem-8e4baed1",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__146-dziennik-za-o-yciela-nie-jest-k-tem-75b51ea5",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
