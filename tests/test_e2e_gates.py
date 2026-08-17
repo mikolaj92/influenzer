@@ -92,6 +92,7 @@ from influenzer.playbook import (
     looks_like_letter_crush,
     looks_like_letter_team_voice,
     looks_like_poll,
+    looks_like_model_in_frame,
     looks_like_reddit_disclose,
     looks_like_secret,
     looks_like_seminar_first_person,
@@ -676,6 +677,37 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, "poll")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_prompt_dump_or_i_asked_chatgpt_is_silence_not_an_angle(self) -> None:
+        dumps = (
+            "I asked ChatGPT how to score a brief",
+            "as an AI I would ship the local tick",
+            "here's the prompt I used for the launch",
+            "zrzut rozmowy z modelem",
+        )
+        for idx, text in enumerate(dumps):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_model_in_frame(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    "model_in_frame",
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-model-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "model_in_frame")
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 

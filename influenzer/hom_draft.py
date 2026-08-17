@@ -75,6 +75,7 @@ from influenzer.playbook import (
     looks_like_monday_without_history,
     looks_like_contest,
     looks_like_poll,
+    looks_like_model_in_frame,
     looks_like_dunk,
     looks_like_worse_clone,
     looks_like_foreign_wave,
@@ -690,6 +691,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_solicit_gesture(bits.blob)
         or looks_like_contest(bits.blob)
         or looks_like_poll(bits.blob)
+        or looks_like_model_in_frame(bits.blob)
         or looks_like_thread(bits.blob)
         or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
@@ -762,6 +764,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_solicit_gesture(body)
         or looks_like_contest(body)
         or looks_like_poll(body)
+        or looks_like_model_in_frame(body)
         or looks_like_thread(body)
         or looks_like_ranking_dump(body)
         or looks_like_hashtag_wall(body)

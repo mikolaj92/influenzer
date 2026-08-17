@@ -1,35 +1,39 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=138 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=142 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #138 — Wydarzenie nie jest shipem
+Issue: #142 — Prompt i I asked ChatGPT nie są kątem
 
 ## Goal
 
-Wydarzenie nie jest shipem. Webinar, meetup, calendar, „join us Thursday” = cisza. Kalendarz nie jest artefaktem.
+Prompt i „I asked ChatGPT” nie są kątem. Dump rozmowy z modelem, „as an AI” = cisza. HoM nie jest modelem w kadrze.
+
+Neighbor of #117 (AI-powered slogan without proof). This issue is the model in the frame, not the slogan.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `EVENT_RE` / `looks_like_event` / `EVENT_NOT_A_SHIP`
-- `influenzer/hom.py` — score kill/changelog
-- `influenzer/hom_draft.py` — undress event copy
-- `github_pack/classify.py` + `github_pack/pack.py` — inbound event silence
-- `influenzer/brief_admit.py` — admit fail-closed
-- `tests/test_e2e_gates.py`, `tests/test_hom_operator.py`, `tests/test_github_pack.py`, `tests/test_brief_admit.py`
+- `influenzer/playbook.py` — `looks_like_model_in_frame`, model-chat hosts, `unquotable_reason`
+- `influenzer/hom.py` — score kill `model_in_frame`
+- `influenzer/hom_draft.py` — undressable even when a fake score says draft
+- `tests/test_hom_operator.py`
+- `tests/test_hom_draft.py`
+- `tests/test_e2e_gates.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_event_is_not_a_ship_on_hn_x_or_shorts tests/test_hom_operator.py::ScoreBriefTests::test_event_is_not_a_ship tests/test_hom_operator.py::ScoreBriefTests::test_event_ship_claim_is_killed tests/test_hom_operator.py::ScoreBriefTests::test_event_without_ship_claim_is_changelog_only tests/test_github_pack.py::PackSilenceTests::test_webinar_release_is_silence tests/test_brief_admit.py::AdmitAndComposeTests::test_event_pack_is_silence_not_a_ship -q`
+- Detector: I asked ChatGPT / I asked the model / as an AI / Prompt: dump / zapytałem model / paste this prompt into ChatGPT / zrzut rozmowy z modelem / chat.openai.com = silence
+- Negative: AI-powered slogan, "prompt the operator", Claude Shannon, GPT tokenizer still draft
+- Dress refuses a model dump even when score is forced to DRAFT
+- Superlative (#117) still works independently
 
 ## Non-goals
 
-- Do not treat a calendar year mention as an invite.
-- A calendar invite is not a ship artifact even with a GitHub URL.
+- Do not kill an honest "AI-powered" slogan that already has a tryable artifact (#117)
+- Do not change arena seating / costume choice
+- No collector / no live publish
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Same fail-closed shape as #141 (poll) and #132 (private conversation).
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
