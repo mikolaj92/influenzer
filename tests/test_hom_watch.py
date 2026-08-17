@@ -25,7 +25,17 @@ from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
 from influenzer.tick import guarded_tick, loop_ticks, main as tick_main
-from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, b64_readme, ship_script
+from tests.gh_scripts import (
+    ISSUE,
+    NOW,
+    REPO,
+    SHIP_PR,
+    ScriptedGh,
+    b64_readme,
+    feedback_noise_script,
+    gh_issue,
+    ship_script,
+)
 
 ALWAYS_ON = HostPower(has_battery=False, source="test")
 
@@ -367,6 +377,42 @@ class HomWatchTests(unittest.TestCase):
         self.assertNotIn("Show HN:", json.dumps(out))
         self.assertFalse(out.get("published", False))
         self.assertEqual(loop_status(out), {"status": "cisza", "mutated": False, "published": False})
+
+    def test_watch_due_open_issue_admits_feedback_not_a_second_bag(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        script = ship_script()
+        script.update(feedback_noise_script())
+        script["issues"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_issue(
+                        html_url=ISSUE,
+                        title="How do I install this when uv is missing?",
+                        body="The Windows install fails with a traceback",
+                    )
+                ]
+            ),
+        )
+        out, fake = self._tick(script)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["feedback"]["status"], "admitted")
+        self.assertEqual(out["feedback"]["brief_id"], "fb-9")
+        stored = self.repo.get_brief("app-1", "fb-9")
+        assert stored is not None
+        self.assertEqual(stored.source, "github-feedback")
+        self.assertTrue(
+            any(fact.kind == "excerpt" and fact.artifact_url == ISSUE for fact in stored.facts)
+        )
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertIsNone(self.repo.get_brief("app-1", "scan-v0-1-0"))
+        self.assertTrue(fake.calls)
+        self.assertFalse(out["published"])
+        self.assertFalse(out["mutated"])
+        self.assertFalse((self.home / "runtime.db").exists())
+        logged = loop_status(out)
+        self.assertEqual(logged["status"], "admitted")
+        self.assertNotIn("body", logged)
 
 
 class HomWatchCLIFAlaTests(unittest.TestCase):

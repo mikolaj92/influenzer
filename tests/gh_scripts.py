@@ -12,6 +12,7 @@ NOW = "2026-08-17T06:00:00Z"
 REPO = "mikolaj92/demo"
 SHIP_PR = "https://github.com/mikolaj92/demo/pull/12"
 SHIP_RELEASE = "https://github.com/mikolaj92/demo/releases/tag/v0.1.0"
+ISSUE = "https://github.com/mikolaj92/demo/issues/9"
 ISSUE_COMMENT = "https://github.com/mikolaj92/demo/issues/7#issuecomment-101"
 ISSUE_COMMENT_BUG = "https://github.com/mikolaj92/demo/issues/8#issuecomment-102"
 PR_COMMENT = "https://github.com/mikolaj92/demo/pull/12#discussion_r202"
@@ -99,6 +100,7 @@ def ship_script(**overrides: GhCall) -> dict[str, GhCall]:
         "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n")),
         "issue_comments": GhCall(0, "[]"),
         "pull_comments": GhCall(0, "[]"),
+        "issues": GhCall(0, "[]"),
     }
     script.update(overrides)
     return script
@@ -141,6 +143,7 @@ def merge_log_script() -> dict[str, GhCall]:
         "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n")),
         "issue_comments": GhCall(0, "[]"),
         "pull_comments": GhCall(0, "[]"),
+        "issues": GhCall(0, "[]"),
     }
 
 
@@ -180,6 +183,7 @@ def noise_script() -> dict[str, GhCall]:
         "readme": GhCall(0, b64_readme("# Demo\nWIP\n")),
         "issue_comments": GhCall(0, "[]"),
         "pull_comments": GhCall(0, "[]"),
+        "issues": GhCall(0, "[]"),
     }
 
 
@@ -199,6 +203,32 @@ def gh_comment(
         "user": {"login": login, "type": user_type},
         "created_at": created_at,
     }
+
+
+def gh_issue(
+    *,
+    html_url: str,
+    title: str,
+    body: str = "",
+    login: str = "alice",
+    user_type: str = "User",
+    created_at: str = "2026-08-16T12:00:00Z",
+    number: int = 9,
+    pull_request: dict | None = None,
+) -> dict:
+    item = {
+        "id": number,
+        "number": number,
+        "html_url": html_url,
+        "title": title,
+        "body": body,
+        "user": {"login": login, "type": user_type},
+        "created_at": created_at,
+        "state": "open",
+    }
+    if pull_request is not None:
+        item["pull_request"] = pull_request
+    return item
 
 
 def feedback_question_script(**overrides: GhCall) -> dict[str, GhCall]:
@@ -237,6 +267,7 @@ def feedback_question_script(**overrides: GhCall) -> dict[str, GhCall]:
                 ]
             ),
         ),
+        "issues": GhCall(0, "[]"),
     }
     script.update(overrides)
     return script
@@ -278,4 +309,5 @@ def feedback_noise_script() -> dict[str, GhCall]:
                 ]
             ),
         ),
+        "issues": GhCall(0, "[]"),
     }

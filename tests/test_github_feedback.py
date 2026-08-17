@@ -19,6 +19,7 @@ from github_survey import GhCall, classify_gh_argv
 from github_survey.survey import MAX_PAGES, look_argv_is_unbounded_pages, look_short_gh
 
 from tests.gh_scripts import (
+    ISSUE,
     ISSUE_COMMENT,
     ISSUE_COMMENT_BUG,
     NOW,
@@ -28,6 +29,7 @@ from tests.gh_scripts import (
     feedback_noise_script,
     feedback_question_script,
     gh_comment,
+    gh_issue,
     repo_json,
 )
 
@@ -54,6 +56,10 @@ class ClassifyFeedbackArgvTests(unittest.TestCase):
             classify_gh_argv(["api", f"repos/{REPO}/pulls/comments?since=2026-08-06T06:00:00Z"]),
             "pull_comments",
         )
+        self.assertEqual(
+            classify_gh_argv(["api", f"repos/{REPO}/issues?per_page=100&state=open"]),
+            "issues",
+        )
 
 
 class NoiseGateTests(unittest.TestCase):
@@ -78,6 +84,12 @@ class NoiseGateTests(unittest.TestCase):
                 gh_comment(html_url=ISSUE_COMMENT, body="How do I install this when uv is missing?")
             )
         )
+        self.assertFalse(
+            is_noise_comment(
+                gh_issue(html_url=ISSUE, title="Windows install fails", body="The traceback on 3.12")
+            )
+        )
+        self.assertTrue(is_noise_comment(gh_issue(html_url=ISSUE, title="thanks", body="+1")))
 
 
 class CollectFeedbackTests(unittest.TestCase):
@@ -112,6 +124,68 @@ class CollectFeedbackTests(unittest.TestCase):
             self.assertTrue(is_feedback_excerpt_url(item["artifact_url"]))
             self.assertEqual(set(item), {"kind", "text", "artifact_url"})
         self.assertIsNone(whole_thread_reason(out))
+
+    def test_open_issue_in_launch_window_is_a_fact(self) -> None:
+        script = feedback_noise_script()
+        script["issues"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_issue(
+                        html_url=ISSUE,
+                        title="How do I install this when uv is missing?",
+                        body="The Windows install fails with a traceback",
+                    )
+                ]
+            ),
+        )
+        out = self._collect(script)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["source"], "github-feedback")
+        self.assertEqual(out["story_kind"], "hard_issue")
+        self.assertFalse(out["claims_ship"])
+        self.assertFalse(out["tryable"])
+        urls = {item["artifact_url"] for item in out["facts"]}
+        self.assertIn(ISSUE, urls)
+        kinds = {item["kind"] for item in out["facts"]}
+        self.assertIn("excerpt", kinds)
+        for item in out["facts"]:
+            self.assertLessEqual(len(item["text"]), MAX_STORED_FACT_CHARS)
+            self.assertTrue(is_feedback_excerpt_url(item["artifact_url"]))
+            self.assertEqual(set(item), {"kind", "text", "artifact_url"})
+        self.assertIsNone(whole_thread_reason(out))
+
+    def test_thanks_issue_in_launch_window_is_silence(self) -> None:
+        script = feedback_noise_script()
+        script["issues"] = GhCall(
+            0,
+            json.dumps([gh_issue(html_url=ISSUE, title="thanks", body="+1")]),
+        )
+        out = self._collect(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "comment_noise")
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("facts", out)
+
+    def test_old_open_issue_outside_launch_window_is_silence(self) -> None:
+        script = feedback_noise_script()
+        script["issues"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_issue(
+                        html_url=ISSUE,
+                        title="How do I install this when uv is missing?",
+                        body="The Windows install fails with a traceback",
+                        created_at="2026-08-01T12:00:00Z",
+                    )
+                ]
+            ),
+        )
+        out = self._collect(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "comment_noise")
+        self.assertIsNone(out["brief_id"])
 
     def test_same_issue_keeps_one_excerpt_not_the_thread(self) -> None:
         second = ISSUE_COMMENT.replace("issuecomment-101", "issuecomment-199")
@@ -218,6 +292,7 @@ class CollectFeedbackTests(unittest.TestCase):
                 "repo": GhCall(0, repo_json(private=True)),
                 "issue_comments": GhCall(0, "[]"),
                 "pull_comments": GhCall(0, "[]"),
+                "issues": GhCall(0, "[]"),
             }
         )
         self.assertEqual(out["status"], "noop")

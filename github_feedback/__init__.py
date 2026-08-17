@@ -1,4 +1,4 @@
-"""Public GitHub issue/PR comments → facts, or silence.
+"""Public GitHub issue/PR comments and new open issues → facts, or silence.
 
 Does not know briefs, drafts, state.db, scoring, publishing, or arenas.
 Does not write SQLite. Does not tick. Does not load the Influenzer host.

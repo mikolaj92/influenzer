@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,7 +30,9 @@ from influenzer.domain import (
     PublishPlan,
     PlanStatus,
 )
+from github_feedback.feedback import collect_feedback, whole_thread_reason
 from influenzer.brief_admit import open_story_reason
+from influenzer.hom_feedback import SOURCE as FEEDBACK_SOURCE, admit_feedback
 from influenzer.playbook import (
     ARENAS,
     ArenaId,
@@ -1578,6 +1581,43 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "workshop")
         self.assertIn("I struggled with timeouts", draft.body)
         self.assertNotIn("Costume:", draft.body)
+
+    def test_launch_window_issue_is_one_feedback_fact_not_a_second_bag(self) -> None:
+        from github_survey import GhCall
+        from tests.gh_scripts import ISSUE, NOW, REPO, ScriptedGh, feedback_noise_script, gh_issue
+
+        script = feedback_noise_script()
+        script["issues"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_issue(
+                        html_url=ISSUE,
+                        title="How do I install this when uv is missing?",
+                        body="The Windows install fails with a traceback",
+                    )
+                ]
+            ),
+        )
+        packed = collect_feedback(REPO, gh=ScriptedGh(script), now=NOW)
+        self.assertEqual(packed["status"], "ok")
+        self.assertEqual(packed["source"], FEEDBACK_SOURCE)
+        self.assertEqual(packed["story_kind"], "hard_issue")
+        self.assertFalse(packed["claims_ship"])
+        self.assertFalse(packed["tryable"])
+        self.assertIsNone(whole_thread_reason(packed))
+        self.assertTrue(
+            any(item["kind"] == "excerpt" and item["artifact_url"] == ISSUE for item in packed["facts"])
+        )
+        admitted = admit_feedback(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(admitted["status"], "ok")
+        self.assertEqual(admitted["source"], FEEDBACK_SOURCE)
+        self.assertFalse(admitted["published"])
+        stored = self.repo.get_brief("app-1", admitted["brief_id"])
+        assert stored is not None
+        self.assertEqual(stored.source, FEEDBACK_SOURCE)
+        self.assertTrue(any(fact.kind == "excerpt" and fact.artifact_url == ISSUE for fact in stored.facts))
+        self.assertEqual(len(self.repo.list_pending_briefs("app-1")), 1)
 
     def test_decision_does_not_sit_on_discord(self) -> None:
         # #38: story_kind=decision → warsztat (GitHub), nigdy tawerna.

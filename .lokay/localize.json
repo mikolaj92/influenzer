@@ -1,19 +1,28 @@
 {
   "paths": [
-    "influenzer/playbook.py",
-    "skills/influenzer-discord",
-    "tests/test_e2e_gates.py"
+    "github_feedback",
+    "influenzer/hom_feedback.py",
+    "influenzer/hom_watch.py",
+    "github_feedback/feedback.py",
+    "github_survey/gh.py",
+    "github_survey/survey.py",
+    "tests/gh_scripts.py",
+    "tests/test_github_feedback.py",
+    "tests/test_hom_feedback.py",
+    "tests/test_hom_watch.py",
+    "tests/test_e2e_gates.py",
+    "tests/test_github_survey.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["Discord", "influenzer", "gate", "choose_arena", "decision"],
+  "matched_tokens": ["Feedback", "watch", "feedback", "influenzer", "gate"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Refined after inspection: sit-exception lives in choose_arena.",
-    "Repo tree entries considered: 137."
+    "Empty path list fails closed \u2014 run_agent must not start.",
+    "Repo tree entries considered: 137.",
+    "Issue #39 needed a read-only /issues GET in the existing feedback bag; gh allowlist/classify and scripted fixtures had to know that endpoint."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__38-decyzje-nie-mieszkaj-na-discordzie-6bfa06b5",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__39-nowe-issue-w-oknie-launchu-to-fakt-nie-d-9dec1287",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

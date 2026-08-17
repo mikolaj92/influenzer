@@ -238,6 +238,17 @@ def _allowlisted_api_path(path: str) -> bool:
         if "since" in params and not _SINCE_RE.fullmatch(params["since"]):
             return False
         return True
+    if re.fullmatch(rf"repos/{_SLUG_PATH}/issues", resource):
+        allowed = {"per_page", "since", "state"}
+        if not set(params) <= allowed:
+            return False
+        if params.get("state") != "open":
+            return False
+        if "per_page" in params and not _LIMIT_RE.fullmatch(params["per_page"]):
+            return False
+        if "since" in params and not _SINCE_RE.fullmatch(params["since"]):
+            return False
+        return True
     return False
 
 
@@ -419,6 +430,8 @@ def classify_gh_argv(argv: Sequence[str]) -> str:
             return "issue_comments"
         if "/pulls/comments" in path:
             return "pull_comments"
+        if "/issues" in path:
+            return "issues"
     return "other"
 
 

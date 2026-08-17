@@ -1,10 +1,11 @@
 # github_feedback
 
-Public GitHub issue/PR comments → facts, or silence.
+Public GitHub issue/PR comments and new open issues → facts, or silence.
 
-`gh` (injectable) reads recent comments on one `owner/name`. Bots, LGTM,
-and empty thanks fail closed. A real question, bug, or pushback becomes
-facts. Missing `gh`, auth failure, a private repo (even when the owner is
+`gh` (injectable) reads recent comments and open issues on one `owner/name`.
+A new question/bug in the ~48h launch window is one excerpt in this bag,
+not a second collector. Bots, LGTM, and empty thanks fail closed. A real
+question, bug, or pushback becomes facts. Missing `gh`, auth failure, a private repo (even when the owner is
 ours), an empty repo or a repo without a README, or only noise is a silent
 envelope, not a crash. Watch on private is fail-closed, not a 404 loop.
 Workshop is a public README.
