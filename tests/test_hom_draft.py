@@ -2758,6 +2758,83 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertIn(SHIP_PR, draft.body)
         self.assertNotIn("Costume:", draft.body)
 
+    def test_mastodon_x_punchline_or_clip_is_undressable_even_when_score_says_draft(self) -> None:
+        punchline = "Local tick scores briefs and emits a draft"
+        clips = (
+            (punchline,),
+            (punchline, punchline),
+            (punchline, "Local tick scores briefs"),
+            (punchline, "local tick scores briefs and emits a draft."),
+        )
+        fake = Score(
+            brief_id="b-parish-punchline",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.MASTODON,
+            angle="I struggled with X",
+            wave_checklist=ARENAS[ArenaId.MASTODON].wave,
+            canon_url=ARENAS[ArenaId.MASTODON].canon_url,
+        )
+        for texts in clips:
+            with self.subTest(texts=texts):
+                brief = _ship_brief(
+                    brief_id="b-parish-punchline",
+                    preferred_arena=ArenaId.MASTODON,
+                    claims_ship=False,
+                    story_kind=StoryKind.HARD_ISSUE,
+                    facts=tuple(Fact(text=text, artifact_url=SHIP_PR if idx == 0 else None) for idx, text in enumerate(texts)),
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "mastodon",
+                            "angle": "I struggled with X",
+                            "wave_checklist": list(ARENAS[ArenaId.MASTODON].wave),
+                            "canon_url": ARENAS[ArenaId.MASTODON].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("Costume:", dumped)
+                self.assertNotIn(punchline, dumped)
+
+    def test_mastodon_wears_own_conversation_not_the_x_punchline(self) -> None:
+        punchline = "Local tick scores briefs and emits a draft"
+        talk = "The dry-run still sat with us on every tick"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.MASTODON,
+            claims_ship=False,
+            story_kind=StoryKind.HARD_ISSUE,
+            facts=(
+                Fact(text=punchline, artifact_url=SHIP_PR),
+                Fact(text=talk),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.MASTODON,
+            angle="I struggled with X",
+            wave_checklist=ARENAS[ArenaId.MASTODON].wave,
+            canon_url=ARENAS[ArenaId.MASTODON].canon_url,
+        )
+        draft = dress_brief(brief, fake)
+        assert draft is not None
+        self.assertEqual(draft.costume, "parish")
+        self.assertEqual(draft.body, talk)
+        self.assertNotEqual(draft.body, punchline)
+        self.assertFalse(draft.body.casefold().startswith("local tick"))
+        self.assertNotIn(SHIP_PR, draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_x_is_short_reply_not_a_thread(self) -> None:
         brief = _ship_brief(
             preferred_arena=ArenaId.X,

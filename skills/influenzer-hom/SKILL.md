@@ -22,7 +22,7 @@ I wear the arena. I do not mix costumes.
 - HN: seminar — “I struggled with X”; press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill or changelog, not a social angle.
 - Reddit: village — each sub is a different room; story of pain.
 - Newsletter: letter — owned list, cadence. Algorithm cannot take this.
-- Discord: tavern. Bluesky: newer cafe. Mastodon: parish (no PR tone). Mail: correspondence (HTML, charts, threads).
+- Discord: tavern. Bluesky: newer cafe. Mastodon: parish — own slow conversation, or silence. Not an X punchline paste or clip. Mail: correspondence (HTML, charts, threads).
 
 ## Two machines
 

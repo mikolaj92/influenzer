@@ -1,32 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=33 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=34 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #33 — LinkedIn to dwór, nie stoisko
+Issue: #34 — Parafia nie dostaje punchline’u z X
 
 ## Goal
 
-LinkedIn fold (~210 chars) is insight, not pitch, CTA, or URL. A draft that starts with CTA, a URL, or “we’re launching” is silence on court (other arena or kill). Does not publish. Does not go live. One story.
+Jeśli draft na Mastodon jest tym samym tekstem co X (albo jego obcięciem) — cisza na parish. Wolna rozmowa albo nic, nie broadcast.
 
 ## Files likely touched
 
-- `influenzer/hom_draft.py` — court dresser: skip stall lines; fail-closed if fold is pitch/CTA/URL
-- `skills/influenzer-linkedin/SKILL.md` — fold is insight or silence
-- `tests/test_hom_draft.py` — leaked-score silence + insight-first fold
-- `tests/test_e2e_gates.py` — compose_draft refuses a stall fold
+- `influenzer/hom_draft.py` — parish dresser: skip the X one-liner and clips of it; fail-closed if nothing else remains
+- `skills/influenzer-hom/SKILL.md` — parish is own conversation or silence
+- `tests/test_hom_draft.py` — leaked-score silence + own conversation
+- `tests/test_e2e_gates.py` — compose_draft refuses an X punchline paste
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_draft.py::HomDraftCostumeTests tests/test_e2e_gates.py::OrderedLiveGateTests::test_court_is_not_a_launch_channel tests/test_e2e_gates.py::OrderedLiveGateTests::test_linkedin_fold_is_insight_not_pitch_cta_or_url -q`
+- `python -m pytest tests/test_hom_draft.py::HomDraftCostumeTests::test_mastodon_x_punchline_or_clip_is_undressable_even_when_score_says_draft tests/test_hom_draft.py::HomDraftCostumeTests::test_mastodon_wears_own_conversation_not_the_x_punchline tests/test_hom_draft.py::HomDraftCostumeTests::test_every_arena_dresser_refuses_the_label_dump tests/test_e2e_gates.py::OrderedLiveGateTests::test_parish_does_not_get_the_x_punchline -q`
 
 ## Non-goals
 
-- No playbook/scoring rewrite outside the LinkedIn dress path
+- No playbook/scoring rewrite outside the Mastodon dress path
 - No publish / live / multi-story changes
+- Do not invent an influenzer-mastodon skill directory
 
 ## Notes
 
-- Leak before the patch: `_PITCH_LINE_RE` missed `we're launching` / `we are launching` / `Learn more` / `Comment if`, so those lines dressed as the fold.
-- Court already had launch-energy kill via `court_reason`; this issue is the dress fold, not the launch-channel gate.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Leak before the patch: `_dress_mastodon` pasted `one_liner` + rest, so parish wore the same hook X would wear.
+- Mastodon already kills ship-claim as `mastodon_pr_tone`; this issue is the dress fold, not the PR-tone gate.
 - Collector boundary: no collector.

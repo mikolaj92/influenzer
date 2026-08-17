@@ -1,28 +1,34 @@
 {
   "paths": [
+    "influenzer/adapters/fake_provider.py",
     "influenzer/hom_draft.py",
-    "skills/influenzer-linkedin",
-    "skills/influenzer-linkedin/SKILL.md",
+    "github_pack/pack.py",
+    "influenzer/adapters/child_worker.py",
+    "influenzer/adapters/contract.py",
+    "influenzer/adapters/platforms.py",
+    "tools/hygiene_check.py",
+    "skills/influenzer-x",
+    "skills/influenzer-hom/SKILL.md",
+    "tests/test_x_handoff.py",
+    "tests/test_adapter_contract.py",
+    "tests/test_fake_provider.py",
     "tests/test_hom_draft.py",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "LinkedIn",
-    "link",
     "draft",
-    "kill",
-    "Influenzer",
     "influenzer",
-    "gate"
+    "gate",
+    "X"
   ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__33-linkedin-to-dw-r-nie-stoisko-f2038c4c",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__34-parafia-nie-dostaje-punchline-u-z-x-d09f4afb",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }
