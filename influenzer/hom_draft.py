@@ -71,6 +71,7 @@ from influenzer.playbook import (
     looks_like_contest,
     looks_like_poll,
     looks_like_dunk,
+    looks_like_worse_clone,
     looks_like_foreign_wave,
     looks_like_engagement_bait,
     looks_like_ranking_dump,
@@ -265,6 +266,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_dead_link(bits.blob)
         or looks_like_dead_release_asset(bits.blob)
         or looks_like_roadmap(bits.blob)
+        or looks_like_worse_clone(bits.blob)
         or looks_like_press_release(bits.blob)
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
@@ -572,6 +574,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or _undressable_blob(bits)
         or _superlative_without_proof(brief, bits)
         or looks_like_dunk(bits.blob)
+        or looks_like_worse_clone(bits.blob)
         or looks_like_foreign_wave(triples)
         or looks_like_engagement_bait(bits.blob)
         or looks_like_contest(bits.blob)
@@ -631,6 +634,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         body is None
         or unquotable_reason(triples, extra=body)
         or looks_like_dunk(body)
+        or looks_like_worse_clone(body)
         or looks_like_foreign_wave((*triples, ("signal", body, None)))
         or looks_like_engagement_bait(body)
         or looks_like_contest(body)

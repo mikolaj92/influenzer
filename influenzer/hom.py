@@ -57,6 +57,7 @@ from influenzer.playbook import (
     looks_like_contest,
     looks_like_poll,
     looks_like_dunk,
+    looks_like_worse_clone,
     looks_like_foreign_wave,
     looks_like_engagement_bait,
     looks_like_ranking_dump,
@@ -95,6 +96,7 @@ from influenzer.playbook import (
     looks_like_failed_ci,
     looks_like_prerelease,
     looks_like_waitlist,
+    WORSE_CLONE_REASON,
     ranking_urls_only,
     unquotable_reason,
 )
@@ -650,6 +652,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, "superlative_without_proof")
     if looks_like_dunk(blob):
         return _kill(brief, "dunking")
+    if looks_like_worse_clone(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, WORSE_CLONE_REASON)
+        return _changelog(brief, WORSE_CLONE_REASON)
     if looks_like_foreign_wave(_fact_triples(brief)):
         return _kill(brief, "foreign_wave")
     if looks_like_engagement_bait(blob):

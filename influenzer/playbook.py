@@ -1017,6 +1017,39 @@ DUNK_NAMED_RE = re.compile(
     r"is\s+a\s+dumpster\s+fire|is\s+a\s+clown(?:\s+project)?|"
     r"is\s+a\s+toy(?:\s+project)?)\b"
 )
+# A worse clone is not an angle. Someone already did this better /
+# we reinvented X / gorszy klon is changelog or silence. Help them
+# or name the difference. Pair of dunk: mockery is silence; a
+# worse clone is also silence. Issue #43.
+WORSE_CLONE_REASON = "worse_clone"
+WORSE_CLONE_RE = re.compile(
+    r"(?i)(?:"
+    r"\balready\s+(?:did|built|shipped|made|solved)\s+(?:this|it|that)\s+better\b|"
+    r"\bsomeone\s+already\s+(?:did|built|shipped|made)\b|"
+    r"\balready\s+exists?\s+(?:and\s+is\s+)?better\b|"
+    r"\breinvent(?:ed|ing|s)?\b|"
+    r"\bznowu\s+wymy[sś]l|"
+    r"\bkto[sś]\s+ju[zż]\s+to\s+zrobi[lł]\s+lepiej\b|"
+    r"\bju[zż]\s+to\s+zrobi[lł]\s+lepiej\b|"
+    r"\bworse\s+clones?\b|"
+    r"\bgorsz(?:y|ego|a|e)\s+klon|"
+    r"\bjust\s+(?:another|a)\s+(?:\w+\s+)?clones?\b|"
+    r"\byet\s+another\s+(?:\w+\s+)?clones?\b|"
+    r"\banother\s+clone\s+of\b"
+    r")"
+)
+_CLONE_BETTER_IDEA_RE = re.compile(
+    r"(?i)(?:"
+    r"\bthe\s+difference\s+is\b|"
+    r"\bunlike\b|"
+    r"\bworth\s+helping\b|"
+    r"\bhelp(?:ing)?\s+them\b|"
+    r"\bbetter\s+idea\b|"
+    r"\bcompared\s+to\b|"
+    r"\bpom[oó]c\b|"
+    r"\blepsz[yea]\s+pomys"
+    r")"
+)
 # A reply under someone else's post. Kind names a parent; a social URL
 # is a thread to sit under, not a ship. This is wave theft, not dunk.
 PARENT_FACT_KINDS: frozenset[str] = frozenset(
@@ -2643,6 +2676,15 @@ def looks_like_dunk(text: str) -> bool:
     return False
 
 
+def looks_like_worse_clone(text: str) -> bool:
+    """True when facts say someone already did this better, or we reinvented X."""
+    if not text or not text.strip():
+        return False
+    if not WORSE_CLONE_RE.search(text):
+        return False
+    return not _CLONE_BETTER_IDEA_RE.search(text)
+
+
 def is_parent_post_url(url: str | None) -> bool:
     """True for a social parent post. A ship artifact is not a foreign wave."""
     if not url or is_ship_artifact_url(url):
@@ -3238,6 +3280,8 @@ __all__ = [
     "COURT_PITCH_RE",
     "DUNK_NAMED_RE",
     "DUNK_PHRASE_RE",
+    "WORSE_CLONE_REASON",
+    "WORSE_CLONE_RE",
     "EMPTY_TAVERN_REASON",
     "BLUESKY_PACK_WITHOUT_FEED_REASON",
     "LETTER_ASK_WITHOUT_GIFT_REASON",
@@ -3378,6 +3422,7 @@ __all__ = [
     "looks_like_commit_noise",
     "looks_like_court_launch",
     "looks_like_dunk",
+    "looks_like_worse_clone",
     "looks_like_foreign_wave",
     "looks_like_reply",
     "is_parent_post_url",
