@@ -852,12 +852,7 @@ class StateRepository:
                 ((row["arena"], row["created_at"]) for row in stacked),
                 brief.created_at,
             ):
-                oldest = min(
-                    stacked,
-                    key=lambda row: (str(row["created_at"] or ""), str(row["arena"] or "")),
-                )
-                if oldest["project_id"] != brief.project_id:
-                    return "living_stack"
+                return "living_stack"
             existing = c.execute(
                 "SELECT 1 FROM briefs WHERE project_id=? AND brief_id=?",
                 (brief.project_id, brief.brief_id),

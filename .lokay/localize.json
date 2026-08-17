@@ -1,18 +1,19 @@
 {
   "paths": [
-    "github_pack/pack.py",
-    "tests/test_brief_admit.py",
+    "tests/test_scan_due.py",
     "tests/test_brief_scan_cli.py",
     "tests/test_e2e_gates.py",
-    "tests/test_github_pack.py",
-    "tests/test_hom_watch.py"
+    "tests/test_hom_draft.py",
+    "tests/test_hom_verdict.py",
+    "tests/test_scan_path.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "Watch",
-    "Brief",
-    "pack",
+    "draft",
+    "verdict",
+    "scan",
+    "due",
     "gate"
   ],
   "notes": [
@@ -20,7 +21,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__25-nie-reklamowa-zepsutej-witryny-2b18a4a2",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__26-launch-to-jeden-stos-24-48h-nie-drugi-k-5a6a9085",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

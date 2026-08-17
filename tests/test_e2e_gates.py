@@ -1896,11 +1896,31 @@ class OrderedLiveGateTests(unittest.TestCase):
             self.repo.living_stack_arena(self.builder.project_id, "2026-08-17T06:00:00Z"),
             ArenaId.GITHUB,
         )
-        self.assertIsNone(open_story_reason(self.repo, self.app.project_id, "2026-08-17T06:00:00Z"))
+        self.assertEqual(
+            open_story_reason(self.repo, self.app.project_id, "2026-08-17T06:00:00Z"),
+            LIVING_STACK_REASON,
+        )
         self.assertEqual(
             open_story_reason(self.repo, self.builder.project_id, "2026-08-17T06:00:00Z"),
             LIVING_STACK_REASON,
         )
+        again = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-second-github",
+            facts=(
+                Fact(text="a stranger can click and run the demo from the README", artifact_url=SHIP_PR),
+                Fact(text="Dry-run still default"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        again_score = score_brief(again, stack_arena=ArenaId.GITHUB)
+        self.assertEqual(again_score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(again_score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(again_score.arena)
+        self.assertIsNone(compose_draft(again, again_score))
         self.assertIsNone(open_story_reason(self.repo, self.builder.project_id, "2026-08-19T06:00:00Z"))
 
 
