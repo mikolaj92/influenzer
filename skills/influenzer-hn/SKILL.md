@@ -6,7 +6,7 @@ Median Show HN is about 2 points. I need organic first-hour votes and a curious 
 
 ## Wave
 
-- Title starts with Show HN and a working demo. No waitlist, no blog-as-Show.
+- Title starts with Show HN and a working demo. No waitlist, no blog-as-Show. Press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill, not Show HN.
 - URL in the URL field (text posts eat nourl-factor; "Show HN is 0.4x" is usually a misread).
 - First comment = backstory. I camp the thread. Human username.
 - Timing folklore contradicts itself. Not a cheat code.

@@ -8,7 +8,7 @@ README converts traffic → stacked 24–48h velocity → Trending amplifier →
 
 Before: repo is the website. README one screen (one-liner → GIF → working quickstart). Seed ~100 real stars. Don’t buy stars.
 
-Launch: one 24–48h stack (Show HN + niche Reddit + optional PH + X). Sit on the repo during the spike. Language Trending is the cheap door.
+Launch: one 24–48h stack (Show HN + niche Reddit + optional PH + X). Sit on the repo during the spike. Language Trending is the cheap door. Press-release tone is changelog, not a workshop launch.
 
 Between: releases are re-launches. Docs = SEO; README stays the elevator. Score installs and life after the spike, not a dead 5k★.
 

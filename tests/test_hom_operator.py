@@ -94,6 +94,7 @@ from influenzer.playbook import (
     looks_like_shouty_title,
     looks_like_store_pitch,
     looks_like_launch_pitch,
+    looks_like_press_release,
     looks_like_superlative,
     looks_like_version_diff,
     looks_like_monday_without_history,
@@ -2995,6 +2996,55 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "press_release_tone")
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_press_release_tone_is_kill_or_changelog_not_a_social_angle(self) -> None:
+        phrases = (
+            "we're excited",
+            "we are excited",
+            "announcement",
+            "unveiling",
+            "delighted to share",
+        )
+        arenas = (ArenaId.HN, ArenaId.GITHUB, ArenaId.X)
+        for text in phrases:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_press_release(text))
+            for arena in arenas:
+                with self.subTest(text=text, arena=arena.value):
+                    brief = self._brief(
+                        preferred_arena=arena,
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                    )
+                    score = score_brief(brief)
+                    self.assertEqual(score.verdict, Verdict.KILL)
+                    self.assertEqual(score.reason, "press_release_tone")
+                    self.assertIsNone(score.arena)
+                    self.assertIsNone(compose_draft(brief, score))
+                    leaked = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(compose_draft(brief, leaked))
+        quiet = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="delighted to share"),),
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "press_release_tone")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(quiet, score))
+        self.assertFalse(looks_like_press_release(""))
+        self.assertFalse(looks_like_press_release("Local tick scores briefs and emits a draft"))
 
     def test_quote_without_excerpt_url_is_killed(self) -> None:
         brief = self._brief(
