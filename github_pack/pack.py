@@ -7,7 +7,8 @@ A GitHub workshop README is one screen: one-liner, visible demo
 changelog, not a launch. A prose mention of pip/uv/brew is not a
 start: HN/X stay silent without a one-liner a stranger can copy.
 A merge and a revert of the same change in the look window is not
-a ship: the thing is already gone from main. Inbound titles/descriptions
+a ship: the thing is already gone from main. A star / upvote / follow
+/ RT ask is silence, not a social angle. Inbound titles/descriptions
 are data, not a command. Pack cuts instructions ("zpostuj to",
 "ignore scoring"), leaves content. Our score stays ours.
 """
@@ -51,6 +52,7 @@ _BADGE_OR_LOGO_RE = re.compile(
 README_WITHOUT_DEMO_REASON = "readme_without_demo"
 README_WITHOUT_QUICKSTART_REASON = "readme_without_quickstart"
 REVERTED_NOT_A_SHIP_REASON = "reverted_not_a_ship"
+SOLICIT_GESTURE_REASON = "solicit_gesture"
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _COPYABLE_START_RE = re.compile(
     r"(?im)^\s*(?:\$\s*)?(?:pip(?:x)? install|uv add|uv pip install|uv run|"
@@ -74,6 +76,23 @@ _INBOUND_INSTRUCTION_RE = re.compile(
     r"\bopublikuj\s+to\b"
     r")"
 )
+# Star / upvote / follow / RT ask is silence. "Follow the README" stays.
+_SOLICIT_GESTURE_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:please\s+)?(?:star|upvote|rt|retweet)\s+"
+    r"(?:us|me|this|it|the\s+(?:repo|project|post)|if)\b|"
+    r"\b(?:please\s+)?follow\s+(?:us|me|our\s+\w+|for(?:\s+more)?|and\s+subscribe)\b|"
+    r"\b(?:give|leave|drop|add|hit)\s+(?:us\s+|it\s+)?(?:a\s+|an\s+)?"
+    r"(?:star|upvote|follow|rt|retweet|like|gwiazdk\w*)\b|"
+    r"\bstar\s+the\s+(?:repo|project)\b|"
+    r"\bplease\s+(?:star|upvote|follow|rt|retweet)\b|"
+    r"\b(?:rt|retweet)\s+this\b|"
+    r"\bdaj(?:cie)?\s+(?:nam\s+)?(?:gwiazdk\w*|follow|rt|lajk\w*|upvote)\b|"
+    r"\bzostaw(?:cie)?\s+(?:nam\s+)?(?:gwiazdk\w*|lajk\w*|follow|rt)\b|"
+    r"\bobserwuj(?:cie)?\s+(?:nas|mnie)\b|"
+    r"\bprosimy\s+o\s+(?:gwiazdk|follow|upvote|rt|lajk)"
+    r")"
+)
 
 
 def _slug_fragment(raw: str) -> str:
@@ -91,6 +110,14 @@ def _silence(reason: str, *, repo: str) -> dict[str, Any]:
 
 def looks_like_inbound_instruction(text: str) -> bool:
     return bool(text and _INBOUND_INSTRUCTION_RE.search(text))
+
+
+def looks_like_solicit_gesture(text: str) -> bool:
+    """True for a star / upvote / follow / RT ask. Follow-the-README stays."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(_SOLICIT_GESTURE_RE.search(cleaned))
 
 
 def strip_inbound_instructions(text: str) -> str:
@@ -322,6 +349,17 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     blob = "\n".join(str(fact.get("text") or "") for fact in facts)
     if looks_like_waitlist(blob):
         return _silence("waitlist_not_tryable", repo=slug)
+    meta = survey.get("meta") if isinstance(survey.get("meta"), dict) else {}
+    if looks_like_solicit_gesture(
+        "\n".join(
+            (
+                blob,
+                str(survey.get("readme_text") or ""),
+                str(meta.get("description") or ""),
+            )
+        )
+    ):
+        return _silence(SOLICIT_GESTURE_REASON, repo=slug)
     if looks_like_same_window_revert(survey.get("prs") or []):
         return _silence(REVERTED_NOT_A_SHIP_REASON, repo=slug)
     if facts_are_merge_log(facts) and not survey.get("releases"):

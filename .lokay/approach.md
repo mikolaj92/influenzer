@@ -1,34 +1,37 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=27 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=28 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #27 — X nie dostaje pustego feedu
+Issue: #28 — Żadnego żebrania o gwiazdki, upvote, follow, RT
 
 ## Goal
 
-X nie dostaje pustego feedu. Score nie wybiera X, chyba że brief ma URL posta-rodzica (reply, pożyczony heat). Ship bez wątku → github albo HN gdy tryable, inaczej cisza. Żadnego oryginału w pustkę.
+Żadnego żebrania. Jeśli fakty albo draft proszą o gwiazdkę, upvote, follow, RT — score/dress pada na kill albo changelog, nie na kąt. HN i GitHub tym umierają.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — sit on X only with a parent-post URL; empty feed is not a first costume
-- `influenzer/hom.py` — pass parent proof into score; kill leaked X originals
-- `influenzer/hom_draft.py` — refuse to dress X without a parent URL
-- `skills/influenzer-x/SKILL.md`, `skills/influenzer-hom/SKILL.md` — no original into an empty feed
-- `tests/test_e2e_gates.py` — empty-feed original is github/HN or silence, not agora
-- `tests/test_hom_operator.py` / `tests/test_hom_draft.py` — preferred X without a thread no longer drafts an original
+- `github_pack/pack.py` — fail-closed pack silence on a star / upvote / follow / RT ask in facts, README, or description
+- `github_pack/__init__.py` — export the detector
+- `influenzer/hom_draft.py` — same ask is undressable even when score says draft (no `github_pack` import)
+- `skills/influenzer-hn/SKILL.md` — never solicit stars / follows / RTs either
+- `tests/test_github_pack.py`
+- `tests/test_hom_draft.py`
+- `tests/test_e2e_gates.py`
 
 ## Test plan
 
-- `pytest tests/test_e2e_gates.py tests/test_hom_operator.py tests/test_hom_draft.py -q`
+- `python -m pytest tests/test_github_pack.py tests/test_hom_draft.py tests/test_e2e_gates.py`
 
 ## Non-goals
 
-- No publish, no live, no second story. Small score block, not a new path.
+- Do not move the detector into `playbook.py` (out of localize scope).
+- Do not treat a dead star *count* as this gate; that remains `dead_star_count`.
+- Product copy such as "follow the README" stays.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Small pack/dress klocek: `solicit_gesture`. Dress keeps a local copy because `hom_draft` must not import `github_pack`.

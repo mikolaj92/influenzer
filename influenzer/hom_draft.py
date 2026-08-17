@@ -135,6 +135,32 @@ _PITCH_LINE_RE = re.compile(
 )
 _URL_IN_TEXT_RE = re.compile(r"https?://", re.I)
 _SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
+# Star / upvote / follow / RT ask is silence. "Follow the README" stays.
+_SOLICIT_GESTURE_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:please\s+)?(?:star|upvote|rt|retweet)\s+"
+    r"(?:us|me|this|it|the\s+(?:repo|project|post)|if)\b|"
+    r"\b(?:please\s+)?follow\s+(?:us|me|our\s+\w+|for(?:\s+more)?|and\s+subscribe)\b|"
+    r"\b(?:give|leave|drop|add|hit)\s+(?:us\s+|it\s+)?(?:a\s+|an\s+)?"
+    r"(?:star|upvote|follow|rt|retweet|like|gwiazdk\w*)\b|"
+    r"\bstar\s+the\s+(?:repo|project)\b|"
+    r"\bplease\s+(?:star|upvote|follow|rt|retweet)\b|"
+    r"\b(?:rt|retweet)\s+this\b|"
+    r"\bdaj(?:cie)?\s+(?:nam\s+)?(?:gwiazdk\w*|follow|rt|lajk\w*|upvote)\b|"
+    r"\bzostaw(?:cie)?\s+(?:nam\s+)?(?:gwiazdk\w*|lajk\w*|follow|rt)\b|"
+    r"\bobserwuj(?:cie)?\s+(?:nas|mnie)\b|"
+    r"\bprosimy\s+o\s+(?:gwiazdk|follow|upvote|rt|lajk)"
+    r")"
+)
+
+
+def looks_like_solicit_gesture(text: str) -> bool:
+    """True for a star / upvote / follow / RT ask. Follow-the-README stays."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(_SOLICIT_GESTURE_RE.search(cleaned))
+
 
 
 @dataclass(frozen=True)
@@ -279,6 +305,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_shortener(bits.blob)
         or looks_like_utm_farm(bits.blob)
         or looks_like_click_here(bits.blob)
+        or looks_like_solicit_gesture(bits.blob)
         or looks_like_dead_link(bits.blob)
         or looks_like_dead_release_asset(bits.blob)
         or looks_like_roadmap(bits.blob)
@@ -595,6 +622,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_worse_clone(bits.blob)
         or looks_like_foreign_wave(triples)
         or looks_like_engagement_bait(bits.blob)
+        or looks_like_solicit_gesture(bits.blob)
         or looks_like_contest(bits.blob)
         or looks_like_poll(bits.blob)
         or looks_like_thread(bits.blob)
@@ -658,6 +686,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_worse_clone(body)
         or looks_like_foreign_wave((*triples, ("signal", body, None)))
         or looks_like_engagement_bait(body)
+        or looks_like_solicit_gesture(body)
         or looks_like_contest(body)
         or looks_like_poll(body)
         or looks_like_thread(body)

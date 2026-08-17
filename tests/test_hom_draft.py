@@ -704,15 +704,65 @@ class HomDraftCostumeTests(unittest.TestCase):
             preferred_arena=ArenaId.HN,
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
-                Fact(text="star the repo after you try it"),
+                Fact(text="product dashboard for the local tick"),
             ),
         )
         decision = apply_brief(brief)
         assert decision.draft is not None
-        self.assertIn("star the repo after you try it", decision.draft.body)
+        self.assertIn("product dashboard for the local tick", decision.draft.body)
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertNotIn("HN front", decision.draft.body)
         self.assertNotIn("vanity chart", decision.draft.body.lower())
+
+    def test_star_upvote_follow_or_rt_ask_is_undressable_even_when_score_says_draft(self) -> None:
+        asks = (
+            "star the repo after you try it",
+            "please star us",
+            "give us a star",
+            "please upvote this",
+            "follow us",
+            "RT this",
+            "daj nam gwiazdkę",
+        )
+        for text in asks:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("star the repo", dumped)
+                self.assertNotIn("upvote", dumped.lower())
+                self.assertNotIn("follow us", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
 
     def test_hn_ranking_only_url_is_undressable_even_when_score_says_draft(self) -> None:
         brief = _ship_brief(
