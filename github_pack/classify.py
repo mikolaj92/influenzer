@@ -149,6 +149,32 @@ _FOUNDER_JOURNAL_RE = re.compile(
     r"|\brutyna\s+porann"
     r")"
 )
+_LEAD_MAGNET_RE = re.compile(
+    r"(?i)(?:"
+    r"\blead[- ]magnets?\b"
+    r"|\bebooks?\b"
+    r"|\be[- ]books?\b"
+    r"|\bfree\s+guides?\b"
+    r"|\bfree\s+pdfs?\b"
+    r"|\btypeforms?\b"
+    r"|\bdownload\s+(?:the|our|my)\s+(?:free\s+)?(?:guide|ebook|e-book|pdf|checklist|whitepaper)\b"
+    r"|\bget\s+(?:the|our|my)\s+(?:free\s+)?(?:guide|ebook|e-book|pdf)\b"
+    r"|\benter\s+your\s+e[- ]?mail\s+to\s+(?:download|unlock|get|receive)\s+"
+    r"(?:the\s+|our\s+|my\s+)?(?:free\s+)?(?:guide|ebook|e-book|pdf|checklist)\b"
+    r"|\be[- ]?mail\s+to\s+(?:download|unlock|get|receive)\s+"
+    r"(?:the\s+|our\s+|my\s+)?(?:free\s+)?(?:guide|ebook|e-book|pdf|checklist)\b"
+    r"|\bswap\s+(?:your\s+)?e[- ]?mail\s+for\b"
+    r"|\bgated\s+(?:pdf|content|guide|ebook|e-book)\b"
+    r"|\bopt[- ]in\s+(?:form|pdf|guide|ebook)\b"
+    r"|\bemail\s+gates?\b"
+    r"|\bmail\s+gates?\b"
+    r"|\bmagnet\s+za\s+mail"
+    r"|\be[- ]?book\s+za\s+mail"
+    r"|\bdarmow(?:y|e|a)\s+(?:przewodnik|ebook|e-book|pdf)\b"
+    r"|\bza\s+maila\b"
+    r"|\bbramk[aąę]\s+mail"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -209,6 +235,13 @@ def looks_like_founder_journal(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_FOUNDER_JOURNAL_RE.search(text))
+
+
+def looks_like_lead_magnet(text: str) -> bool:
+    """True for ebook / free guide / typeform for an email. A mail gate is not tryable."""
+    if not text or not text.strip():
+        return False
+    return bool(_LEAD_MAGNET_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

@@ -103,6 +103,7 @@ from influenzer.playbook import (
     looks_like_counter_thanks,
     looks_like_fog,
     looks_like_founder_journal,
+    looks_like_lead_magnet,
     looks_like_waitlist,
     looks_like_worse_clone,
     EVENT_NOT_A_SHIP,
@@ -110,6 +111,7 @@ from influenzer.playbook import (
     COUNTER_THANKS_REASON,
     FOG_REASON,
     FOUNDER_JOURNAL_REASON,
+    LEAD_MAGNET_REASON,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -671,6 +673,55 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, FOUNDER_JOURNAL_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_lead_magnet_is_silence_not_an_angle(self) -> None:
+        magnets = (
+            "ebook for the local tick",
+            "free guide to scoring briefs",
+            "typeform for an email",
+            "download the free pdf",
+            "ebook za maila",
+        )
+        self.assertFalse(looks_like_lead_magnet(""))
+        self.assertFalse(looks_like_lead_magnet("   "))
+        self.assertFalse(looks_like_lead_magnet("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_lead_magnet("user guide for the local tick"))
+        self.assertFalse(looks_like_lead_magnet("email notifications stay local"))
+        self.assertFalse(looks_like_lead_magnet("join the waitlist"))
+        for idx, text in enumerate(magnets):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_lead_magnet(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    LEAD_MAGNET_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-magnet-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LEAD_MAGNET_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(

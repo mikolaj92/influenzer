@@ -1158,6 +1158,38 @@ FOUNDER_JOURNAL_RE = re.compile(
     r"|\brutyna\s+porann"
     r")"
 )
+# A lead magnet is not an angle. Ebook / free guide / typeform for
+# an email is silence, not tryable. Neighbor of waitlist (#46, join
+# the list) and login gate (#126, artifact behind auth). Here it is
+# the mail gate, not the waitlist. A user guide and email
+# notifications stay.
+LEAD_MAGNET_REASON = "lead_magnet"
+LEAD_MAGNET_RE = re.compile(
+    r"(?i)(?:"
+    r"\blead[- ]magnets?\b"
+    r"|\bebooks?\b"
+    r"|\be[- ]books?\b"
+    r"|\bfree\s+guides?\b"
+    r"|\bfree\s+pdfs?\b"
+    r"|\btypeforms?\b"
+    r"|\bdownload\s+(?:the|our|my)\s+(?:free\s+)?(?:guide|ebook|e-book|pdf|checklist|whitepaper)\b"
+    r"|\bget\s+(?:the|our|my)\s+(?:free\s+)?(?:guide|ebook|e-book|pdf)\b"
+    r"|\benter\s+your\s+e[- ]?mail\s+to\s+(?:download|unlock|get|receive)\s+"
+    r"(?:the\s+|our\s+|my\s+)?(?:free\s+)?(?:guide|ebook|e-book|pdf|checklist)\b"
+    r"|\be[- ]?mail\s+to\s+(?:download|unlock|get|receive)\s+"
+    r"(?:the\s+|our\s+|my\s+)?(?:free\s+)?(?:guide|ebook|e-book|pdf|checklist)\b"
+    r"|\bswap\s+(?:your\s+)?e[- ]?mail\s+for\b"
+    r"|\bgated\s+(?:pdf|content|guide|ebook|e-book)\b"
+    r"|\bopt[- ]in\s+(?:form|pdf|guide|ebook)\b"
+    r"|\bemail\s+gates?\b"
+    r"|\bmail\s+gates?\b"
+    r"|\bmagnet\s+za\s+mail"
+    r"|\be[- ]?book\s+za\s+mail"
+    r"|\bdarmow(?:y|e|a)\s+(?:przewodnik|ebook|e-book|pdf)\b"
+    r"|\bza\s+maila\b"
+    r"|\bbramk[aąę]\s+mail"
+    r")"
+)
 # Press-release tone is not a social angle. We're excited / announcement /
 # unveiling / delighted to share is kill or changelog, never HN/GitHub/X.
 # Pair of seminar brand voice: we announced as a brand is also silence.
@@ -3010,6 +3042,14 @@ def looks_like_founder_journal(text: str) -> bool:
     return bool(FOUNDER_JOURNAL_RE.search(cleaned))
 
 
+def looks_like_lead_magnet(text: str) -> bool:
+    """True for ebook / free guide / typeform for an email. A mail gate is not tryable."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(LEAD_MAGNET_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3550,7 +3590,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3581,6 +3621,11 @@ def unquotable_reason(
             return FOUNDER_JOURNAL_REASON
     if extra and looks_like_founder_journal(extra):
         return FOUNDER_JOURNAL_REASON
+    for _kind, text, _url in packed:
+        if looks_like_lead_magnet(text):
+            return LEAD_MAGNET_REASON
+    if extra and looks_like_lead_magnet(extra):
+        return LEAD_MAGNET_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3884,6 +3929,8 @@ __all__ = [
     "FOG_RE",
     "FOUNDER_JOURNAL_REASON",
     "FOUNDER_JOURNAL_RE",
+    "LEAD_MAGNET_REASON",
+    "LEAD_MAGNET_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -4035,6 +4082,7 @@ __all__ = [
     "looks_like_counter_thanks",
     "looks_like_fog",
     "looks_like_founder_journal",
+    "looks_like_lead_magnet",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",

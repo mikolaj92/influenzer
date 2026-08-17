@@ -1,27 +1,27 @@
 {
   "paths": [
     "influenzer/playbook.py",
-    "influenzer/hom.py",
-    "influenzer/hom_draft.py",
-    "influenzer/brief_admit.py",
     "github_pack/classify.py",
     "github_pack/pack.py",
+    "influenzer/brief_admit.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
     "tests/test_e2e_gates.py",
-    "tests/test_hom_operator.py",
-    "tests/test_hom_draft.py",
     "tests/test_brief_admit.py",
-    "tests/test_github_pack.py"
+    "tests/test_github_pack.py",
+    "tests/test_hom_draft.py",
+    "tests/test_hom_operator.py"
   ],
-  "source": "deterministic+inspection",
-  "seed_paths": ["tools", "tools/hygiene_check.py", "tests/test_e2e_gates.py"],
-  "matched_tokens": ["tools", "gate"],
+  "source": "deterministic",
+  "seed_paths": [],
+  "matched_tokens": ["influenzer", "gate"],
   "notes": [
-    "Deterministic localize matched tools/ from the phrase “tools I use”.",
-    "Inspection moved the gate onto the sibling fail-closed path used by #130/#138/#145.",
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start."
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137.",
+    "Issue #147 lead magnet fail-closed at score, dress, pack, and admit."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__146-dziennik-za-o-yciela-nie-jest-k-tem-75b51ea5",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__147-lead-magnet-nie-jest-k-tem-d284099a",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
