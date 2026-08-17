@@ -1,24 +1,19 @@
 {
   "paths": [
-    "tests/test_brief_admit.py",
-    "tests/test_brief_scan_cli.py",
     "tests/test_e2e_gates.py",
-    "tests/test_envelope.py",
-    "tests/test_hom_outbox.py",
     "influenzer/playbook.py",
-    "influenzer/hom.py",
-    "influenzer/hom_draft.py",
-    "influenzer/hom_outbox.py",
-    "influenzer/brief_admit.py"
+    "github_pack/classify.py"
   ],
   "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": ["env", "outbox", "brief", "gate", "secret"],
+  "seed_paths": ["HN/X/shorts"],
+  "matched_tokens": ["HN", "shorts", "gate", "waitlist"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Refined after inspection: score/dress/outbox/admit are the fail-closed secret gate.",
-    "Empty path list fails closed — run_agent must not start."
+    "Seed 'HN/X/shorts' is not a repo path; waitlist detector lives in playbook + github_pack classify, with e2e coverage on HN/X/shorts.",
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
   ],
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__46-waitlista-to-nie-ship-17a4cfef",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

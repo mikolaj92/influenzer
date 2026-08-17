@@ -63,6 +63,7 @@ from influenzer.playbook import (
     looks_like_secret,
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
+    looks_like_waitlist,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -283,6 +284,86 @@ class OrderedLiveGateTests(unittest.TestCase):
                     canon_url=ARENAS[ArenaId.HN].canon_url,
                 )
                 self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_waitlist_is_not_a_ship_on_hn_x_or_shorts(self) -> None:
+        vapor = (
+            "Coming soon",
+            "join the list",
+            "sign up to get access",
+            "join the waitlist",
+            "get early access",
+            "request access",
+        )
+        self.assertFalse(looks_like_waitlist(""))
+        self.assertFalse(looks_like_waitlist("   "))
+        self.assertFalse(looks_like_waitlist("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_waitlist("as soon as you install, the local tick scores"))
+        arenas = (ArenaId.HN, ArenaId.X, ArenaId.SHORTS)
+        for text in vapor:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_waitlist(text))
+            for arena in arenas:
+                with self.subTest(text=text, arena=arena.value):
+                    brief = Brief.create(
+                        project_id="app-1",
+                        brief_id=f"b-waitlist-{arena.value}-{text.split()[0].lower()}",
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                        story_kind="major",
+                        claims_ship=True,
+                        tryable=True,
+                        preferred_arena=arena,
+                    )
+                    score = score_brief(brief)
+                    self.assertEqual(score.verdict, Verdict.KILL)
+                    self.assertEqual(score.reason, "waitlist_not_tryable")
+                    self.assertIsNone(score.arena)
+                    self.assertIsNone(compose_draft(brief, score))
+                    leaked = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-waitlist-changelog",
+            facts=(Fact(text="join the list", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "waitlist_not_tryable")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(quiet, score))
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-waitlist-alive",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
 
     def test_poll_quiz_or_this_or_that_is_silence_not_an_angle(self) -> None:
         polls = (

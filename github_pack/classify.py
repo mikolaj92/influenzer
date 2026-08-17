@@ -30,7 +30,18 @@ _INSTALL_RE = re.compile(
     r"pnpm add|yarn add|cargo install|go install|brew install)\b"
 )
 _WAITLIST_RE = re.compile(
-    r"(?i)\b(?:waitlist|coming soon|join the (?:beta|waitlist)|landing page|no demo)\b"
+    r"(?i)(?:"
+    r"\bwaitlists?\b"
+    r"|\bcoming\s+soon\b"
+    r"|\bjoin\s+(?:the|our|my)\s+(?:beta|waitlists?|lists?|mailing\s+lists?)\b"
+    r"|\bsign\s*[- ]?up\s+to\s+get\s+(?:early\s+)?access\b"
+    r"|\bsign\s*[- ]?up\s+for\s+(?:(?:early\s+)?access|(?:the|our|my)\s+(?:beta|waitlists?|lists?))\b"
+    r"|\bget\s+on\s+(?:the|our|my)\s+(?:beta|waitlists?|lists?)\b"
+    r"|\bget\s+early\s+access\b"
+    r"|\brequest\s+(?:early\s+)?access\b"
+    r"|\blanding\s+page\b"
+    r"|\bno\s+demo\b"
+    r")"
 )
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
