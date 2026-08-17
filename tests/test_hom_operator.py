@@ -235,6 +235,51 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertIsNone(stack_costume_reason(ArenaId.HN, ArenaId.HN))
         self.assertIsNone(stack_costume_reason(None, ArenaId.HN))
 
+    def test_choose_arena_does_not_sit_lab_notebook_on_hn(self) -> None:
+        # #40: exploration / decision / failure do not sit on seminar,
+        # even with a tryable demo. Workshop or silence. Major still sits.
+        for kind in (StoryKind.EXPLORATION, StoryKind.DECISION, StoryKind.FAILURE):
+            with self.subTest(kind=kind.value):
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.HN,
+                        tryable=True,
+                        claims_ship=True,
+                        story_kind=kind,
+                        clickable=True,
+                    ),
+                    ArenaId.GITHUB,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.HN,
+                        tryable=False,
+                        claims_ship=False,
+                        story_kind=kind,
+                        clickable=True,
+                    ),
+                    ArenaId.GITHUB,
+                )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.HN,
+                tryable=False,
+                story_kind=StoryKind.MAJOR,
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+        self.assertEqual(
+            choose_arena(
+                stack_arena=ArenaId.HN,
+                preferred_arena=ArenaId.HN,
+                tryable=False,
+                story_kind=StoryKind.EXPLORATION,
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+
     def test_ship_artifact_accepts_repo_pr_issue_release(self) -> None:
         self.assertTrue(is_ship_artifact(SHIP_PR))
         self.assertTrue(is_ship_artifact(SHIP_ISSUE))

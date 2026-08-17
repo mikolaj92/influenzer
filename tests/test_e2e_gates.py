@@ -2406,7 +2406,7 @@ class OrderedLiveGateTests(unittest.TestCase):
                     ),
                     ArenaId.GITHUB,
                 )
-                self.assertNotEqual(
+                self.assertEqual(
                     choose_arena(
                         preferred_arena=ArenaId.HN,
                         claims_ship=True,
@@ -2414,7 +2414,7 @@ class OrderedLiveGateTests(unittest.TestCase):
                         story_kind=kind,
                         clickable=True,
                     ),
-                    ArenaId.HN,
+                    ArenaId.GITHUB,
                 )
                 brief = Brief.create(
                     project_id="app-1",

@@ -19,7 +19,7 @@ I wear the arena. I do not mix costumes.
 - YouTube long: cinema — package (title+thumb+5s) before the middle.
 - Shorts/TikTok/Reels: fair — hook in 1–2s, loop, not an essay.
 - GitHub: workshop — README and code are proof; stars are not success.
-- HN: seminar — “I struggled with X”; press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill or changelog, not a social angle.
+- HN: seminar — “I struggled with X”; press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill or changelog, not a social angle. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence.
 - Reddit: village — each sub is a different room; story of pain.
 - Newsletter: letter — owned list, cadence. Algorithm cannot take this.
 - Discord: tavern. Bluesky: newer cafe — artifact URL (repo, demo, release) or silence; pack/feed is costume, not content. Mastodon: parish — own slow conversation, or silence. Not an X punchline paste or clip. Mail: correspondence (HTML, charts, threads).

@@ -2,14 +2,29 @@
   "paths": [
     "influenzer/playbook.py",
     "skills/influenzer-hn",
-    "tests/test_e2e_gates.py"
+    "skills/influenzer-hom",
+    "skills/influenzer-github",
+    "tests/test_e2e_gates.py",
+    "tests/test_hom_operator.py"
   ],
   "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": ["HN", "influenzer", "gate", "choose_arena", "tryable"],
+  "seed_paths": [
+    "influenzer/playbook.py",
+    "skills/influenzer-hn/SKILL.md",
+    "tests/test_e2e_gates.py",
+    "tests/test_hom_operator.py"
+  ],
+  "matched_tokens": [
+    "HN",
+    "influenzer",
+    "gate",
+    "choose_arena",
+    "tryable",
+    "playbook"
+  ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Inspection refined the sit-path into choose_arena in playbook.py.",
+    "Repair: costume/wave still implied a tryable lab notebook could sit on HN.",
     "Repo tree entries considered: 137."
   ],
   "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__40-show-hn-bez-tryable-ship-cisza-48225f9a",
