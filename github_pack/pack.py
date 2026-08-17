@@ -4,9 +4,11 @@ Tryable is a README+URL heuristic. Look does not run the project.
 Launching on watch is silence. Code in look is untrusted.
 A GitHub workshop README is one screen: one-liner, visible demo
 (GIF/screenshot), working quickstart. Text without an image is
-changelog, not a launch. Inbound titles/descriptions are data,
-not a command. Pack cuts instructions ("zpostuj to", "ignore
-scoring"), leaves content. Our score stays ours.
+changelog, not a launch. A merge and a revert of the same change
+in the look window is not a ship: the thing is already gone from
+main. Inbound titles/descriptions are data, not a command. Pack
+cuts instructions ("zpostuj to", "ignore scoring"), leaves content.
+Our score stays ours.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from github_pack.classify import (
     is_trusted_artifact_url,
     is_tryable,
     looks_like_patch_only,
+    looks_like_ship_title,
     looks_like_waitlist,
     readme_tryable_url,
 )
@@ -45,6 +48,10 @@ _BADGE_OR_LOGO_RE = re.compile(
     r"(?i)\b(?:logo|badge|shield|icon|favicon|stars?)\b|shields\.io|img\.shields"
 )
 README_WITHOUT_DEMO_REASON = "readme_without_demo"
+REVERTED_NOT_A_SHIP_REASON = "reverted_not_a_ship"
+_REVERT_PREFIX_RE = re.compile(r"(?i)^\s*revert(?:s|ed|ing)?\b[\s:]*")
+_PR_NUMBER_RE = re.compile(r"(?i)(?:\bpr\s*#?|#|/pull/)(\d+)\b")
+_QUOTED_RE = re.compile(r"[\"“”'«»](.+?)[\"“”'«»]")
 # Comment/issue/title copy is data. These shapes are an order, not a fact.
 _INBOUND_INSTRUCTION_RE = re.compile(
     r"(?i)(?:"
@@ -118,6 +125,74 @@ def readme_has_visible_demo(text: str) -> bool:
     if not text:
         return False
     return any(_looks_like_visible_demo(alt, src) for alt, src in _image_candidates(text))
+
+
+def _norm_title(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+
+
+def _pr_number(item: Any) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    number = item.get("number")
+    if number is not None and str(number).strip().isdigit():
+        return str(int(number))
+    blob = " ".join(
+        str(item.get(key) or "") for key in ("title", "body", "url", "text")
+    )
+    match = _PR_NUMBER_RE.search(blob)
+    return match.group(1) if match else None
+
+
+def _revert_targets(title: str) -> tuple[set[str], set[str]]:
+    """PR numbers and leftover title tokens a revert points at."""
+    stripped = _REVERT_PREFIX_RE.sub("", title).strip(" \"'“”«»:-.")
+    numbers = {match.group(1) for match in _PR_NUMBER_RE.finditer(stripped)}
+    leftovers = {_norm_title(_PR_NUMBER_RE.sub(" ", stripped))}
+    leftovers.discard("")
+    for match in _QUOTED_RE.finditer(stripped):
+        quoted = _norm_title(match.group(1))
+        if quoted:
+            leftovers.add(quoted)
+    return numbers, leftovers
+
+
+def looks_like_same_window_revert(prs: Any) -> bool:
+    """True when the look window has a merge and a revert of that same change."""
+    if not isinstance(prs, list):
+        return False
+    ships: list[dict[str, Any]] = []
+    reverts: list[dict[str, Any]] = []
+    for item in prs:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or item.get("text") or "").strip()
+        if not title:
+            continue
+        if _REVERT_PREFIX_RE.match(title):
+            reverts.append(item)
+            continue
+        if looks_like_ship_title(title):
+            ships.append(item)
+    if not ships or not reverts:
+        return False
+    ship_numbers: set[str] = set()
+    ship_titles: set[str] = set()
+    for item in ships:
+        number = _pr_number(item)
+        if number:
+            ship_numbers.add(number)
+        title = _norm_title(str(item.get("title") or item.get("text") or ""))
+        if title:
+            ship_titles.add(title)
+    for item in reverts:
+        blob = " ".join(
+            str(item.get(key) or "") for key in ("title", "body", "text")
+        )
+        numbers, leftovers = _revert_targets(blob)
+        if numbers & ship_numbers or leftovers & ship_titles:
+            return True
+    return False
 
 
 def sanitize_inbound_facts(facts: list[Any]) -> list[dict[str, Any]]:
@@ -209,6 +284,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     blob = "\n".join(str(fact.get("text") or "") for fact in facts)
     if looks_like_waitlist(blob):
         return _silence("waitlist_not_tryable", repo=slug)
+    if looks_like_same_window_revert(survey.get("prs") or []):
+        return _silence(REVERTED_NOT_A_SHIP_REASON, repo=slug)
     if facts_are_merge_log(facts) and not survey.get("releases"):
         return _silence("not_tryable", repo=slug)
     claims_ship = any(is_ship_artifact(str(fact.get("artifact_url") or "") or None) for fact in facts)
