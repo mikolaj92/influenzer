@@ -37,6 +37,7 @@ from github_pack.classify import (
     looks_like_counter_thanks,
     looks_like_fog,
     looks_like_founder_journal,
+    looks_like_lead_magnet,
     readme_tryable_url,
 )
 
@@ -364,6 +365,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
         return _silence("fog", repo=slug)
     if looks_like_founder_journal(blob):
         return _silence("founder_journal", repo=slug)
+    if looks_like_lead_magnet(blob):
+        return _silence("lead_magnet", repo=slug)
     meta = survey.get("meta") if isinstance(survey.get("meta"), dict) else {}
     if looks_like_solicit_gesture(
         "\n".join(
