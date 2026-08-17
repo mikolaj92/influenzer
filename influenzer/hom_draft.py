@@ -585,15 +585,45 @@ def _dress_bluesky(bits: CopyBits, score: Score) -> str | None:
     return _body_or_none(f"{_clip(bits.one_liner, 200)}\n\n{url}")
 
 
-def _dress_mastodon(bits: CopyBits, score: Score) -> str | None:
-    """Parish: slow, no PR tone, not an X punchline paste."""
-    if not bits.one_liner:
+def _fold_punchline(text: str) -> str:
+    """X hook without URLs or extra space. Parish is not this line."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return " ".join(cleaned.split()).casefold().rstrip(".,;:!?")
+
+
+def _is_x_punchline_paste(text: str, punchline: str) -> bool:
+    """True when parish copy is the X hook or a clip of it."""
+    folded = _fold_punchline(text)
+    hook = _fold_punchline(punchline)
+    if not folded:
+        return True
+    if not hook:
+        return False
+    if folded == hook or folded in hook:
+        return True
+    first = _fold_punchline(text.split("\n\n", 1)[0])
+    return bool(first) and (first == hook or first in hook)
+
+
+def _parish_conversation(bits: CopyBits) -> str | None:
+    """Own slow talk. The X one-liner and clips of it stay off parish."""
+    punchline = bits.one_liner
+    parts = [
+        text.strip()
+        for text in bits.rest
+        if text.strip() and not _is_x_punchline_paste(text, punchline)
+    ]
+    if not parts:
         return None
-    parts = [bits.one_liner]
-    rest = _join_rest(bits)
-    if rest:
-        parts.extend(["", rest])
-    return _body_or_none("\n".join(parts))
+    return "\n\n".join(parts)
+
+
+def _dress_mastodon(bits: CopyBits, score: Score) -> str | None:
+    """Parish: own slow conversation, or silence. Not an X punchline paste or clip."""
+    conversation = _parish_conversation(bits)
+    if conversation is None:
+        return None
+    return _body_or_none(conversation)
 
 
 def _dress_discord(bits: CopyBits, score: Score) -> str | None:
@@ -749,6 +779,10 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(body))
         or (score.arena is ArenaId.X and agora_reason(triples, extra=body))
+        or (
+            score.arena is ArenaId.MASTODON
+            and _is_x_punchline_paste(body, bits.one_liner)
+        )
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(body))
         or (score.arena is ArenaId.REDDIT and reddit_reason(body))
         or (score.arena is ArenaId.HN and seminar_reason(body))

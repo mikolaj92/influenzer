@@ -1106,6 +1106,59 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertIn(SHIP_PR, draft.body)
         self.assertNotIn("Costume:", draft.body)
 
+    def test_parish_does_not_get_the_x_punchline(self) -> None:
+        punchline = "Local tick scores briefs and emits a draft"
+        clips = (
+            (punchline,),
+            (punchline, "Local tick scores briefs"),
+            (punchline, punchline),
+        )
+        leaked = Score(
+            brief_id="b-parish-punchline",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.MASTODON,
+            angle="I struggled with X",
+            wave_checklist=ARENAS[ArenaId.MASTODON].wave,
+            canon_url=ARENAS[ArenaId.MASTODON].canon_url,
+        )
+        for idx, texts in enumerate(clips):
+            with self.subTest(texts=texts):
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-parish-punchline-{idx}",
+                    facts=tuple(
+                        Fact(text=text, artifact_url=SHIP_PR if pos == 0 else None)
+                        for pos, text in enumerate(texts)
+                    ),
+                    story_kind="hard_issue",
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.MASTODON,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        talk = "The dry-run still sat with us on every tick"
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-parish-talk",
+            facts=(
+                Fact(text=punchline, artifact_url=SHIP_PR),
+                Fact(text=talk),
+            ),
+            story_kind="hard_issue",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.MASTODON,
+        )
+        draft = compose_draft(alive, leaked)
+        assert draft is not None
+        self.assertEqual(draft.costume, "parish")
+        self.assertEqual(draft.body, talk)
+        self.assertNotEqual(draft.body, punchline)
+        self.assertNotIn(punchline, draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_empty_tavern_does_not_get_an_invite(self) -> None:
         empties = (
             "stand up a Discord",
