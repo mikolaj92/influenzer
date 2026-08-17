@@ -1,27 +1,26 @@
 {
   "paths": [
     "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
     "github_pack/classify.py",
     "github_pack/pack.py",
     "influenzer/brief_admit.py",
-    "influenzer/hom.py",
-    "influenzer/hom_draft.py",
     "tests/test_e2e_gates.py",
-    "tests/test_brief_admit.py",
-    "tests/test_github_pack.py",
+    "tests/test_hom_operator.py",
     "tests/test_hom_draft.py",
-    "tests/test_hom_operator.py"
+    "tests/test_brief_admit.py",
+    "tests/test_github_pack.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["influenzer", "gate"],
+  "matched_tokens": ["logo", "rebrand", "ship", "gate"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137.",
-    "Issue #147 lead magnet fail-closed at score, dress, pack, and admit."
+    "Refined after inspection: logo reveal / rebrand / palette / moodboard fail-closed like event (#138) and roadmap (#129)."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__147-lead-magnet-nie-jest-k-tem-d284099a",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__148-ods-ona-logo-nie-jest-shipem-2c4ab2c6",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

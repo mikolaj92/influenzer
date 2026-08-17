@@ -1,47 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=147 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=148 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #147 — Lead magnet nie jest kątem
+Issue: #148 — Odsłona logo nie jest shipem
 
 ## Goal
 
-Lead magnet is not an angle. Ebook / free guide / typeform for an email is
-silence, not tryable. Fail closed at score, dress, pack, and admit.
-
-Neighbor of #46 (waitlist is not a ship) and #126 (artifact behind login).
-Here the gate is the mail form, not the waitlist.
+Odsłona logo nie jest shipem. Rebrand, paleta, moodboard = cisza. To nie produkt.
 
 ## Files likely touched
 
-- `influenzer/playbook.py`
-- `github_pack/classify.py`
-- `github_pack/pack.py`
-- `influenzer/brief_admit.py`
-- `influenzer/hom.py`
-- `influenzer/hom_draft.py`
-- `tests/test_e2e_gates.py`
-- `tests/test_brief_admit.py`
-- `tests/test_github_pack.py`
-- `tests/test_hom_draft.py`
-- `tests/test_hom_operator.py`
+- `influenzer/playbook.py` — `LOGO_REVEAL_RE` / `looks_like_logo_reveal` / `LOGO_REVEAL_NOT_A_SHIP`
+- `influenzer/hom.py` — score kill/changelog
+- `influenzer/hom_draft.py` — undress rebrand copy
+- `github_pack/classify.py` + `github_pack/pack.py` — inbound rebrand silence
+- `influenzer/brief_admit.py` — admit fail-closed
+- tests for score, dress, pack, admit, e2e
 
 ## Test plan
 
-- Run the smallest useful tests for files touched:
-  `tests/test_e2e_gates.py`, `tests/test_brief_admit.py`,
-  `tests/test_github_pack.py`, `tests/test_hom_draft.py`,
-  `tests/test_hom_operator.py`
+- Run the smallest useful tests for files touched
+- `pytest` on logo-reveal cases in `test_e2e_gates`, `test_hom_operator`, `test_hom_draft`, `test_brief_admit`, `test_github_pack`
 
 ## Non-goals
 
-- Do not fold this into waitlist (`join the list` stays #46).
-- Do not fold this into login gate (`za logowaniem` stays #126).
-- A user guide and email notifications stay.
+- Do not treat a README logo, a Shorts logo intro, or an outro-logo as a rebrand.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Pair of founder journal (#146, lifestyle) and roadmap (#129, a calendar). Here it is the look, not a tryable drop.

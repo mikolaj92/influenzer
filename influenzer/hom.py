@@ -104,6 +104,7 @@ from influenzer.playbook import (
     looks_like_fog,
     looks_like_founder_journal,
     looks_like_lead_magnet,
+    looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -114,6 +115,7 @@ from influenzer.playbook import (
     FOG_REASON,
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
+    LOGO_REVEAL_NOT_A_SHIP,
     PRESS_RELEASE_REASON,
     WORSE_CLONE_REASON,
     ranking_urls_only,
@@ -698,6 +700,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, FOUNDER_JOURNAL_REASON)
     if looks_like_lead_magnet(blob):
         return _kill(brief, LEAD_MAGNET_REASON)
+    if looks_like_logo_reveal(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, LOGO_REVEAL_NOT_A_SHIP)
+        return _changelog(brief, LOGO_REVEAL_NOT_A_SHIP)
     if looks_like_superlative(blob) and not (
         brief.tryable and any(is_ship_artifact(url) for url in brief_artifacts(brief))
     ):

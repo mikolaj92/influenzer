@@ -56,6 +56,7 @@ from influenzer.playbook import (
     FOG_REASON,
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
+    LOGO_REVEAL_NOT_A_SHIP,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
     looks_like_bot_bump_week,
@@ -98,6 +99,7 @@ from influenzer.playbook import (
     looks_like_fog,
     looks_like_founder_journal,
     looks_like_lead_magnet,
+    looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -977,6 +979,51 @@ class PlaybookCopyTests(unittest.TestCase):
                 if text == "join the waitlist":
                     continue
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_logo_reveal_is_look_not_a_product(self) -> None:
+        looks = (
+            "rebrand of the local tick",
+            "re-brand of the local tick",
+            "rebranding the local tick",
+            "brand refresh this week",
+            "new brand for the local tick",
+            "visual identity for the local tick",
+            "brand identity for the local tick",
+            "color palette for the local tick",
+            "new palette for the local tick",
+            "paleta kolorów",
+            "moodboard for the launch",
+            "mood board for the launch",
+            "logo reveal this week",
+            "revealing the new logo",
+            "logo unveil this week",
+            "unveiling the new logo",
+            "new logo for the local tick",
+            "logo drop this week",
+            "logo redesign this week",
+            "odsłona logo",
+            "odsłaniamy logo",
+            "odsłonięcie logo",
+            "nowe logo",
+            "nowa paleta",
+            "nowy branding",
+        )
+        for text in looks:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_logo_reveal(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "logo intro then the demo",
+            "outro-logo",
+            "![logo](docs/logo.png)",
+            "logotype in the README",
+            "brand the CLI as influenzer",
+            "palette of status colors in the TUI",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_logo_reveal(text))
 
     def test_model_in_frame_is_prompt_dump_or_i_asked_chatgpt(self) -> None:
         dumps = (
@@ -3034,6 +3081,54 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertEqual(score.reason, LEAD_MAGNET_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
+
+    def test_logo_reveal_ship_claim_is_killed(self) -> None:
+        looks = (
+            "rebrand of the local tick",
+            "new palette for the local tick",
+            "moodboard for the launch",
+            "logo reveal this week",
+            "odsłona logo",
+        )
+        for text in looks:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LOGO_REVEAL_NOT_A_SHIP)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_logo_reveal_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="rebrand of the local tick", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, LOGO_REVEAL_NOT_A_SHIP)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_logo_reveal_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="logo intro then the demo"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
 
     def test_prerelease_ship_claim_is_killed(self) -> None:
         vapor = (
