@@ -1,21 +1,20 @@
 {
   "paths": [
-    "tests/test_brief_admit.py",
-    "tests/test_brief_scan_cli.py",
-    "tests/test_e2e_gates.py"
+    "tests/test_e2e_gates.py",
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": [
-    "brief",
-    "gate"
-  ],
+  "matched_tokens": ["gate"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Repo tree entries considered: 137.",
+    "Refined after inspection: worse-clone is a score gate (playbook/hom/hom_draft), locked by the e2e suite."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__44-jedna-historia-na-ca-maszyn-nie-per-repo-5c79661b",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__43-nie-reklamujemy-gorszego-klona-9f4810f4",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

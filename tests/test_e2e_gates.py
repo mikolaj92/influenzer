@@ -40,6 +40,7 @@ from influenzer.playbook import (
     REDDIT_NO_DISCLOSURE_REASON,
     SECRET_REASON,
     SEMINAR_BRAND_VOICE_REASON,
+    WORSE_CLONE_REASON,
     Verdict,
     cafe_reason,
     choose_arena,
@@ -71,6 +72,7 @@ from influenzer.playbook import (
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
     looks_like_waitlist,
+    looks_like_worse_clone,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -371,6 +373,87 @@ class OrderedLiveGateTests(unittest.TestCase):
         draft = compose_draft(alive, score)
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
+
+    def test_worse_clone_is_changelog_or_silence_not_an_angle(self) -> None:
+        clones = (
+            "someone already did this better",
+            "we reinvented X",
+            "znowu wymyśliliśmy X",
+            "gorszy klon Loki",
+            "just another clone of Loki",
+        )
+        self.assertFalse(looks_like_worse_clone(""))
+        self.assertFalse(looks_like_worse_clone("   "))
+        self.assertFalse(looks_like_worse_clone("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_worse_clone("Loki is the predecessor; the difference is a local tick"))
+        self.assertFalse(looks_like_worse_clone("Loki is worth helping with a local tick"))
+        arenas = (ArenaId.HN, ArenaId.X, ArenaId.SHORTS)
+        for text in clones:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_worse_clone(text))
+            for arena in arenas:
+                with self.subTest(text=text, arena=arena.value):
+                    brief = Brief.create(
+                        project_id="app-1",
+                        brief_id=f"b-clone-{arena.value}-{text.split()[0].lower()}",
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                        story_kind="major",
+                        claims_ship=True,
+                        tryable=True,
+                        preferred_arena=arena,
+                    )
+                    score = score_brief(brief)
+                    self.assertEqual(score.verdict, Verdict.KILL)
+                    self.assertEqual(score.reason, WORSE_CLONE_REASON)
+                    self.assertIsNone(score.arena)
+                    self.assertIsNone(compose_draft(brief, score))
+                    leaked = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-clone-changelog",
+            facts=(Fact(text="someone already did this better", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, WORSE_CLONE_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(quiet, score))
+
+        better = Brief.create(
+            project_id="app-1",
+            brief_id="b-clone-better",
+            facts=(
+                Fact(text="Loki is the predecessor; the difference is a local tick", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(better)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(better, score)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
+        self.assertIn("Loki", draft.body)
 
     def test_poll_quiz_or_this_or_that_is_silence_not_an_angle(self) -> None:
         polls = (
