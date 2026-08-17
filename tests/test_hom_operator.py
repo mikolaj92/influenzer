@@ -52,6 +52,7 @@ from influenzer.playbook import (
     invented_metric_reason,
     is_model_host_url,
     CALENDAR_FILLER_REASON,
+    COUNTER_THANKS_REASON,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
     looks_like_bot_bump_week,
@@ -90,6 +91,7 @@ from influenzer.playbook import (
     looks_like_roadmap,
     looks_like_event,
     looks_like_calendar_filler,
+    looks_like_counter_thanks,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -792,6 +794,46 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_calendar_filler(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_counter_thanks_is_thanks_for_n_stars_or_milestone_follow(self) -> None:
+        greetings = (
+            "thanks for 1000 stars",
+            "thanks for N stars",
+            "thank you for 1k GitHub stars",
+            "thanks for all the stars",
+            "thanks everyone for the stars",
+            "grateful for 500 followers",
+            "dziękujemy za gwiazdki",
+            "dzięki za 1000 gwiazdek",
+            "podziękowanie za licznik",
+            "milestone follow",
+            "star milestone",
+            "follower milestone",
+            "1000 follower milestone",
+            "we hit 1k stars, thanks everyone",
+        )
+        for text in greetings:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_counter_thanks(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    COUNTER_THANKS_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "follow the README to run the demo",
+            "star the repo after you try it",
+            "thanks for the issue",
+            "thanks for the PR",
+            "thanks for watching",
+            "thanks for trying the demo",
+            "thanks for the follow-up",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_counter_thanks(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_model_in_frame_is_prompt_dump_or_i_asked_chatgpt(self) -> None:
@@ -2762,6 +2804,27 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, CALENDAR_FILLER_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_counter_thanks_is_killed(self) -> None:
+        greetings = (
+            "thanks for 1000 stars",
+            "milestone follow",
+            "dziękujemy za gwiazdki",
+            "podziękowanie za licznik",
+        )
+        for text in greetings:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, COUNTER_THANKS_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 

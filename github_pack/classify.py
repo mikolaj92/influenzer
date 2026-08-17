@@ -74,6 +74,33 @@ _CALENDAR_FILLER_RE = re.compile(
     r"|\b[sś]wi[eę]t(?:a|o)\b"
     r")"
 )
+_COUNTER_TOTAL = r"(?:n|\d{1,3}(?:,\d{3})+|(?:\d+))(?:\.\d+)?[kmb]?"
+_COUNTER_UNIT = (
+    r"(?:github\s+)?(?:stars?|stargazers?|follows?(?!-?ups?\b|ing\b)|"
+    r"followers?|watchers?|gwiazd(?:ek|ki|ka|k\u0105)?|obserwacj\w*|obserwuj\w*)"
+)
+_COUNTER_THANKS_RE = re.compile(
+    r"(?i)(?:"
+    r"\bthanks?\s+(?:to\s+)?(?:everyone\s+)?for\s+"
+    r"(?:all\s+)?(?:the\s+|our\s+|every\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?{_COUNTER_UNIT}\b"
+    r"|\bthank\s+you\s+(?:to\s+)?(?:everyone\s+)?for\s+"
+    r"(?:all\s+)?(?:the\s+|our\s+|every\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?{_COUNTER_UNIT}\b"
+    r"|\bgrateful\s+for\s+"
+    r"(?:all\s+)?(?:the\s+|our\s+|every\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?{_COUNTER_UNIT}\b"
+    r"|\bdzi[eę]k\w*\s+za\s+(?:ka[zż]d\w*\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?(?:gwiazd(?:ek|ki|ka|k\u0105)?|obserwacj\w*|follow(?:y|ów)?)\b"
+    r"|\bpodzi[eę]kowani\w*\s+za\s+(?:licznik|gwiazd|follow|obserw)"
+    r"|\bmilestone\s+follow\b"
+    r"|\b(?:star|follow(?:er)?)\s+milestone\b"
+    rf"|\b{_COUNTER_TOTAL}\s+follow(?:er)?\s+milestone\b"
+    r"|\b(?:hit|reached|crossed)\s+"
+    rf"{_COUNTER_TOTAL}\s+{_COUNTER_UNIT}\b"
+    r".{0,40}\b(?:thanks?|thank\s+you)\b"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -113,6 +140,13 @@ def looks_like_calendar_filler(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_CALENDAR_FILLER_RE.search(text))
+
+
+def looks_like_counter_thanks(text: str) -> bool:
+    """True for 'thanks for N stars' / a follower milestone. A thank-you is not an angle."""
+    if not text or not text.strip():
+        return False
+    return bool(_COUNTER_THANKS_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

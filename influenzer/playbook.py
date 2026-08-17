@@ -1066,6 +1066,39 @@ CALENDAR_FILLER_RE = re.compile(
     r"|\b[sś]wi[eę]t(?:a|o)\b"
     r")"
 )
+# A thank-you for a vanity counter is not an angle. "Thanks for N stars"
+# / a follower milestone is silence, not product history. Neighbor of #56
+# (dead stars are not a story) and #134 (a ranking dump is not an artifact).
+# Here it is the thank-you, not the chart. "thanks for the issue" and
+# "thanks for watching" stay with their own gates.
+COUNTER_THANKS_REASON = "counter_thanks"
+_COUNTER_TOTAL = r"(?:n|\d{1,3}(?:,\d{3})+|(?:\d+))(?:\.\d+)?[kmb]?"
+_COUNTER_UNIT = (
+    r"(?:github\s+)?(?:stars?|stargazers?|follows?(?!-?ups?\b|ing\b)|"
+    r"followers?|watchers?|gwiazd(?:ek|ki|ka|k\u0105)?|obserwacj\w*|obserwuj\w*)"
+)
+COUNTER_THANKS_RE = re.compile(
+    r"(?i)(?:"
+    r"\bthanks?\s+(?:to\s+)?(?:everyone\s+)?for\s+"
+    r"(?:all\s+)?(?:the\s+|our\s+|every\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?{_COUNTER_UNIT}\b"
+    r"|\bthank\s+you\s+(?:to\s+)?(?:everyone\s+)?for\s+"
+    r"(?:all\s+)?(?:the\s+|our\s+|every\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?{_COUNTER_UNIT}\b"
+    r"|\bgrateful\s+for\s+"
+    r"(?:all\s+)?(?:the\s+|our\s+|every\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?{_COUNTER_UNIT}\b"
+    r"|\bdzi[eę]k\w*\s+za\s+(?:ka[zż]d\w*\s+)?"
+    rf"(?:{_COUNTER_TOTAL}\s+)?(?:gwiazd(?:ek|ki|ka|k\u0105)?|obserwacj\w*|follow(?:y|ów)?)\b"
+    r"|\bpodzi[eę]kowani\w*\s+za\s+(?:licznik|gwiazd|follow|obserw)"
+    r"|\bmilestone\s+follow\b"
+    r"|\b(?:star|follow(?:er)?)\s+milestone\b"
+    rf"|\b{_COUNTER_TOTAL}\s+follow(?:er)?\s+milestone\b"
+    r"|\b(?:hit|reached|crossed)\s+"
+    rf"{_COUNTER_TOTAL}\s+{_COUNTER_UNIT}\b"
+    r".{0,40}\b(?:thanks?|thank\s+you)\b"
+    r")"
+)
 # Press-release tone is not a social angle. We're excited / announcement /
 # unveiling / delighted to share is kill or changelog, never HN/GitHub/X.
 # Pair of seminar brand voice: we announced as a brand is also silence.
@@ -2894,6 +2927,14 @@ def looks_like_calendar_filler(text: str) -> bool:
     return bool(CALENDAR_FILLER_RE.search(cleaned))
 
 
+def looks_like_counter_thanks(text: str) -> bool:
+    """True for 'thanks for N stars' / a follower milestone. A thank-you is not an angle."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(COUNTER_THANKS_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3434,7 +3475,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3450,6 +3491,11 @@ def unquotable_reason(
             return CALENDAR_FILLER_REASON
     if extra and looks_like_calendar_filler(extra):
         return CALENDAR_FILLER_REASON
+    for _kind, text, _url in packed:
+        if looks_like_counter_thanks(text):
+            return COUNTER_THANKS_REASON
+    if extra and looks_like_counter_thanks(extra):
+        return COUNTER_THANKS_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3747,6 +3793,8 @@ __all__ = [
     "EVENT_RE",
     "CALENDAR_FILLER_REASON",
     "CALENDAR_FILLER_RE",
+    "COUNTER_THANKS_REASON",
+    "COUNTER_THANKS_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -3895,6 +3943,7 @@ __all__ = [
     "looks_like_roadmap",
     "looks_like_event",
     "looks_like_calendar_filler",
+    "looks_like_counter_thanks",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",
