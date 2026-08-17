@@ -1,28 +1,18 @@
 {
   "paths": [
-    "github_feedback",
-    "influenzer/hom_feedback.py",
-    "influenzer/hom_watch.py",
-    "github_feedback/feedback.py",
-    "github_survey/gh.py",
-    "github_survey/survey.py",
-    "tests/gh_scripts.py",
-    "tests/test_github_feedback.py",
-    "tests/test_hom_feedback.py",
-    "tests/test_hom_watch.py",
-    "tests/test_e2e_gates.py",
-    "tests/test_github_survey.py"
+    "influenzer/playbook.py",
+    "skills/influenzer-hn",
+    "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["Feedback", "watch", "feedback", "influenzer", "gate"],
+  "matched_tokens": ["HN", "influenzer", "gate", "choose_arena", "tryable"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed \u2014 run_agent must not start.",
-    "Repo tree entries considered: 137.",
-    "Issue #39 needed a read-only /issues GET in the existing feedback bag; gh allowlist/classify and scripted fixtures had to know that endpoint."
+    "Inspection refined the sit-path into choose_arena in playbook.py.",
+    "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__39-nowe-issue-w-oknie-launchu-to-fakt-nie-d-9dec1287",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__40-show-hn-bez-tryable-ship-cisza-48225f9a",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

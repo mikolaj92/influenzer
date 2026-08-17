@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -393,6 +393,9 @@ def choose_arena(
     a thread goes github/HN; not tryable sits so x_empty_feed can kill.
     GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
+    A lab notebook is not Show HN: exploration / decision / failure
+    do not sit here — workshop on GitHub, or silence. Seminar only
+    when a stranger can click and run it.
     Shopping while the window lives is not a new pick — the caller
     kills an explicit change; this keeps the locked costume when
     preferred is empty.
@@ -400,7 +403,21 @@ def choose_arena(
     locked = parse_stack_arena(stack_arena)
     if locked is not None:
         return locked
+    kind = (
+        story_kind
+        if isinstance(story_kind, StoryKind) or story_kind is None
+        else StoryKind(story_kind)
+    )
     seated = parse_stack_arena(preferred_arena)
+    # #40: lab notebook is not Show HN. Exploration / decision / failure
+    # do not sit — workshop or silence. Major / hard_issue still sit so
+    # a missing tryable demo can die as hn_not_tryable.
+    if seated is ArenaId.HN and kind in {
+        StoryKind.EXPLORATION,
+        StoryKind.DECISION,
+        StoryKind.FAILURE,
+    }:
+        seated = None
     if seated is not None:
         return seated
     wanted = None
@@ -413,11 +430,6 @@ def choose_arena(
             )
         except ValueError:
             wanted = None
-    kind = (
-        story_kind
-        if isinstance(story_kind, StoryKind) or story_kind is None
-        else StoryKind(story_kind)
-    )
     # #49/#31: village without disclosure is spam. Sit so a named room
     # without ujawnienie + repo is silence.
     if wanted is ArenaId.REDDIT:

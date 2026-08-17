@@ -1,31 +1,38 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=39 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=40 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #39 — Nowe issue w oknie launchu to fakt, nie drugi worek
+Issue: #40 — Show HN bez tryable ship = cisza
 
 ## Goal
 
-Siedzenie na repo w oknie launchu to też nowe issue, nie tylko komentarze. Feedback look pakuje otwarte issue (pytanie/bug) z watch-repo w oknie ~48h do faktów. „+1” / thanks = cisza. Jedna historia. Nie odpowiada sam, nie zamyka ticketów.
+Show HN is not a lab notebook. `story_kind` exploration / decision / failure
+must not sit on HN. Workshop or silence. Seminar only when a stranger can
+click and run a major or hard-issue ship. Small `choose_arena` block, not a
+second bag. Composes onto #32 (Show HN format). Not live. One story.
 
 ## Files likely touched
 
-- `github_feedback/feedback.py` — pack open issues in the ~48h launch window into the existing comment bag
-- `github_survey/gh.py`, `github_survey/survey.py` — allowlist/classify the read-only `/issues` GET so the look can see tickets
-- `tests/gh_scripts.py`, `tests/test_github_feedback.py`, `tests/test_hom_feedback.py`, `tests/test_hom_watch.py`, `tests/test_e2e_gates.py`
+- `influenzer/playbook.py` — `choose_arena` no longer seats preferred HN for
+  exploration / decision / failure; major / hard_issue still sit so a missing
+  demo can die as `hn_not_tryable`.
+- `skills/influenzer-hn/SKILL.md` — costume note: lab notebook is not Show HN.
+- `tests/test_e2e_gates.py` — e2e gate: those kinds do not pick HN.
 
 ## Test plan
 
-- `python -m unittest tests.test_github_feedback tests.test_hom_feedback tests.test_hom_watch tests.test_github_survey tests.test_e2e_gates`
+- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_show_hn_without_tryable_ship_does_not_sit tests/test_e2e_gates.py::OrderedLiveGateTests::test_show_hn_is_title_url_and_backstory_or_silence tests/test_e2e_gates.py::OrderedLiveGateTests::test_decision_does_not_sit_on_discord -q`
 
 ## Non-goals
 
-- (none stated)
+- Do not change living-stack / camp behavior after a real Show HN.
+- Do not invent a new reason bag; reuse workshop / existing `hn_not_tryable`.
+- Not live. One story.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Localization listed only the HN skill and e2e tests; inspection found the
+  sit-path in `choose_arena` (`parse_stack_arena(preferred)` returned HN
+  before story_kind / tryable). Refined file list accordingly.

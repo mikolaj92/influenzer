@@ -2424,6 +2424,128 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertNotIn("waitlist", draft.body.lower())
         self.assertNotIn("Costume:", draft.body)
 
+    def test_show_hn_without_tryable_ship_does_not_sit(self) -> None:
+        # #40: exploration / decision / failure without tryable → HN forbidden.
+        # Workshop or silence. Seminar only when a stranger can click and run.
+        # Composes onto #32 (three fields). Not live. One story.
+        lab = (
+            ("exploration", "we tried a dry-run envelope and learned the adapter stays quiet"),
+            ("decision", "we chose SQLite over a hosted store so the operator stays local"),
+            ("failure", "the queue never scored a brief and we learned to fail closed"),
+        )
+        demo = "strangers can click and run the demo today"
+        for kind, text in lab:
+            with self.subTest(kind=kind):
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.HN,
+                        claims_ship=False,
+                        tryable=False,
+                        story_kind=kind,
+                        clickable=True,
+                    ),
+                    ArenaId.GITHUB,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.HN,
+                        claims_ship=True,
+                        tryable=True,
+                        story_kind=kind,
+                        clickable=True,
+                    ),
+                    ArenaId.GITHUB,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-hn-lab-{kind}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text=demo),
+                    ),
+                    story_kind=kind,
+                    claims_ship=False,
+                    tryable=False,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertNotEqual(score.arena, ArenaId.HN)
+                self.assertIn(score.arena, {ArenaId.GITHUB, None})
+                draft = compose_draft(brief, score)
+                if draft is not None:
+                    self.assertEqual(draft.costume, "workshop")
+                    self.assertNotEqual(draft.costume, "seminar")
+                    self.assertNotIn("Show HN:", draft.body)
+                    self.assertNotIn("Costume:", draft.body)
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.HN, "\n".join((text, demo))),
+                    (Verdict.KILL, "hn_not_tryable"),
+                )
+
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.HN,
+                claims_ship=True,
+                tryable=True,
+                story_kind="major",
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.HN,
+                claims_ship=False,
+                tryable=False,
+                story_kind="major",
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+        seminar = Brief.create(
+            project_id="app-1",
+            brief_id="b-hn-tryable-sits",
+            facts=(
+                Fact(text="I built a local tick that scores briefs", artifact_url=SHIP_PR),
+                Fact(text="I struggled with a queue that never scored a brief"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        seminar_score = score_brief(seminar)
+        self.assertEqual(seminar_score.verdict, Verdict.DRAFT)
+        self.assertEqual(seminar_score.arena, ArenaId.HN)
+        seminar_draft = compose_draft(seminar, seminar_score)
+        assert seminar_draft is not None
+        self.assertEqual(seminar_draft.costume, "seminar")
+        self.assertTrue(seminar_draft.body.startswith("Show HN:"))
+        self.assertNotIn("Costume:", seminar_draft.body)
+
+        decision = Brief.create(
+            project_id="app-1",
+            brief_id="b-hn-decision-workshop",
+            facts=(
+                Fact(text="we chose SQLite over a hosted store so the operator stays local", artifact_url=SHIP_PR),
+                Fact(text=demo),
+            ),
+            story_kind="decision",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        decision_score = score_brief(decision)
+        self.assertEqual(decision_score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision_score.arena, ArenaId.GITHUB)
+        self.assertNotEqual(decision_score.arena, ArenaId.HN)
+        decision_draft = compose_draft(decision, decision_score)
+        assert decision_draft is not None
+        self.assertEqual(decision_draft.costume, "workshop")
+        self.assertNotEqual(decision_draft.costume, "seminar")
+        self.assertNotIn("Show HN:", decision_draft.body)
+        self.assertNotIn("Costume:", decision_draft.body)
+
     def test_reddit_without_named_sub_is_not_village(self) -> None:
         empties = (
             "I built a local tick that scores briefs",
