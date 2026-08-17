@@ -1099,6 +1099,33 @@ COUNTER_THANKS_RE = re.compile(
     r".{0,40}\b(?:thanks?|thank\s+you)\b"
     r")"
 )
+# Fog is not an angle. A subtweet / you-know-who / unnamed allusion
+# is silence. Name the artifact or stay quiet. Neighbor of dunk (#116,
+# mockery) and world commentary (#131, a take on headlines). Here it
+# is the hint, not the dunk. "Unlike Loki" and a named difference stay.
+FOG_REASON = "fog"
+FOG_RE = re.compile(
+    r"(?i)(?:"
+    r"\bsubtweets?\b"
+    r"|\bsubtweeting\b"
+    r"|\byou[- ]know[- ]who\b"
+    r"|\bif\s+you\s+know\s*,?\s+you\s+know\b"
+    r"|\bthose\s+who\s+know\s*,?\s+know\b"
+    r"|\bthey\s+know\s+who\s+they\s+are\b"
+    r"|\biykyk\b"
+    r"|\ba\s+certain\s+(?:someone|somebody|project|tool|repo|competitor|person)\b"
+    r"|\b(?:we\s+)?(?:won['’]?t|do\s+not|don['’]?t)\s+name\s+names\b"
+    r"|\bnot\s+naming\s+names\b"
+    r"|\bunnamed\s+(?:competitor|project|tool|repo|someone)\b"
+    r"|\bread(?:ing)?\s+between\s+the\s+lines\b"
+    r"|\bhint\s+hint\b"
+    r"|\baluzj[aąeęi]\b"
+    r"|\bwiecie\s+kto\b"
+    r"|\bnie\s+wymieniamy?\s+nazw"
+    r"|\bpewien\s+(?:kto[sś]|projekt|narz[eę]dzie)\b"
+    r"|\bmg[lł]a\b"
+    r")"
+)
 # Press-release tone is not a social angle. We're excited / announcement /
 # unveiling / delighted to share is kill or changelog, never HN/GitHub/X.
 # Pair of seminar brand voice: we announced as a brand is also silence.
@@ -2935,6 +2962,14 @@ def looks_like_counter_thanks(text: str) -> bool:
     return bool(COUNTER_THANKS_RE.search(cleaned))
 
 
+def looks_like_fog(text: str) -> bool:
+    """True for a subtweet / you-know-who / unnamed allusion. Name it or stay silent."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(FOG_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3475,7 +3510,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3496,6 +3531,11 @@ def unquotable_reason(
             return COUNTER_THANKS_REASON
     if extra and looks_like_counter_thanks(extra):
         return COUNTER_THANKS_REASON
+    for _kind, text, _url in packed:
+        if looks_like_fog(text):
+            return FOG_REASON
+    if extra and looks_like_fog(extra):
+        return FOG_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3795,6 +3835,8 @@ __all__ = [
     "CALENDAR_FILLER_RE",
     "COUNTER_THANKS_REASON",
     "COUNTER_THANKS_RE",
+    "FOG_REASON",
+    "FOG_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -3944,6 +3986,7 @@ __all__ = [
     "looks_like_event",
     "looks_like_calendar_filler",
     "looks_like_counter_thanks",
+    "looks_like_fog",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",

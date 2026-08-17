@@ -445,6 +445,28 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "counter_thanks")
 
+    def test_you_know_who_release_is_silence(self) -> None:
+        out = self._pack(
+            ship_script(
+                releases=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "tagName": "v0.0.0-fog",
+                                "name": "You know who still scores remotely",
+                                "isDraft": False,
+                                "isPrerelease": False,
+                                "publishedAt": "2026-08-12T18:00:00Z",
+                            }
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "fog")
+
     def test_prior_silence_passes_through(self) -> None:
         out = pack_survey({"status": "noop", "ok": True, "reason": "gh_missing", "repo": REPO})
         self.assertEqual(out["reason"], "gh_missing")

@@ -12,7 +12,7 @@ from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
 from github_pack.pack import README_WITHOUT_QUICKSTART_REASON
-from influenzer.playbook import ArenaId, CALENDAR_FILLER_REASON, COUNTER_THANKS_REASON, EVENT_NOT_A_SHIP, LIVING_STACK_REASON, SECRET_REASON, StoryKind
+from influenzer.playbook import ArenaId, CALENDAR_FILLER_REASON, COUNTER_THANKS_REASON, EVENT_NOT_A_SHIP, FOG_REASON, LIVING_STACK_REASON, SECRET_REASON, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from github_survey import GhCall
@@ -557,6 +557,33 @@ class AdmitAndComposeTests(unittest.TestCase):
         )
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], COUNTER_THANKS_REASON)
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_fog_pack_is_silence_not_a_ship(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": "you know who still scores remotely"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], FOG_REASON)
         self.assertTrue(out["ok"])
         self.assertFalse(out["published"])
         self.assertIsNone(out["brief_id"])

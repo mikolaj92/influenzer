@@ -53,6 +53,7 @@ from influenzer.playbook import (
     is_model_host_url,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
+    FOG_REASON,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
     looks_like_bot_bump_week,
@@ -92,6 +93,7 @@ from influenzer.playbook import (
     looks_like_event,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
+    looks_like_fog,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -834,6 +836,47 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_counter_thanks(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_fog_is_subtweet_or_you_know_who_not_a_named_difference(self) -> None:
+        hints = (
+            "subtweet about the local tick",
+            "you know who still scores remotely",
+            "if you know, you know",
+            "they know who they are",
+            "iykyk",
+            "a certain someone still queues briefs",
+            "we won't name names",
+            "not naming names",
+            "unnamed competitor",
+            "read between the lines",
+            "hint hint",
+            "aluzja bez artefaktu",
+            "wiecie kto",
+            "nie wymieniamy nazw",
+            "pewien ktoś",
+            "mgła",
+        )
+        for text in hints:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_fog(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    FOG_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Unlike Loki, this scores briefs locally",
+            "Loki is the predecessor; the difference is a local tick",
+            "Compared to Loki we keep the draft local",
+            "you know the timeout bug",
+            "if you know the install path, run the demo",
+            "we name the difference",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_fog(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_model_in_frame_is_prompt_dump_or_i_asked_chatgpt(self) -> None:
@@ -2825,6 +2868,27 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, COUNTER_THANKS_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_fog_is_killed(self) -> None:
+        hints = (
+            "subtweet about the local tick",
+            "you know who still scores remotely",
+            "aluzja bez artefaktu",
+            "mgła",
+        )
+        for text in hints:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, FOG_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
