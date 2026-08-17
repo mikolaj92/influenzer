@@ -3,22 +3,19 @@
     "influenzer/playbook.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
-    "skills/influenzer-bluesky",
-    "skills/influenzer-hom/SKILL.md",
-    "tests/test_e2e_gates.py",
-    "tests/test_hom_draft.py",
-    "tests/test_hom_operator.py"
+    "skills/influenzer-shorts",
+    "skills/influenzer-youtube",
+    "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["Bluesky", "Draft", "Pack", "feed", "influenzer", "gate"],
+  "matched_tokens": ["Shorts", "YouTube", "influenzer", "gate", "has_fair_hook"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137.",
-    "Refined after inspection: score/dress cafe artifact gate lives in playbook/hom/hom_draft, not pack/feedback."
+    "Inspection refined the seed list: hook fail-closed lives in playbook/hom/hom_draft, not only skill docs.",
+    "kind=hook and the word loop were treating a cinema cut as a fair hook."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__35-bluesky-bez-url-a-artefaktu-cisza-a2be1a68",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__36-shorts-bez-haczyka-1-3s-cisza-881b544d",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

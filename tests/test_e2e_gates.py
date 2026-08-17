@@ -40,6 +40,7 @@ from influenzer.playbook import (
     COURT_NOT_A_LAUNCH_REASON,
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
+    FAIR_MISSING_HOOK_REASON,
     LETTER_ASK_WITHOUT_GIFT_REASON,
     HN_CAMP_REASON,
     LETTER_WITHOUT_SURNAME_REASON,
@@ -58,11 +59,14 @@ from influenzer.playbook import (
     has_parent_post,
     cinema_end_reason,
     court_reason,
+    fair_hook_reason,
     fair_loop_reason,
     has_agora_thought,
     has_cafe_feed,
     has_cafe_pack,
+    has_cinema_package,
     has_court_insight,
+    has_fair_hook,
     has_fair_loop,
     has_letter_gift,
     has_letter_surname,
@@ -655,7 +659,11 @@ class OrderedLiveGateTests(unittest.TestCase):
                     canon_url=ARENAS[ArenaId.SHORTS].canon_url,
                 )
                 self.assertEqual(
-                    _gate_violation(brief, ArenaId.SHORTS, "\n".join(("hook", text))),
+                    _gate_violation(
+                        brief,
+                        ArenaId.SHORTS,
+                        "\n".join(("hook in 1-3s: brief in, draft out", text)),
+                    ),
                     (Verdict.KILL, "fair_cta_with_loop"),
                 )
                 self.assertIsNone(compose_draft(brief, leaked))
@@ -684,7 +692,13 @@ class OrderedLiveGateTests(unittest.TestCase):
             wave_checklist=ARENAS[ArenaId.SHORTS].wave,
             canon_url=ARENAS[ArenaId.SHORTS].canon_url,
         )
-        self.assertIsNone(_gate_violation(brief, ArenaId.SHORTS, "\n".join(("hook", looped))))
+        self.assertIsNone(
+            _gate_violation(
+                brief,
+                ArenaId.SHORTS,
+                "\n".join(("hook in 1-3s: brief in, draft out", looped)),
+            )
+        )
         draft = compose_draft(brief, leaked)
         assert draft is not None
         self.assertEqual(draft.arena, ArenaId.SHORTS)
@@ -694,6 +708,103 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertFalse(has_fair_loop("one loop per state.db"))
         self.assertFalse(has_fair_loop("event loop"))
         self.assertFalse(looks_like_fair_cta("follow the README to run the demo"))
+
+    def test_shorts_without_hook_or_youtube_cut_is_silence(self) -> None:
+        looped = "last frame into first; rewatch is the signal"
+        missing = (
+            "hook",
+            "logo intro then the demo",
+            "hey, watch this local tick",
+            "title plus thumb in 0.5s: one-angle operator tick",
+        )
+        for idx, text in enumerate(missing):
+            with self.subTest(text=text):
+                self.assertFalse(has_fair_hook(text))
+                self.assertEqual(fair_hook_reason(text), FAIR_MISSING_HOOK_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-nohook-{idx}",
+                    facts=(
+                        Fact(kind="hook", text=text, artifact_url=SHIP_PR),
+                        Fact(text=looped),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.SHORTS,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+                    canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.SHORTS, "\n".join((text, looped))),
+                    (Verdict.KILL, FAIR_MISSING_HOOK_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+                cinema = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.YOUTUBE,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
+                    canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
+                )
+                if has_cinema_package(text):
+                    self.assertIsNone(
+                        _gate_violation(brief, ArenaId.YOUTUBE, "\n".join((text, looped)))
+                    )
+                    cinema_draft = compose_draft(brief, cinema)
+                    assert cinema_draft is not None
+                    self.assertEqual(cinema_draft.arena, ArenaId.YOUTUBE)
+                    self.assertNotEqual(cinema_draft.costume, "fair")
+
+        hooked = "hook in 1-3s: picture plus voice plus text"
+        self.assertTrue(has_fair_hook(hooked))
+        self.assertTrue(has_fair_hook("first 3s: obraz+g\u0142os+tekst"))
+        self.assertFalse(has_fair_hook("event loop"))
+        self.assertFalse(has_fair_hook("first frame into last"))
+        self.assertIsNone(fair_hook_reason(hooked))
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-hook",
+            facts=(
+                Fact(kind="hook", text=hooked, artifact_url=SHIP_PR),
+                Fact(text=looped),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        leaked = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.SHORTS,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.SHORTS].wave,
+            canon_url=ARENAS[ArenaId.SHORTS].canon_url,
+        )
+        self.assertIsNone(_gate_violation(brief, ArenaId.SHORTS, "\n".join((hooked, looped))))
+        draft = compose_draft(brief, leaked)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.SHORTS)
+        self.assertIn("1-3s", draft.body)
+        self.assertNotIn("0.5s", draft.body)
+        self.assertIsNone(compose_draft(brief, Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.YOUTUBE,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
+            canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
+        )))
 
     def test_cinema_end_does_not_announce_the_end(self) -> None:
         package = "title plus thumb in 0.5s: one-angle operator tick"

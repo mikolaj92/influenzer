@@ -6,7 +6,7 @@ Each upload is an at-bat: seed a cold cohort → did they stay / finish / loop? 
 
 ## Wave I play around
 
-1. Hook 1–3s (picture + voice + text together). No logo, no “hey”.
+1. Hook 1–3s (picture + voice + text together). No logo, no “hey”. A labeled hook or a cinema 0.5s package is not this. `has_fair_hook` fail-closed: no 1–3s hook → do not publish.
 2. Completion: each beat buys the next second. Length is math.
 3. Loop: last frame into first. Rewatch. % viewed >100% is cheap extra signal.
 
@@ -14,7 +14,7 @@ Spine: Hook → Escalation → Payoff → CTA. Loop **or** one ask, not both.
 
 ## Three rankers
 
-Do not paste the same cut everywhere.
+Do not paste the same cut everywhere. A YouTube long-form cut is a different costume, not a paste.
 
 - TikTok FYP: interest graph. Followers ≠ reach. ~3s cliff. Sound as cluster key. Search = say it + show it + caption.
 - YouTube Shorts: decoupled from long-form. VVSA gate. Seed mostly non-subs. CTA = full video on channel, not subscribe. Chase Engaged Views; raw Views lie after replay counting.
