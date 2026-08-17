@@ -82,6 +82,37 @@ class EnvelopeTests(unittest.TestCase):
         self.assertEqual(result["credential_ref"], "<redacted>")
         self.assertIn("<redacted>", result["message"])
 
+    def test_score_brief_with_secret_fact_is_kill_not_almost_redacted(self) -> None:
+        leak = "env:INFLUENZER_TOKEN"
+        result = effector.run(
+            {
+                "handler": "score_brief",
+                "input": {
+                    "project_id": "app-1",
+                    "brief_id": "b-secret",
+                    "story_kind": "major",
+                    "claims_ship": True,
+                    "tryable": True,
+                    "facts": [
+                        {
+                            "text": f"docs mention {leak}",
+                            "artifact_url": "https://github.com/mikolaj92/influenzer/pull/12",
+                        },
+                        {"text": "strangers can click and run the demo today"},
+                    ],
+                },
+            }
+        )
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["verdict"], "kill")
+        self.assertEqual(result["reason"], "secret")
+        self.assertIsNone(result.get("arena"))
+        self.assertIsNone(result.get("draft_id"))
+        self.assertNotIn("body", result)
+        self.assertFalse(result.get("published", False))
+        self.assertFalse(result["mutated"])
+        self.assertNotIn(leak, str(result))
+
 
 if __name__ == "__main__":
     unittest.main()

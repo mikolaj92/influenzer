@@ -1254,6 +1254,21 @@ PRIVATE_CONVERSATION_RE = re.compile(
     r")",
     re.I | re.M,
 )
+# A secret is not an angle. Token / password / key in a fact or body
+# is silence. No almost-redacted social copy. env / bearer / sk- /
+# ghp_ / keychain are enough; this is not a bag of every vault.
+SECRET_REASON = "secret"
+SECRET_RE = re.compile(
+    r"(?:"
+    r"\b(?:env|keychain):[^\s]+|"
+    r"\bbearer\s+[A-Za-z0-9._\-+/=]{8,}|"
+    r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]{12,}|"
+    r"\bgh[pousr]_[A-Za-z0-9_]+|"
+    r"\bgithub_pat_[A-Za-z0-9_]+|"
+    r"\b(?:authorization|token|password|passwd|secret|api[_-]?key)\s*[:=]\s*\S+"
+    r")",
+    re.I,
+)
 # A world take is not a product angle. Politics / culture / news of the day
 # without a repo artifact is silence. We say what we build, not headlines.
 WORLD_COMMENTARY_RE = re.compile(
@@ -2803,6 +2818,13 @@ def looks_like_private_conversation(text: str) -> bool:
     return bool(PRIVATE_CONVERSATION_RE.search(cleaned))
 
 
+def looks_like_secret(text: str) -> bool:
+    """True for a token, password, or key. Not a product. Fail closed."""
+    if not text or not text.strip():
+        return False
+    return bool(SECRET_RE.search(text))
+
+
 def looks_like_world_commentary(text: str) -> bool:
     """True for a political / cultural / news-of-the-day take. Not a product."""
     if not text or not text.strip():
@@ -3018,12 +3040,17 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
         text for kind, text, url in packed if not is_feedback_excerpt_fact(kind, url)
     ]
+    for _kind, text, url in packed:
+        if looks_like_secret(text):
+            return SECRET_REASON
+    if extra and looks_like_secret(extra):
+        return SECRET_REASON
     for _kind, text, url in packed:
         if looks_like_private_conversation(text) or is_private_channel_url(url):
             return "private_conversation"
@@ -3259,6 +3286,8 @@ __all__ = [
     "PRIMARY_ARENAS",
     "PRIVATE_CHANNEL_HOSTS",
     "PRIVATE_CONVERSATION_RE",
+    "SECRET_REASON",
+    "SECRET_RE",
     "QUOTE_MARKS",
     "RANKING_DUMP_RE",
     "RANKING_HOSTS",
@@ -3354,6 +3383,7 @@ __all__ = [
     "looks_like_invented_opinion",
     "looks_like_person_mention",
     "looks_like_private_conversation",
+    "looks_like_secret",
     "looks_like_world_commentary",
     "metric_tokens",
     "news_urls_only",

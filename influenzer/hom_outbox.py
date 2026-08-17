@@ -21,6 +21,7 @@ from influenzer.config import load_config
 from influenzer.envelope import noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Draft
+from influenzer.playbook import looks_like_secret
 from influenzer.storage import StateRepository
 
 # Bodies must look like the arena, not operator metadata.
@@ -52,6 +53,8 @@ def _silence(reason: str, *, project_id: str | None = None) -> dict[str, Any]:
 def is_wearable(draft: Draft) -> bool:
     body = (draft.body or "").strip()
     if not body:
+        return False
+    if looks_like_secret(body):
         return False
     return not any(marker in body for marker in _FORBIDDEN_IN_BODY)
 

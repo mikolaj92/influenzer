@@ -231,6 +231,39 @@ class HomOutboxTests(unittest.TestCase):
         self.assertNotIsInstance(out.get("drafts"), list)
         self.assertEqual(len(self.repo.list_operator_drafts("app-1")), 2)
 
+    def test_secret_body_is_not_wearable_so_outbox_is_silence(self) -> None:
+        leak = "env:INFLUENZER_TOKEN"
+        self.assertFalse(
+            is_wearable(
+                Draft(
+                    project_id="app-1",
+                    brief_id="secret",
+                    draft_id="draft-secret",
+                    arena=ArenaId.HN,
+                    costume="seminar",
+                    angle="one",
+                    body=f"Show HN: docs mention {leak}\n\n{SHIP_PR}",
+                    wave_checklist=(),
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                    created_at="2026-08-13T05:00:00Z",
+                )
+            )
+        )
+        _put_draft(
+            self.repo,
+            project_id="app-1",
+            brief_id="secret",
+            created_at="2026-08-13T07:00:00Z",
+            body=f"Show HN: docs mention {leak}\n\n{SHIP_PR}",
+        )
+        out = emit_angle(self.repo, project_id="app-1")
+        self.assertEqual(out["status"], "noop")
+        self.assertTrue(out["empty"])
+        self.assertEqual(out["reason"], "no_draft")
+        self.assertIsNone(out["body"])
+        self.assertFalse(out["published"])
+        self.assertNotIn(leak, str(out))
+
     def test_dump_body_is_not_wearable_so_silence_or_skip(self) -> None:
         self.assertFalse(
             is_wearable(

@@ -83,6 +83,7 @@ from influenzer.playbook import (
     looks_like_person_mention,
     looks_like_press_release,
     looks_like_private_conversation,
+    looks_like_secret,
     looks_like_open_source_without_license,
     looks_like_source_available_as_oss,
     looks_like_world_commentary,
@@ -579,6 +580,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
         or looks_like_private_conversation(bits.blob)
+        or looks_like_secret(bits.blob)
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
         or looks_like_source_available_as_oss(bits.blob)
@@ -638,6 +640,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_hashtag_wall(body)
         or looks_like_person_mention(body)
         or looks_like_private_conversation(body)
+        or looks_like_secret(body)
         or looks_like_world_commentary(body)
         or looks_like_hire_fundraise(body)
         or looks_like_source_available_as_oss(body)

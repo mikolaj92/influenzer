@@ -1,32 +1,39 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=48 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=47 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #48 — README bez dema to martwa witryna
+Issue: #47 — Sekret nie wychodzi w kącie społecznym
 
 ## Goal
 
-Kąt GitHub (warsztat) wymaga na jednym ekranie: one-liner, widoczne demo (GIF/screenshot), działający quickstart. Sam tekst bez obrazu → changelog, nie launch.
+Jeśli fakt albo body wygląda na token, hasło albo klucz (wzorce: env, bearer, sk-, ghp, keychain) — dress/outbox milczy, brief pada na kill. Żadnego „prawie zredagowane”.
 
 ## Files likely touched
 
-- `github_pack/pack.py` — fail closed when a ship README has no visible demo (GIF/screenshot).
-- `tests/test_github_pack.py` — pack silence vs launch for text-only vs GIF README.
-- `tests/test_e2e_gates.py` — workshop launch still drafts only with a visible demo.
-- `tests/gh_scripts.py` — default ship fixture is a one-screen README (quickstart + GIF).
+- `influenzer/playbook.py` — mały klocek `looks_like_secret` / `SECRET_RE`
+- `influenzer/hom.py` — score kill
+- `influenzer/hom_draft.py` — dress milczy
+- `influenzer/hom_outbox.py` — wearable = cisza
+- `influenzer/brief_admit.py` — scan/admit nie zapisuje briefu
+- `tests/test_brief_admit.py`
+- `tests/test_brief_scan_cli.py`
+- `tests/test_e2e_gates.py`
+- `tests/test_envelope.py`
+- `tests/test_hom_outbox.py`
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- Run the smallest useful tests for files touched:
+  `tests/test_brief_admit.py tests/test_brief_scan_cli.py tests/test_e2e_gates.py tests/test_envelope.py tests/test_hom_outbox.py`
 
 ## Non-goals
 
-- (none stated)
+- Redakcja „prawie zredagowane”
+- Worek na wszystkie vaulty — tylko wzorce z issue (env, bearer, sk-, ghp, keychain)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Fail-closed: sekret nie publikować, nie live.
