@@ -101,6 +101,28 @@ _COUNTER_THANKS_RE = re.compile(
     r".{0,40}\b(?:thanks?|thank\s+you)\b"
     r")"
 )
+_FOG_RE = re.compile(
+    r"(?i)(?:"
+    r"\bsubtweets?\b"
+    r"|\bsubtweeting\b"
+    r"|\byou[- ]know[- ]who\b"
+    r"|\bif\s+you\s+know\s*,?\s+you\s+know\b"
+    r"|\bthose\s+who\s+know\s*,?\s+know\b"
+    r"|\bthey\s+know\s+who\s+they\s+are\b"
+    r"|\biykyk\b"
+    r"|\ba\s+certain\s+(?:someone|somebody|project|tool|repo|competitor|person)\b"
+    r"|\b(?:we\s+)?(?:won['’]?t|do\s+not|don['’]?t)\s+name\s+names\b"
+    r"|\bnot\s+naming\s+names\b"
+    r"|\bunnamed\s+(?:competitor|project|tool|repo|someone)\b"
+    r"|\bread(?:ing)?\s+between\s+the\s+lines\b"
+    r"|\bhint\s+hint\b"
+    r"|\baluzj[aąeęi]\b"
+    r"|\bwiecie\s+kto\b"
+    r"|\bnie\s+wymieniamy?\s+nazw"
+    r"|\bpewien\s+(?:kto[sś]|projekt|narz[eę]dzie)\b"
+    r"|\bmg[lł]a\b"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -147,6 +169,13 @@ def looks_like_counter_thanks(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_COUNTER_THANKS_RE.search(text))
+
+
+def looks_like_fog(text: str) -> bool:
+    """True for a subtweet / you-know-who / unnamed allusion. Name it or stay silent."""
+    if not text or not text.strip():
+        return False
+    return bool(_FOG_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

@@ -101,11 +101,13 @@ from influenzer.playbook import (
     looks_like_event,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
+    looks_like_fog,
     looks_like_waitlist,
     looks_like_worse_clone,
     EVENT_NOT_A_SHIP,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
+    FOG_REASON,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -570,6 +572,54 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, COUNTER_THANKS_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_fog_is_silence_not_an_angle(self) -> None:
+        hints = (
+            "subtweet about the local tick",
+            "you know who still scores remotely",
+            "aluzja bez artefaktu",
+            "mgła",
+        )
+        self.assertFalse(looks_like_fog(""))
+        self.assertFalse(looks_like_fog("   "))
+        self.assertFalse(looks_like_fog("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_fog("Unlike Loki, this scores briefs locally"))
+        self.assertFalse(looks_like_fog("you know the timeout bug"))
+        self.assertFalse(looks_like_fog("we name the difference"))
+        for idx, text in enumerate(hints):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_fog(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    FOG_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-fog-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, FOG_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(
