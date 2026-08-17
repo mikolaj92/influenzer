@@ -100,10 +100,12 @@ from influenzer.playbook import (
     looks_like_press_release,
     looks_like_event,
     looks_like_calendar_filler,
+    looks_like_counter_thanks,
     looks_like_waitlist,
     looks_like_worse_clone,
     EVENT_NOT_A_SHIP,
     CALENDAR_FILLER_REASON,
+    COUNTER_THANKS_REASON,
     reddit_reason,
     seminar_reason,
     tavern_reason,
@@ -520,6 +522,54 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, CALENDAR_FILLER_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_counter_thanks_is_silence_not_an_angle(self) -> None:
+        greetings = (
+            "thanks for 1000 stars",
+            "milestone follow",
+            "dziękujemy za gwiazdki",
+            "podziękowanie za licznik",
+        )
+        self.assertFalse(looks_like_counter_thanks(""))
+        self.assertFalse(looks_like_counter_thanks("   "))
+        self.assertFalse(looks_like_counter_thanks("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_counter_thanks("thanks for the issue"))
+        self.assertFalse(looks_like_counter_thanks("thanks for watching"))
+        self.assertFalse(looks_like_counter_thanks("follow the README to run the demo"))
+        for idx, text in enumerate(greetings):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_counter_thanks(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    COUNTER_THANKS_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-counter-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, COUNTER_THANKS_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(
