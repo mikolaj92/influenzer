@@ -16,8 +16,9 @@ from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
 from github_feedback.feedback import MAX_STORED_FACT_CHARS, WHOLE_THREAD
 from github_survey.survey import MAX_GH_LOOK_BYTES
+from github_survey import classify_gh_argv
 from influenzer.hom_feedback import SOURCE, admit_feedback, collect_and_admit, main as feedback_main
-from influenzer.playbook import ArenaId, StoryKind
+from influenzer.playbook import HN_CAMP_REASON, ArenaId, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from tests.gh_scripts import (
@@ -179,6 +180,27 @@ class HomFeedbackComposeTests(unittest.TestCase):
     def test_open_social_draft_is_silence(self) -> None:
         pending = Brief.create(
             project_id="app-1",
+            brief_id="prior-court",
+            facts=(
+                Fact(text="Dry-run still default on every tick"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.LINKEDIN,
+        )
+        self.repo.save_brief(pending)
+        tick(self.repo, self.cfg, due=(), now=NOW)
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "prior-court"))
+        self.assertIsNone(self.repo.living_stack_arena("app-1", NOW))
+        out = self._run(feedback_question_script())
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "social_draft")
+
+    def test_open_hn_stack_reads_repo_comments_and_does_not_admit_a_second_show(self) -> None:
+        pending = Brief.create(
+            project_id="app-1",
             brief_id="prior-ship",
             facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
             story_kind=StoryKind.MAJOR,
@@ -189,9 +211,24 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.repo.save_brief(pending)
         tick(self.repo, self.cfg, due=(), now=NOW)
         self.assertIsNotNone(self.repo.get_operator_draft("app-1", "prior-ship"))
-        out = self._run(feedback_question_script())
+        self.assertEqual(self.repo.living_stack_arena("app-1", NOW), ArenaId.HN)
+        fake = ScriptedGh(feedback_question_script())
+        with patch("subprocess.run", side_effect=AssertionError("feedback must not call subprocess")):
+            out = collect_and_admit(
+                self.repo,
+                project_id="app-1",
+                repo_slug=REPO,
+                gh=fake,
+                now=NOW,
+            )
         self.assertEqual(out["status"], "noop")
-        self.assertEqual(out["reason"], "social_draft")
+        self.assertEqual(out["reason"], HN_CAMP_REASON)
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertIsNone(self.repo.get_brief("app-1", "fb-101"))
+        kinds = [classify_gh_argv(list(argv)) for argv in fake.calls]
+        self.assertIn("issue_comments", kinds)
 
     def test_watch_supplies_repo_when_omitted(self) -> None:
         self.repo.set_hom_watch("app-1", REPO, created_at=NOW)

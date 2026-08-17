@@ -11,19 +11,23 @@ Gdy kąt HN jest otwarty albo w stosie 48h, feedback czyta komentarze tego itemu
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/playbook.py` — `hn_camp` latch on a living HN stack
+- `influenzer/hom.py` — score kills a second Show
+- `influenzer/hom_feedback.py` — camp still reads repo comments, does not admit another story
+- `tests/test_e2e_gates.py`, `tests/test_hom_feedback.py`, `tests/test_hom_operator.py`
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python -m unittest tests.test_e2e_gates tests.test_hom_feedback tests.test_github_feedback` plus the living-stack / camp cases in `tests.test_hom_operator`
 
 ## Non-goals
 
-- (none stated)
+- Fetching HN item comments over the network
+- Publishing replies into the thread
+- Changing the 48h github costume (workshop may still draft)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Collector boundary: no unbounded collection.

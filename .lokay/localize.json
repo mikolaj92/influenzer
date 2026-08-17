@@ -1,22 +1,29 @@
 {
   "paths": [
     "github_feedback/feedback.py",
+    "influenzer/hom.py",
+    "influenzer/hom_feedback.py",
+    "influenzer/playbook.py",
     "tests/test_e2e_gates.py",
     "tests/test_github_feedback.py",
-    "tests/test_hom_feedback.py"
+    "tests/test_hom_feedback.py",
+    "tests/test_hom_operator.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
     "feedback",
-    "gate"
+    "gate",
+    "hn",
+    "camp"
   ],
   "notes": [
-    "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
+    "Agentless-style localization refined after inspection.",
+    "Score kills a second Show HN while the 48h HN stack lives (hn_camp).",
+    "Feedback still reads repo comments during camp and does not admit another story.",
     "Repo tree entries considered: 137."
   ],
   "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__50-po-show-hn-siedzimy-w-w-tku-nie-robimy-d-019ae2cd",
-  "wrote": false,
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
