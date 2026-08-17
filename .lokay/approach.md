@@ -1,33 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=32 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=33 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #32 — Show HN to tytuł, URL i backstory, nie blog
+Issue: #33 — LinkedIn to dwór, nie stoisko
 
 ## Goal
 
-Show HN to tytuł + URL + pierwszy komentarz jako backstory, nie blog. Draft na HN ma trzy pola: `Show HN: …`, URL w polu linku, backstory pod spodem (człowiek, nie komunikat). Bez waitlisty, bez „please upvote”.
+LinkedIn fold (~210 chars) is insight, not pitch, CTA, or URL. A draft that starts with CTA, a URL, or “we’re launching” is silence on court (other arena or kill). Does not publish. Does not go live. One story.
 
 ## Files likely touched
 
-- `influenzer/hom_draft.py` — require title + tryable URL + first leftover fact; dump of the rest is a blog; missing backstory is silence.
-- `skills/influenzer-hn/SKILL.md` — three fields or silence.
-- `tests/test_hom_draft.py` — title-only is undressable; leftover dump stays out of the first comment.
-- `tests/test_e2e_gates.py` — same fail-closed gate through score/compose.
+- `influenzer/hom_draft.py` — court dresser: skip stall lines; fail-closed if fold is pitch/CTA/URL
+- `skills/influenzer-linkedin/SKILL.md` — fold is insight or silence
+- `tests/test_hom_draft.py` — leaked-score silence + insight-first fold
+- `tests/test_e2e_gates.py` — compose_draft refuses a stall fold
 
 ## Test plan
 
-- `python3 -m unittest tests.test_hom_draft tests.test_e2e_gates`
+- `python -m pytest tests/test_hom_draft.py::HomDraftCostumeTests tests/test_e2e_gates.py::OrderedLiveGateTests::test_court_is_not_a_launch_channel tests/test_e2e_gates.py::OrderedLiveGateTests::test_linkedin_fold_is_insight_not_pitch_cta_or_url -q`
 
 ## Non-goals
 
-- Do not publish, do not enable live, do not open a second Show HN.
-- Do not change scoring in `hom.py` / `playbook.py` (outside localize scope).
+- No playbook/scoring rewrite outside the LinkedIn dress path
+- No publish / live / multi-story changes
 
 ## Notes
 
-- Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Leak before the patch: `_PITCH_LINE_RE` missed `we're launching` / `we are launching` / `Learn more` / `Comment if`, so those lines dressed as the fold.
+- Court already had launch-energy kill via `court_reason`; this issue is the dress fold, not the launch-channel gate.
+- Collector boundary: no collector.

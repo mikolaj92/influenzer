@@ -1049,6 +1049,63 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(score.reason, COURT_NOT_A_LAUNCH_REASON)
         self.assertIsNone(compose_draft(empty, score))
 
+    def test_linkedin_fold_is_insight_not_pitch_cta_or_url(self) -> None:
+        stalls = (
+            "we're launching the operator today",
+            "we’re launching the operator today",
+            "Learn more in the comments",
+            "https://example.com/launch",
+        )
+        leaked = Score(
+            brief_id="b-court-fold-stall",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.LINKEDIN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.LINKEDIN].wave,
+            canon_url=ARENAS[ArenaId.LINKEDIN].canon_url,
+        )
+        for idx, text in enumerate(stalls):
+            with self.subTest(text=text):
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-court-fold-stall-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text=text),
+                    ),
+                    story_kind="major",
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.LINKEDIN,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        insight = "Dry-run still default on every tick"
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-court-fold-insight",
+            facts=(
+                Fact(text="we're launching the operator today"),
+                Fact(text=insight, artifact_url=SHIP_PR),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.LINKEDIN,
+        )
+        draft = compose_draft(alive, leaked)
+        assert draft is not None
+        self.assertEqual(draft.costume, "court")
+        fold = draft.body.split("\n\n", 1)[0]
+        self.assertEqual(fold, insight)
+        self.assertLessEqual(len(fold), 210)
+        self.assertNotIn("http", fold.lower())
+        self.assertNotIn("launching", fold.lower())
+        self.assertNotIn("learn more", fold.lower())
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_empty_tavern_does_not_get_an_invite(self) -> None:
         empties = (
             "stand up a Discord",
