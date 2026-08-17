@@ -29,6 +29,7 @@ from influenzer.brief_admit import open_story_reason
 from influenzer.playbook import (
     ARENAS,
     ArenaId,
+    AGORA_NO_NEW_THOUGHT_REASON,
     BLUESKY_PACK_WITHOUT_FEED_REASON,
     CINEMA_ANNOUNCES_END_REASON,
     COURT_NOT_A_LAUNCH_REASON,
@@ -43,11 +44,13 @@ from influenzer.playbook import (
     SEMINAR_BRAND_VOICE_REASON,
     WORSE_CLONE_REASON,
     Verdict,
+    agora_reason,
     cafe_reason,
     choose_arena,
     cinema_end_reason,
     court_reason,
     fair_loop_reason,
+    has_agora_thought,
     has_cafe_feed,
     has_cafe_pack,
     has_court_insight,
@@ -60,6 +63,7 @@ from influenzer.playbook import (
     has_tavern_seed,
     has_workshop_life,
     letter_reason,
+    looks_like_agora_echo,
     looks_like_brand_voice,
     looks_like_cinema_end,
     looks_like_court_launch,
@@ -700,6 +704,106 @@ class OrderedLiveGateTests(unittest.TestCase):
             (Verdict.KILL, "fair_cta_with_loop"),
         )
         self.assertIsNone(compose_draft(looped_ask, leaked_both))
+
+    def test_x_reply_without_a_new_thought_is_silence(self) -> None:
+        parent = "https://x.com/mikolaj92/status/123456789"
+        parent_text = "Show HN about mikolaj92/influenzer"
+        empties = (
+            (
+                Fact(kind="parent", text=parent_text, artifact_url=parent),
+                Fact(kind="artifact", text="ship artifact", artifact_url=SHIP_PR),
+            ),
+            (
+                Fact(kind="parent", text=parent_text, artifact_url=parent),
+                Fact(text=parent_text, artifact_url=SHIP_PR),
+            ),
+            (
+                Fact(kind="parent", text=parent_text, artifact_url=parent),
+                Fact(text=parent, artifact_url=SHIP_PR),
+            ),
+        )
+        self.assertFalse(has_agora_thought(""))
+        self.assertFalse(has_agora_thought(parent))
+        self.assertTrue(has_agora_thought(parent_text))
+        self.assertTrue(looks_like_agora_echo(parent_text, parent_text))
+        self.assertTrue(looks_like_agora_echo("mikolaj92/influenzer", parent_text))
+        self.assertFalse(
+            looks_like_agora_echo(
+                "Local tick scores briefs and emits a draft", parent_text
+            )
+        )
+        for idx, extra in enumerate(empties):
+            with self.subTest(idx=idx):
+                triples = tuple(
+                    (fact.kind, fact.text, fact.artifact_url) for fact in extra
+                )
+                self.assertEqual(agora_reason(triples), AGORA_NO_NEW_THOUGHT_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-agora-echo-{idx}",
+                    facts=extra,
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.X,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.X,
+                        claims_ship=True,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=True,
+                    ),
+                    ArenaId.X,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, AGORA_NO_NEW_THOUGHT_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.X,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.X].wave,
+                    canon_url=ARENAS[ArenaId.X].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.X, "\n".join(fact.text for fact in brief.facts)),
+                    (Verdict.KILL, AGORA_NO_NEW_THOUGHT_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        thought = "Local tick scores briefs and emits a draft"
+        living = (
+            Fact(kind="parent", text=parent_text, artifact_url=parent),
+            Fact(text=thought, artifact_url=SHIP_PR),
+            Fact(text="strangers can click and run the demo today"),
+        )
+        self.assertIsNone(
+            agora_reason(tuple((fact.kind, fact.text, fact.artifact_url) for fact in living))
+        )
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-agora-thought",
+            facts=living,
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.X,
+        )
+        self.assertIsNone(_gate_violation(alive, ArenaId.X, "\n".join(fact.text for fact in living)))
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.X)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "agora")
+        self.assertIn(thought, draft.body)
+        self.assertNotIn(parent_text, draft.body)
+        self.assertNotIn("Costume:", draft.body)
 
     def test_court_is_not_a_launch_channel(self) -> None:
         launches = (

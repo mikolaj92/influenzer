@@ -26,6 +26,7 @@ from influenzer.playbook import (
     arena_gate,
     arena_play,
     choose_arena,
+    agora_reason,
     cinema_end_reason,
     court_reason,
     fair_loop_reason,
@@ -508,6 +509,10 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "hn_title_overflow"
     if arena is ArenaId.X and title and looks_like_x_overflow(title, _proof_url_for_brief(brief)):
         return Verdict.KILL, "x_overflow"
+    if arena is ArenaId.X:
+        agora_fail = agora_reason(_fact_triples(brief))
+        if agora_fail:
+            return Verdict.KILL, agora_fail
     if arena is ArenaId.LINKEDIN and title and looks_like_linkedin_fold_overflow(title):
         return Verdict.KILL, "linkedin_fold_overflow"
     if arena is ArenaId.LINKEDIN:

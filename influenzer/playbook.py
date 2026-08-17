@@ -2873,38 +2873,30 @@ def agora_reason(
     """Silence when an X reply has no new thought: echo, link-only, or empty."""
     packed = tuple(facts)
     parents = _agora_parent_facts(packed)
-    if extra:
-        extra_folded = _fold_agora_thought(extra)
-        extra_urls = tuple(_URL_IN_TEXT_RE.findall(extra or ""))
-        if extra_folded or extra_urls:
-            packed = packed + (("signal", extra, extra_urls[0] if extra_urls else None),)
-            parents = _agora_parent_facts(packed)
     if not parents:
         return None
     parent_thoughts = tuple(
         _fold_agora_thought(text) for _kind, text, _url in parents if _fold_agora_thought(text)
     )
-    candidates: list[str] = []
+
+    def _is_new_thought(text: str) -> bool:
+        folded = _fold_agora_thought(text)
+        if len(folded) < MIN_FACT_CHARS:
+            return False
+        return not any(looks_like_agora_echo(folded, parent) for parent in parent_thoughts)
+
+    if extra is not None:
+        return None if _is_new_thought(extra) else AGORA_NO_NEW_THOUGHT_REASON
     for kind, text, url in packed:
         if _is_reply_fact(kind, text, url):
             continue
+        if kind.strip().lower() == "artifact" or text.strip().casefold() == "ship artifact":
+            continue
         if url and is_parent_post_url(url) and not _fold_agora_thought(text):
             continue
-        folded = _fold_agora_thought(text)
-        if len(folded) < MIN_FACT_CHARS:
-            continue
-        if any(looks_like_agora_echo(folded, parent) for parent in parent_thoughts):
-            continue
-        candidates.append(folded)
-    if extra:
-        folded = _fold_agora_thought(extra)
-        if len(folded) >= MIN_FACT_CHARS and not any(
-            looks_like_agora_echo(folded, parent) for parent in parent_thoughts
-        ):
-            candidates.append(folded)
-    if not candidates:
-        return AGORA_NO_NEW_THOUGHT_REASON
-    return None
+        if _is_new_thought(text):
+            return None
+    return AGORA_NO_NEW_THOUGHT_REASON
 
 
 def looks_like_invented_opinion(text: str) -> bool:
@@ -3406,6 +3398,7 @@ __all__ = [
     "WORSE_CLONE_REASON",
     "WORSE_CLONE_RE",
     "EMPTY_TAVERN_REASON",
+    "AGORA_NO_NEW_THOUGHT_REASON",
     "BLUESKY_PACK_WITHOUT_FEED_REASON",
     "LETTER_ASK_WITHOUT_GIFT_REASON",
     "LETTER_ASK_RE",
@@ -3505,11 +3498,13 @@ __all__ = [
     "arena_gate",
     "arena_play",
     "choose_arena",
+    "agora_reason",
     "cafe_reason",
     "cinema_end_reason",
     "court_reason",
     "feedback_excerpt_texts",
     "fair_loop_reason",
+    "has_agora_thought",
     "has_cafe_feed",
     "has_cafe_pack",
     "has_cinema_package",
@@ -3543,6 +3538,7 @@ __all__ = [
     "is_tryable_artifact_url",
     "invented_metric_reason",
     "is_video_host_url",
+    "looks_like_agora_echo",
     "looks_like_bot_author",
     "looks_like_bot_bump_week",
     "looks_like_commit_noise",

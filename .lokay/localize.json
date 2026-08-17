@@ -1,18 +1,20 @@
 {
   "paths": [
-    "tests/test_e2e_gates.py"
+    "tests/test_e2e_gates.py",
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
+    "tests/test_hom_draft.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": [
-    "gate"
-  ],
+  "matched_tokens": ["gate", "agora", "reply", "parent"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Refined after inspection: #41 is a dress-X silence gate (parent URL without a new thought).",
+    "Helpers live in playbook; score/dress must sit on preferred X and fail closed."
   ],
   "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__41-reply-na-x-bez-nowej-my-li-cisza-900e9886",
-  "wrote": false,
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
