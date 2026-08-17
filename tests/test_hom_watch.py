@@ -13,6 +13,7 @@ from unittest.mock import patch
 from github_survey import GhCall
 from github_survey.survey import look_argv_launches_project, look_argv_leaves_declared_repo
 
+from github_pack.pack import README_WITHOUT_QUICKSTART_REASON
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main as cli_main
 from influenzer.cli import setup_parser
@@ -24,7 +25,7 @@ from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
 from influenzer.tick import guarded_tick, loop_ticks, main as tick_main
-from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, ship_script
+from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, b64_readme, ship_script
 
 ALWAYS_ON = HostPower(has_battery=False, source="test")
 
@@ -349,6 +350,23 @@ class HomWatchTests(unittest.TestCase):
         self.assertTrue(fake.calls)
         self.assertFalse(any(look_argv_launches_project(list(argv)) for argv in fake.calls))
         self.assertFalse(out.get("published", False))
+
+    def test_watch_without_copyable_start_is_silence_not_show_hn(self) -> None:
+        prose = (
+            "# Demo\n\nInstall with pip install influenzer, then uv run the tick.\n"
+            "\n![demo](docs/demo.gif)\n"
+        )
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        out, fake = self._tick(ship_script(readme=GhCall(0, b64_readme(prose))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], README_WITHOUT_QUICKSTART_REASON)
+        self.assertTrue(out["ok"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertTrue(fake.calls)
+        self.assertNotIn("Show HN:", json.dumps(out))
+        self.assertFalse(out.get("published", False))
+        self.assertEqual(loop_status(out), {"status": "cisza", "mutated": False, "published": False})
 
 
 class HomWatchCLIFAlaTests(unittest.TestCase):

@@ -11,6 +11,7 @@ from influenzer.brief_scan import scan_github
 from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
+from github_pack.pack import README_WITHOUT_QUICKSTART_REASON
 from influenzer.playbook import ArenaId, LIVING_STACK_REASON, SECRET_REASON, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
@@ -360,6 +361,19 @@ class AdmitAndComposeTests(unittest.TestCase):
         out = self._scan(ship_script(readme=GhCall(0, "{}")))
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "empty_repo_not_a_site")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_prose_install_look_is_silence_not_a_social_launch(self) -> None:
+        prose = (
+            "# Demo\n\nInstall with pip install influenzer, then uv run the tick.\n"
+            "\n![demo](docs/demo.gif)\n"
+        )
+        out = self._scan(ship_script(readme=GhCall(0, b64_readme(prose))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], README_WITHOUT_QUICKSTART_REASON)
         self.assertTrue(out["ok"])
         self.assertFalse(out["published"])
         self.assertIsNone(out["brief_id"])
