@@ -6,8 +6,10 @@ from pathlib import Path
 
 from github_pack.pack import (
     README_WITHOUT_DEMO_REASON,
+    README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
     pack_survey,
+    readme_has_copyable_start,
     readme_has_visible_demo,
 )
 from influenzer.adapters.base import AdapterRequest
@@ -1702,6 +1704,71 @@ class OrderedLiveGateTests(unittest.TestCase):
         draft = compose_draft(brief, score)
         assert draft is not None
         self.assertEqual(draft.costume, "workshop")
+        self.assertNotIn("Costume:", draft.body)
+
+    def test_readme_without_copyable_start_is_not_a_social_launch(self) -> None:
+        prose = (
+            "# Demo\n\nInstall with pip install influenzer, then uv run the tick.\n"
+            "\n![demo](docs/demo.gif)\n"
+        )
+        copyable = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n"
+        self.assertFalse(readme_has_copyable_start(prose))
+        self.assertTrue(readme_has_copyable_start(copyable))
+
+        survey = {
+            "meta": {"description": "Local operator with a working install", "homepageUrl": ""},
+            "prs": [
+                {
+                    "number": 12,
+                    "title": "feat: local HoM operator scores briefs",
+                    "url": "https://github.com/mikolaj92/demo/pull/12",
+                }
+            ],
+            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0"}],
+            "tags": [{"name": "v0.1.0"}],
+            "readme_text": prose,
+            "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+        }
+        dead = pack_survey(
+            {"status": "ok", "ok": True, "repo": "mikolaj92/demo", "now": "2026-08-17T06:00:00Z", "survey": survey}
+        )
+        self.assertEqual(dead["status"], "noop")
+        self.assertEqual(dead["reason"], README_WITHOUT_QUICKSTART_REASON)
+        self.assertTrue(dead["ok"])
+        self.assertIsNone(dead["brief_id"])
+        self.assertNotIn("facts", dead)
+        self.assertNotIn("claims_ship", dead)
+
+        living = dict(survey)
+        living["readme_text"] = copyable
+        packed = pack_survey(
+            {"status": "ok", "ok": True, "repo": "mikolaj92/demo", "now": "2026-08-17T06:00:00Z", "survey": living}
+        )
+        self.assertEqual(packed["status"], "ok")
+        self.assertTrue(packed["claims_ship"])
+        self.assertTrue(packed["tryable"])
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id=str(packed["brief_id"]),
+            facts=tuple(
+                Fact(
+                    kind=str(item.get("kind") or "signal"),
+                    text=str(item.get("text") or ""),
+                    artifact_url=item.get("artifact_url"),
+                )
+                for item in packed["facts"]
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(brief, score)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertNotIn("Costume:", draft.body)
 
     def test_same_window_revert_is_not_a_ship_or_show_hn(self) -> None:

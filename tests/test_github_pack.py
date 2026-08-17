@@ -14,8 +14,10 @@ from github_pack.classify import (
 )
 from github_pack.pack import (
     README_WITHOUT_DEMO_REASON,
+    README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
     looks_like_same_window_revert,
+    readme_has_copyable_start,
     readme_has_visible_demo,
 )
 from github_survey import GhCall, survey_public_repo
@@ -24,6 +26,10 @@ from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, b64_readme, merge
 
 INSTALLABLE = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n"
 VISIBLE_DEMO = INSTALLABLE + "\n![demo](docs/demo.gif)\n"
+PROSE_ONLY = (
+    "# Demo\n\nInstall with pip install influenzer, then uv run the tick.\n"
+    "\n![demo](docs/demo.gif)\n"
+)
 
 
 class HeuristicTests(unittest.TestCase):
@@ -157,6 +163,20 @@ class PackSilenceTests(unittest.TestCase):
         )
         self.assertEqual(badge["status"], "noop")
         self.assertEqual(badge["reason"], README_WITHOUT_DEMO_REASON)
+
+    def test_prose_install_is_not_a_copyable_start(self) -> None:
+        self.assertFalse(readme_has_copyable_start(PROSE_ONLY))
+        self.assertFalse(readme_has_copyable_start("# Demo\n\nSee the docs to install.\n\n![demo](docs/demo.gif)\n"))
+        self.assertTrue(readme_has_copyable_start(VISIBLE_DEMO))
+        self.assertTrue(readme_has_copyable_start("# Demo\n\nRun `brew install influenzer` and go.\n"))
+        self.assertTrue(readme_has_copyable_start("# Demo\n\n```\n$ pip install influenzer\n```\n"))
+        out = self._pack(ship_script(readme=GhCall(0, b64_readme(PROSE_ONLY))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], README_WITHOUT_QUICKSTART_REASON)
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("facts", out)
+        self.assertNotIn("claims_ship", out)
 
     def test_readme_url_outside_trusted_host_is_not_tryable(self) -> None:
         installable = INSTALLABLE

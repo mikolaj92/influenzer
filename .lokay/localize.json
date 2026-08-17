@@ -1,44 +1,18 @@
 {
   "paths": [
-    "tests/test_hom_pass.py",
-    "github_feedback/feedback.py",
-    "github_feedback",
-    "influenzer/hom.py",
-    "github_feedback/__init__.py",
-    "github_feedback/__main__.py",
-    "tests/test_brief_scan_cli.py",
-    "tests/test_github_feedback.py",
-    "tests/test_hom_feedback.py",
-    "tests/test_hom_verdict.py",
-    "tests/test_hom_watch.py",
-    "tests/test_scan_due.py",
+    "github_pack/pack.py",
     "tests/test_brief_admit.py",
+    "tests/test_brief_scan_cli.py",
     "tests/test_e2e_gates.py",
-    "tests/test_fake_provider.py",
-    "tests/test_hom_draft.py",
-    "tests/test_hom_operator.py",
-    "tests/test_hom_outbox.py",
-    "tests/test_scan_path.py",
-    "tests/test_x_handoff.py"
+    "tests/test_github_pack.py",
+    "tests/test_hom_watch.py"
   ],
   "source": "deterministic",
-  "seed_paths": [
-    "tests/test_hom_pass.py"
-  ],
+  "seed_paths": [],
   "matched_tokens": [
-    "feedback",
-    "HoM",
-    "influenzer",
-    "scan",
-    "due",
-    "github_feedback",
-    "Feedback",
-    "watch",
-    "brief",
-    "verdict",
-    "fake",
-    "off",
-    "test_hom_pass",
+    "Watch",
+    "Brief",
+    "pack",
     "gate"
   ],
   "notes": [
@@ -46,7 +20,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__24-compose-feedback-into-the-weekly-cmo-pas-82f3aa88",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__25-nie-reklamowa-zepsutej-witryny-2b18a4a2",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }
