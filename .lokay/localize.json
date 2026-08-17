@@ -1,20 +1,52 @@
 {
   "paths": [
-    "tests/test_e2e_gates.py",
-    "influenzer/playbook.py",
+    "tests/test_hom_pass.py",
+    "github_feedback/feedback.py",
+    "github_feedback",
     "influenzer/hom.py",
-    "influenzer/hom_draft.py",
-    "tests/test_hom_draft.py"
+    "github_feedback/__init__.py",
+    "github_feedback/__main__.py",
+    "tests/test_brief_scan_cli.py",
+    "tests/test_github_feedback.py",
+    "tests/test_hom_feedback.py",
+    "tests/test_hom_verdict.py",
+    "tests/test_hom_watch.py",
+    "tests/test_scan_due.py",
+    "tests/test_brief_admit.py",
+    "tests/test_e2e_gates.py",
+    "tests/test_fake_provider.py",
+    "tests/test_hom_draft.py",
+    "tests/test_hom_operator.py",
+    "tests/test_hom_outbox.py",
+    "tests/test_scan_path.py",
+    "tests/test_x_handoff.py"
   ],
   "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": ["gate", "agora", "reply", "parent"],
+  "seed_paths": [
+    "tests/test_hom_pass.py"
+  ],
+  "matched_tokens": [
+    "feedback",
+    "HoM",
+    "influenzer",
+    "scan",
+    "due",
+    "github_feedback",
+    "Feedback",
+    "watch",
+    "brief",
+    "verdict",
+    "fake",
+    "off",
+    "test_hom_pass",
+    "gate"
+  ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Refined after inspection: #41 is a dress-X silence gate (parent URL without a new thought).",
-    "Helpers live in playbook; score/dress must sit on preferred X and fail closed."
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__41-reply-na-x-bez-nowej-my-li-cisza-900e9886",
-  "wrote": true,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__24-compose-feedback-into-the-weekly-cmo-pas-82f3aa88",
+  "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

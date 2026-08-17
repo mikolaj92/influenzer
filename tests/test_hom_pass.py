@@ -11,17 +11,30 @@ from tempfile import TemporaryDirectory
 from typing import Any
 from unittest.mock import patch
 
+from github_survey import classify_gh_argv
+
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main as cli_main
 from influenzer.cli import setup_parser
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
+from influenzer.hom_feedback import SOURCE as FEEDBACK_SOURCE
 from influenzer.hom_pass import main as pass_main
 from influenzer.hom_pass import run_pass
-from influenzer.playbook import StoryKind
+from influenzer.playbook import HN_CAMP_REASON, StoryKind
 from influenzer.storage import StateRepository, try_acquire_tick_lock
-from tests.gh_scripts import NOW, REPO, SHIP_PR, ScriptedGh, merge_log_script, noise_script, ship_script
+from tests.gh_scripts import (
+    NOW,
+    REPO,
+    SHIP_PR,
+    ScriptedGh,
+    feedback_noise_script,
+    feedback_question_script,
+    merge_log_script,
+    noise_script,
+    ship_script,
+)
 
 
 def _import_lines(path: Path) -> list[str]:
@@ -86,6 +99,9 @@ class HomPassTests(unittest.TestCase):
         self.repo.record_github_scan("app-1", REPO, scanned_at=NOW)
         out, fake = self._pass(ship_script())
         self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "not due")
+        self.assertNotIn("brief_id", out["feedback"])
         self.assertEqual(out["scan"]["status"], "silence")
         self.assertEqual(out["scan"]["reason"], "not due")
         self.assertNotIn("brief_id", out["scan"])
@@ -106,6 +122,9 @@ class HomPassTests(unittest.TestCase):
     def test_due_ship_admits_one_brief_scores_and_one_angle_body(self) -> None:
         out, fake = self._pass(ship_script())
         self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "comment_noise")
+        self.assertNotIn("brief_id", out["feedback"])
         self.assertEqual(out["scan"]["status"], "admitted")
         self.assertEqual(out["scan"]["brief_id"], "scan-v0-1-0")
         self.assertNotIn("reason", out["scan"])
@@ -133,9 +152,13 @@ class HomPassTests(unittest.TestCase):
 
         again, fake2 = self._pass(ship_script())
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertEqual(again["feedback"]["status"], "silence")
+        self.assertIn(again["feedback"]["reason"], {HN_CAMP_REASON, "pending_brief", "social_draft"})
         self.assertEqual(again["scan"]["status"], "silence")
         self.assertIn(again["scan"]["reason"], {"pending_brief", "social_draft"})
-        self.assertEqual(fake2.calls, [])
+        kinds = [classify_gh_argv(list(argv)) for argv in fake2.calls]
+        self.assertNotIn("prs", kinds)
+        self.assertNotIn("releases", kinds)
         self.assertEqual(again["tick"]["scored"], 0)
         self.assertEqual(again["angle"]["status"], "ok")
         self.assertNotIn("Costume:", again["angle"]["body"])
@@ -158,6 +181,8 @@ class HomPassTests(unittest.TestCase):
                 gh=fake2,
                 now=NOW,
             )
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "not due")
         self.assertEqual(out["scan"]["status"], "silence")
         self.assertEqual(out["scan"]["reason"], "not due")
         self.assertEqual(fake2.calls, [])
@@ -181,6 +206,8 @@ class HomPassTests(unittest.TestCase):
             )
         )
         out, fake = self._pass(ship_script())
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "pending_brief")
         self.assertEqual(out["scan"]["status"], "silence")
         self.assertEqual(out["scan"]["reason"], "pending_brief")
         self.assertEqual(fake.calls, [])
@@ -206,6 +233,8 @@ class HomPassTests(unittest.TestCase):
             self.assertNotIn("Merged PR #190", str(body).split("\n", 1)[0])
         else:
             self.assertTrue(angle.get("empty") or angle.get("status") == "noop")
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "comment_noise")
         self.assertEqual(out["scan"]["status"], "silence")
         self.assertEqual(out["scan"]["reason"], "not_tryable")
         self.assertEqual(self.repo.list_briefs("app-1"), [])
@@ -213,6 +242,8 @@ class HomPassTests(unittest.TestCase):
 
     def test_noise_look_is_due_silence_then_not_due_without_gh(self) -> None:
         first, fake1 = self._pass(noise_script())
+        self.assertEqual(first["feedback"]["status"], "silence")
+        self.assertEqual(first["feedback"]["reason"], "comment_noise")
         self.assertEqual(first["scan"]["status"], "silence")
         self.assertEqual(first["scan"]["reason"], "commit_noise")
         self.assertTrue(fake1.calls)
@@ -221,11 +252,80 @@ class HomPassTests(unittest.TestCase):
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
         second, fake2 = self._pass(ship_script())
+        self.assertEqual(second["feedback"]["reason"], "not due")
         self.assertEqual(second["scan"]["reason"], "not due")
         self.assertEqual(fake2.calls, [])
         self.assertEqual(second["tick"]["scored"], 0)
         self.assertTrue(second["angle"]["empty"])
         self.assertFalse(second["published"])
+
+    def test_due_question_admits_feedback_and_scan_stays_silent(self) -> None:
+        out, fake = self._pass(feedback_question_script())
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["feedback"]["status"], "admitted")
+        self.assertEqual(out["feedback"]["brief_id"], "fb-101")
+        self.assertNotIn("reason", out["feedback"])
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], "pending_brief")
+        kinds = [classify_gh_argv(list(argv)) for argv in fake.calls]
+        self.assertIn("issue_comments", kinds)
+        self.assertNotIn("prs", kinds)
+        self.assertNotIn("releases", kinds)
+        stored = self.repo.get_brief("app-1", "fb-101")
+        assert stored is not None
+        self.assertEqual(stored.source, FEEDBACK_SOURCE)
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertIsNone(self.repo.get_brief("app-1", "scan-v0-1-0"))
+        self.assertEqual(out["tick"]["scored"], 1)
+        self.assertEqual(out["angle"]["status"], "ok")
+        self.assertEqual(out["angle"]["brief_id"], "fb-101")
+        self.assertFalse(out["published"])
+        self.assertFalse(out["mutated"])
+        self.assertFalse(self.cfg.scheduler_live_enabled)
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_question_plus_open_story_is_no_second_brief(self) -> None:
+        self.repo.save_brief(
+            Brief.create(
+                project_id="app-1",
+                brief_id="manual-1",
+                facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+                story_kind=StoryKind.MAJOR,
+                claims_ship=True,
+                tryable=True,
+                source="cli",
+            )
+        )
+        out, fake = self._pass(feedback_question_script())
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "pending_brief")
+        self.assertEqual(out["scan"]["status"], "silence")
+        self.assertEqual(out["scan"]["reason"], "pending_brief")
+        self.assertEqual(fake.calls, [])
+        self.assertIsNone(self.repo.get_brief("app-1", "fb-101"))
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertEqual(out["tick"]["scored"], 1)
+        self.assertEqual(out["angle"]["brief_id"], "manual-1")
+        self.assertFalse(out["published"])
+
+    def test_bot_only_is_feedback_silence_then_scan_may_admit(self) -> None:
+        script = ship_script()
+        script.update(feedback_noise_script())
+        out, fake = self._pass(script)
+        self.assertEqual(out["feedback"]["status"], "silence")
+        self.assertEqual(out["feedback"]["reason"], "comment_noise")
+        self.assertNotIn("brief_id", out["feedback"])
+        self.assertEqual(out["scan"]["status"], "admitted")
+        self.assertEqual(out["scan"]["brief_id"], "scan-v0-1-0")
+        kinds = [classify_gh_argv(list(argv)) for argv in fake.calls]
+        self.assertIn("issue_comments", kinds)
+        self.assertIn("prs", kinds)
+        self.assertIsNone(self.repo.get_brief("app-1", "fb-101"))
+        self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertEqual(self.repo.get_brief("app-1", "scan-v0-1-0").source, SOURCE)
+        self.assertFalse(out["published"])
+        self.assertFalse(self.cfg.scheduler_live_enabled)
+        self.assertFalse((self.home / "runtime.db").exists())
 
     def test_live_enabled_does_not_put_adapters_on_look(self) -> None:
         from influenzer.content import create_revision, persist_revision
@@ -417,6 +517,7 @@ class HomPassCLIFAlaTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["feedback"]["status"], "silence")
         self.assertEqual(payload["scan"]["status"], "admitted")
         self.assertEqual(payload["tick"]["scored"], 1)
         self.assertNotIn("Costume:", payload["angle"]["body"])
@@ -446,9 +547,13 @@ class HomPassCLIFAlaTests(unittest.TestCase):
             )
         self.assertEqual(code, 0)
         again = json.loads(module_buf.getvalue())
+        self.assertEqual(again["feedback"]["status"], "silence")
+        self.assertIn(again["feedback"]["reason"], {HN_CAMP_REASON, "pending_brief", "social_draft"})
         self.assertEqual(again["scan"]["status"], "silence")
         self.assertIn(again["scan"]["reason"], {"pending_brief", "social_draft"})
-        self.assertEqual(fake2.calls, [])
+        kinds = [classify_gh_argv(list(argv)) for argv in fake2.calls]
+        self.assertNotIn("prs", kinds)
+        self.assertNotIn("releases", kinds)
         self.assertEqual(again["tick"]["scored"], 0)
         self.assertEqual(again["angle"]["status"], "ok")
         with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
@@ -524,6 +629,8 @@ class HomPassBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not invoke hold or pass", blob)
         self.assertIn("Does not run every tick interval", blob)
         self.assertIn("Does not merge scan_due, tick, and outbox into one file", blob)
+        self.assertIn("Does not grow github_feedback into a bag", blob)
+        self.assertIn("Does not run feedback on score-only ticks", blob)
         self.assertIn("Does not open runtime.db", blob)
         self.assertIn("Does not run the project", blob)
         self.assertIn("Launching on watch is silence", blob)
@@ -536,8 +643,10 @@ class HomPassBlockBoundaryTests(unittest.TestCase):
         self.assertNotIn("apply_brief", blob)
         imports = _import_lines(src)
         self.assertTrue(any("scan_due" in line and "scan_github_if_due" in line for line in imports))
+        self.assertTrue(any("hom_feedback" in line and "collect_and_admit" in line for line in imports))
         self.assertTrue(any("scheduler" in line and "tick" in line for line in imports))
         self.assertTrue(any("hom_outbox" in line and "emit_angle" in line for line in imports))
+        self.assertFalse(any("github_feedback" in line for line in imports))
         self.assertFalse(any("github_pack" in line for line in imports))
         self.assertFalse(any("github_survey" in line for line in imports))
         self.assertFalse(any("hom_draft" in line for line in imports))
