@@ -1,30 +1,46 @@
 {
   "paths": [
-    "github_pack",
+    "influenzer/brief_admit.py",
+    "influenzer/adapters/fake_provider.py",
     "influenzer/hom_draft.py",
-    "github_pack/pack.py",
     "skills/influenzer-hn",
-    "tests/test_github_pack.py",
+    "skills/influenzer-x",
+    "github_pack/pack.py",
+    "influenzer/adapters/child_worker.py",
+    "influenzer/adapters/contract.py",
+    "influenzer/adapters/platforms.py",
+    "influenzer/brief_scan.py",
+    "tools/hygiene_check.py",
+    "skills/influenzer-hom/SKILL.md",
+    "tests/test_x_handoff.py",
+    "tests/test_adapter_contract.py",
+    "tests/test_brief_admit.py",
+    "tests/test_brief_scan_cli.py",
+    "tests/test_fake_provider.py",
     "tests/test_hom_draft.py",
-    "tests/test_e2e_gates.py"
+    "tests/test_e2e_gates.py",
+    "HN/GitHub/X"
   ],
   "source": "deterministic",
-  "seed_paths": [],
+  "seed_paths": [
+    "HN/GitHub/X"
+  ],
   "matched_tokens": [
+    "brief",
     "draft",
-    "kill",
     "HN",
-    "pack",
+    "kill",
     "Influenzer",
     "influenzer",
-    "gate"
+    "gate",
+    "X"
   ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__28-adnego-ebrania-o-gwiazdki-upvote-follow-24abcebe",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__29-ton-notki-prasowej-nie-idzie-na-k-t-spo-7fac0d1c",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

@@ -129,7 +129,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. A Monday without a ship or real public feedback is silence, not a recap. Weekly update without history stays in the changelog. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. A Monday without a ship or real public feedback is silence, not a recap. Weekly update without history stays in the changelog. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch. Press-release tone is changelog, not a workshop launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -1004,9 +1004,26 @@ ROADMAP_RE = re.compile(
     r"|\bplanowane\s+na\s+q[1-4]\b"
     r")"
 )
+# Press-release tone is not a social angle. We're excited / announcement /
+# unveiling / delighted to share is kill or changelog, never HN/GitHub/X.
+# Pair of seminar brand voice: we announced as a brand is also silence.
+# "announce" past tense stays with seminar; the noun and the costume die here.
+PRESS_RELEASE_REASON = "press_release_tone"
 PRESS_RELEASE_RE = re.compile(
-    r"(?i)\b(?:excited to announce|humbled to announce|we are (?:excited|pleased|proud) to|"
-    r"game[- ]changer|revolutionary|disrupt(?:ing|s)? the)\b"
+    r"(?i)(?:"
+    r"\bwe(?:['’]re|\s+are)\s+(?:excited|delighted|pleased|proud|thrilled|humbled)\b"
+    r"|\b(?:excited|delighted|pleased|proud|thrilled|humbled)\s+to\s+"
+    r"(?:announce|announcing|share|unveil|introduce|present)\b"
+    r"|\bannouncements?\b"
+    r"|\bannouncing\b"
+    r"|\bunveil(?:s|ed|ing)?\b"
+    r"|\bdelighted\s+to\s+share\b"
+    r"|\bpress[- ]release\b"
+    r"|\bnotk[ai]\s+prasow"
+    r"|\bgame[- ]changer\b"
+    r"|\brevolutionary\b"
+    r"|\bdisrupt(?:ing|s)?\s+the\b"
+    r")"
 )
 # A superlative is a slogan, not a story. Revolutionary / world's first /
 # AI-powered without a tryable GitHub artifact is silence. Proof or nothing.
@@ -2693,6 +2710,9 @@ def looks_like_roadmap(text: str) -> bool:
 
 
 def looks_like_press_release(text: str) -> bool:
+    """True for we're excited / announcement / unveiling / delighted to share."""
+    if not text or not text.strip():
+        return False
     return bool(PRESS_RELEASE_RE.search(text))
 
 
@@ -3478,6 +3498,8 @@ __all__ = [
     "MIN_SOCIAL_FACTS",
     "NEWS_HOSTS",
     "NEWSLETTER_STORY_KINDS",
+    "PRESS_RELEASE_REASON",
+    "PRESS_RELEASE_RE",
     "PRIMARY_ARENAS",
     "PRIVATE_CHANNEL_HOSTS",
     "PRIVATE_CONVERSATION_RE",

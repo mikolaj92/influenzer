@@ -44,6 +44,7 @@ from influenzer.playbook import (
     LETTER_WITHOUT_SURNAME_REASON,
     LIVING_STACK_REASON,
     REDDIT_NO_DISCLOSURE_REASON,
+    PRESS_RELEASE_REASON,
     SECRET_REASON,
     SEMINAR_BRAND_VOICE_REASON,
     WORSE_CLONE_REASON,
@@ -83,6 +84,7 @@ from influenzer.playbook import (
     looks_like_secret,
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
+    looks_like_press_release,
     looks_like_waitlist,
     looks_like_worse_clone,
     reddit_reason,
@@ -385,6 +387,90 @@ class OrderedLiveGateTests(unittest.TestCase):
         draft = compose_draft(alive, score)
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
+
+    def test_press_release_tone_is_changelog_or_silence_not_an_angle(self) -> None:
+        phrases = (
+            "we're excited",
+            "we are excited",
+            "product announcement",
+            "unveiling our new tool",
+            "delighted to share",
+            "we are delighted to share",
+            "proud to announce",
+            "pleased to announce",
+        )
+        self.assertFalse(looks_like_press_release(""))
+        self.assertFalse(looks_like_press_release("   "))
+        self.assertFalse(looks_like_press_release("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_press_release("I built a local tick and struggled with the score"))
+        arenas = (ArenaId.HN, ArenaId.GITHUB, ArenaId.X)
+        for idx, text in enumerate(phrases):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_press_release(text))
+            for arena in arenas:
+                with self.subTest(text=text, arena=arena.value):
+                    brief = Brief.create(
+                        project_id="app-1",
+                        brief_id=f"b-pr-{arena.value}-{idx}",
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                        story_kind="major",
+                        claims_ship=True,
+                        tryable=True,
+                        preferred_arena=arena,
+                    )
+                    score = score_brief(brief)
+                    self.assertEqual(score.verdict, Verdict.KILL)
+                    self.assertEqual(score.reason, PRESS_RELEASE_REASON)
+                    self.assertIsNone(score.arena)
+                    self.assertIsNone(compose_draft(brief, score))
+                    leaked = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-pr-changelog",
+            facts=(Fact(text="delighted to share", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, PRESS_RELEASE_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(quiet, score))
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-pr-alive",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
+        self.assertNotIn("delighted to share", draft.body.lower())
+        self.assertNotIn("we're excited", draft.body.lower())
 
     def test_worse_clone_is_changelog_or_silence_not_an_angle(self) -> None:
         clones = (

@@ -19,7 +19,7 @@ I wear the arena. I do not mix costumes.
 - YouTube long: cinema — package (title+thumb+5s) before the middle.
 - Shorts/TikTok/Reels: fair — hook in 1–2s, loop, not an essay.
 - GitHub: workshop — README and code are proof; stars are not success.
-- HN: seminar — “I struggled with X”; press releases die here.
+- HN: seminar — “I struggled with X”; press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill or changelog, not a social angle.
 - Reddit: village — each sub is a different room; story of pain.
 - Newsletter: letter — owned list, cadence. Algorithm cannot take this.
 - Discord: tavern. Bluesky: newer cafe. Mastodon: parish (no PR tone). Mail: correspondence (HTML, charts, threads).
@@ -50,7 +50,7 @@ On each `influenzer-tick-all` (or `influenzer-tick` locally), pending briefs are
 
 - **kill** / **changelog-only** / **one angle**. Silence is a correct decision. Borderline briefs do not leak a social draft.
 - **One primary arena.** Costume of that arena only; play the wave (checklist), not a champion fantasy.
-- A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill. Waitlist/landing and press-release tone fail closed.
+- A **ship claim** needs a GitHub PR, release, or issue URL. No artifact → no ship post. Hype without a tryable demo is a kill. Waitlist/landing and press-release tone fail closed: HN/GitHub/X get kill or changelog, never a costume.
 - Output is a **draft** (content status `draft`, source `operator`) whose `body` is costume-native copy for that one arena — not a `Costume:` / `One arena:` label dump. `influenzer.hom_draft` dresses; scoring stays fail-closed in `hom.py`. `influenzer angle` (`influenzer.hom_outbox`) leaves **one** wearable packet or silence — it does not publish. `influenzer verdict hold` / `pass` (`influenzer.hom_verdict`) records the gate decision; hold releases the one-story lock, pass does not post. Live publish stays behind the existing dry-run / grant / `scheduler.live_enabled` gates. Tick-all never auto-spams.
 - Run the 24/7 tick on an always-on host (Mac mini): `uv run influenzer-tick --interval 300` or `contrib/always-on-tick.sh`. Battery laptops fail closed for the interval loop. `--once` is allowed anywhere. Not a laptop LaunchAgent. Fala may conduct the same one-shot as a subprocess organ.
 - Look at GitHub on a coarse cadence (about weekly), one story or silence — not every tick. Declare the look with `influenzer watch set --project-id ID --repo owner/name`. The interval loop still scores; when that watch is due it runs `influenzer pass` once. `--once` stays score-only unless `--pass-if-due`. `influenzer pass --project-id ID --repo owner/name` is one CMO look: scan-due, score pending briefs, at most one wearable angle. `influenzer brief scan-due --project-id ID --repo owner/name` (or `brief scan --if-due`) is the scan-only slice. `influenzer feedback --project-id ID --repo owner/name` (or the declared watch) collects inbound issue/PR comments into 0 or 1 brief; bots and LGTM stay silent; it does not post replies. Verdict stays the gate.

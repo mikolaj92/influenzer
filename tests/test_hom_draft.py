@@ -714,6 +714,56 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("HN front", decision.draft.body)
         self.assertNotIn("vanity chart", decision.draft.body.lower())
 
+    def test_press_release_tone_is_undressable_even_when_score_says_draft(self) -> None:
+        phrases = (
+            "we're excited",
+            "announcement",
+            "unveiling",
+            "delighted to share",
+        )
+        arenas = (ArenaId.HN, ArenaId.GITHUB, ArenaId.X)
+        for text in phrases:
+            for arena in arenas:
+                with self.subTest(text=text, arena=arena.value):
+                    brief = _ship_brief(
+                        preferred_arena=arena,
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                    )
+                    fake = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.DRAFT,
+                        reason="one_angle",
+                        arena=arena,
+                        angle="what shipped and why a stranger should try it",
+                        wave_checklist=ARENAS[arena].wave,
+                        canon_url=ARENAS[arena].canon_url,
+                    )
+                    self.assertIsNone(dress_brief(brief, fake))
+                    payload = dress_payload(
+                        {
+                            "brief": brief_to_mapping(brief),
+                            "score": {
+                                "brief_id": brief.brief_id,
+                                "verdict": "draft",
+                                "reason": "one_angle",
+                                "arena": arena.value,
+                                "angle": "what shipped and why a stranger should try it",
+                                "wave_checklist": list(ARENAS[arena].wave),
+                                "canon_url": ARENAS[arena].canon_url,
+                            },
+                        }
+                    )
+                    self.assertEqual(payload["status"], "noop")
+                    self.assertIsNone(payload["body"])
+                    dumped = json.dumps(payload)
+                    self.assertNotIn("we're excited", dumped.lower())
+                    self.assertNotIn("delighted to share", dumped.lower())
+                    self.assertNotIn("Show HN:", dumped)
+                    self.assertNotIn("Costume:", dumped)
+
     def test_star_upvote_follow_or_rt_ask_is_undressable_even_when_score_says_draft(self) -> None:
         asks = (
             "star the repo after you try it",
