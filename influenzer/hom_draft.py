@@ -40,6 +40,7 @@ from influenzer.playbook import (
     ArenaId,
     Verdict,
     arena_play,
+    cinema_end_reason,
     court_reason,
     fair_loop_reason,
     tavern_reason,
@@ -431,6 +432,8 @@ def _dress_linkedin(bits: CopyBits, score: Score) -> str | None:
 
 def _dress_youtube(bits: CopyBits, score: Score) -> str | None:
     """Cinema: package (title/thumb) first, then pay the promise."""
+    if cinema_end_reason(bits.blob) or fair_loop_reason(bits.blob) == "fair_cta_with_loop":
+        return None
     if not bits.package_text:
         return None
     pay = next((text for text in (bits.one_liner, *bits.rest) if text != bits.package_text), "")
@@ -620,6 +623,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))
         or (score.arena is ArenaId.REDDIT and reddit_reason(bits.blob))
         or (score.arena is ArenaId.HN and seminar_reason(bits.blob))
+        or (score.arena is ArenaId.YOUTUBE and cinema_end_reason(bits.blob))
     ):
         return None
     if unquotable_reason(triples):
@@ -662,6 +666,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(body))
         or (score.arena is ArenaId.REDDIT and reddit_reason(body))
         or (score.arena is ArenaId.HN and seminar_reason(body))
+        or (score.arena is ArenaId.YOUTUBE and cinema_end_reason(body))
     ):
         return None
     if looks_like_open_source_without_license(body):
