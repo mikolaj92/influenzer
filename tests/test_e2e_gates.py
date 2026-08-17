@@ -29,6 +29,7 @@ from influenzer.playbook import (
     LETTER_ASK_WITHOUT_GIFT_REASON,
     HN_CAMP_REASON,
     LETTER_WITHOUT_SURNAME_REASON,
+    REDDIT_NO_DISCLOSURE_REASON,
     SEMINAR_BRAND_VOICE_REASON,
     Verdict,
     cafe_reason,
@@ -41,6 +42,8 @@ from influenzer.playbook import (
     has_fair_loop,
     has_letter_gift,
     has_letter_surname,
+    has_named_subreddit,
+    has_reddit_repo,
     has_tavern_intent_split,
     has_tavern_seed,
     has_workshop_life,
@@ -54,8 +57,10 @@ from influenzer.playbook import (
     looks_like_letter_crush,
     looks_like_letter_team_voice,
     looks_like_poll,
+    looks_like_reddit_disclose,
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
+    reddit_reason,
     seminar_reason,
     tavern_reason,
     unquotable_reason,
@@ -1049,6 +1054,112 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertIn("I built", draft.body)
         self.assertNotIn("We at Product", draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
+    def test_reddit_without_disclosure_is_silence(self) -> None:
+        empties = (
+            "timeouts looked like success in r/SideProject",
+            "bez ujawnienia, native self-post in r/SideProject",
+        )
+        for idx, text in enumerate(empties):
+            with self.subTest(text=text):
+                self.assertTrue(has_named_subreddit(text))
+                self.assertEqual(reddit_reason(f"{text}\n{SHIP_PR}"), REDDIT_NO_DISCLOSURE_REASON)
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-village-spam-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.REDDIT,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.REDDIT,
+                        claims_ship=True,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=True,
+                    ),
+                    ArenaId.REDDIT,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, REDDIT_NO_DISCLOSURE_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.REDDIT,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.REDDIT].wave,
+                    canon_url=ARENAS[ArenaId.REDDIT].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.REDDIT, f"{text}\n{SHIP_PR}"),
+                    (Verdict.KILL, REDDIT_NO_DISCLOSURE_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        nameless = "I built a local tick in r/SideProject"
+        self.assertTrue(looks_like_reddit_disclose(nameless))
+        self.assertTrue(has_named_subreddit(nameless))
+        self.assertFalse(has_reddit_repo(nameless))
+        self.assertEqual(reddit_reason(nameless), REDDIT_NO_DISCLOSURE_REASON)
+        no_repo = Brief.create(
+            project_id="app-1",
+            brief_id="b-village-no-repo",
+            facts=(
+                Fact(text=nameless),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.REDDIT,
+        )
+        score = score_brief(no_repo)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, REDDIT_NO_DISCLOSURE_REASON)
+        self.assertIsNone(compose_draft(no_repo, score))
+
+        disclose = "I built a local tick that scores briefs"
+        room = "native self-post in r/SideProject"
+        living = (disclose, room, SHIP_PR)
+        self.assertTrue(looks_like_reddit_disclose(disclose))
+        self.assertTrue(has_named_subreddit(room))
+        self.assertTrue(has_reddit_repo(SHIP_PR))
+        self.assertIsNone(reddit_reason("\n".join(living)))
+        self.assertFalse(looks_like_reddit_disclose("timeouts in r/SideProject"))
+        self.assertFalse(looks_like_reddit_disclose("bez ujawnienia in r/SideProject"))
+        self.assertFalse(has_reddit_repo(disclose))
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-village-disclosed",
+            facts=(
+                Fact(text=disclose, artifact_url=SHIP_PR),
+                Fact(text=room),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.REDDIT,
+        )
+        self.assertIsNone(_gate_violation(alive, ArenaId.REDDIT, "\n".join(living)))
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.REDDIT)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "village")
+        self.assertIn("I built", draft.body)
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertIn("r/SideProject", draft.body)
         self.assertNotIn("Costume:", draft.body)
 
     def test_after_show_hn_score_does_not_pick_hn_again(self) -> None:

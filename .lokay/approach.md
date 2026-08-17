@@ -1,33 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=50 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=49 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #50 — Po Show HN siedzimy w wątku, nie robimy drugiego Show
+Issue: #49 — Reddit bez ujawnienia to spam
 
 ## Goal
 
-Gdy kąt HN jest otwarty albo w stosie 48h, feedback czyta komentarze tego itemu/repo. Score nie wybiera HN drugi raz. Backstory już padł (#32); teraz obóz.
+Draft na village: native self-post, disclose że to nasze, repo na dole albo w pierwszym komentarzu. Bez tego — cisza, nawet gdy sub jest nazwany (#31).
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `hn_camp` latch on a living HN stack
-- `influenzer/hom.py` — score kills a second Show
-- `influenzer/hom_feedback.py` — camp still reads repo comments, does not admit another story
-- `tests/test_e2e_gates.py`, `tests/test_hom_feedback.py`, `tests/test_hom_operator.py`
+- `influenzer/playbook.py` — sit preferred Reddit; `reddit_reason` requires named room + disclose + repo
+- `influenzer/hom.py` — village gate uses `reddit_reason`
+- `influenzer/hom_draft.py` — dress Reddit is silence without disclosure
+- `tests/test_e2e_gates.py` — one village story: no disclose = kill; disclose+repo = draft
+- `tests/test_hom_draft.py` — leaked Reddit score still undressable without ujawnienie
 
 ## Test plan
 
-- `python -m unittest tests.test_e2e_gates tests.test_hom_feedback tests.test_github_feedback` plus the living-stack / camp cases in `tests.test_hom_operator`
+- `pytest tests/test_e2e_gates.py tests/test_hom_draft.py` plus the existing named-room score test
 
 ## Non-goals
 
-- Fetching HN item comments over the network
-- Publishing replies into the thread
-- Changing the 48h github costume (workshop may still draft)
+- (none stated)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: no unbounded collection.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
