@@ -40,6 +40,7 @@ from influenzer.playbook import (
     ArenaId,
     Verdict,
     arena_play,
+    agora_reason,
     cinema_end_reason,
     court_reason,
     fair_loop_reason,
@@ -74,6 +75,9 @@ from influenzer.playbook import (
     looks_like_dunk,
     looks_like_worse_clone,
     looks_like_foreign_wave,
+    looks_like_reply,
+    is_parent_post_url,
+    PARENT_FACT_KINDS,
     looks_like_engagement_bait,
     looks_like_ranking_dump,
     looks_like_thread,
@@ -188,6 +192,16 @@ def _is_artifact_stub(fact: Fact) -> bool:
     return fact.kind.strip().lower() == "artifact" or fact.text.strip().casefold() == "ship artifact"
 
 
+def _is_parent_fact(fact: Fact) -> bool:
+    """A parent URL / reply-under slot is the thread, not the new thought."""
+    kind = fact.kind.strip().lower()
+    if kind in PARENT_FACT_KINDS:
+        return True
+    if looks_like_reply(fact.text):
+        return True
+    return bool(fact.artifact_url and is_parent_post_url(fact.artifact_url))
+
+
 def _copy_bits(brief: Brief) -> CopyBits | None:
     texts: list[str] = []
     package_text: str | None = None
@@ -203,7 +217,7 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
     drop_oss_sticker = looks_like_open_source_without_license(evidence)
     for fact in brief.facts:
         text = fact.text.strip()
-        if not text or _is_artifact_stub(fact):
+        if not text or _is_artifact_stub(fact) or _is_parent_fact(fact):
             continue
         wearable = strip_person_mentions(text)
         if drop_oss_sticker:
@@ -619,6 +633,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             and court_reason(bits.blob, claims_ship=brief.claims_ship)
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
+        or (score.arena is ArenaId.X and agora_reason(triples))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))
         or (score.arena is ArenaId.REDDIT and reddit_reason(bits.blob))
@@ -663,6 +678,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             and court_reason(body, claims_ship=brief.claims_ship)
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(body))
+        or (score.arena is ArenaId.X and agora_reason(triples, extra=body))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(body))
         or (score.arena is ArenaId.REDDIT and reddit_reason(body))
         or (score.arena is ArenaId.HN and seminar_reason(body))

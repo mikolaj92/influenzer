@@ -377,6 +377,8 @@ def choose_arena(
     our launch without a gift, or a letter without a surname, can be
     silence — give first, sign First Last from the profile, recs are
     adjacent.
+    Preferred X sits so an empty-feed original or a reply without a
+    new thought can be silence — ratio is the comment, not a dead RT.
     GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
     Shopping while the window lives is not a new pick — the caller
@@ -412,6 +414,10 @@ def choose_arena(
     # #54/#51: letter gives first and signs a surname. Sit so nameless we/team dies.
     if wanted is ArenaId.NEWSLETTER:
         return ArenaId.NEWSLETTER
+    # #27/#41: empty-feed original and reply-without-thought are silence.
+    # Sit so agora can die closed instead of leaking a Show HN / dead RT.
+    if wanted is ArenaId.X:
+        return ArenaId.X
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
         return ArenaId.LINKEDIN
@@ -2818,6 +2824,81 @@ def looks_like_foreign_wave(
     )
 
 
+# A reply under a parent URL (#27) needs one new thought. Echo of the
+# parent, or a body that is only the link, is a dead RT — silence on agora.
+# Pair of #27 (X does not get an empty feed) and #41 (ratio is the comment).
+AGORA_NO_NEW_THOUGHT_REASON = "agora_no_new_thought"
+
+
+def _fold_agora_thought(text: str) -> str:
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return " ".join(cleaned.split()).casefold()
+
+
+def has_agora_thought(text: str) -> bool:
+    """True when a non-URL line is long enough to be a new thought."""
+    return len(_fold_agora_thought(text)) >= MIN_FACT_CHARS
+
+
+def looks_like_agora_echo(thought: str, parent: str) -> bool:
+    """True when the reply restates the parent instead of adding a thought."""
+    folded = _fold_agora_thought(thought)
+    other = _fold_agora_thought(parent)
+    if not folded or not other:
+        return False
+    if folded == other:
+        return True
+    shorter, longer = (folded, other) if len(folded) <= len(other) else (other, folded)
+    if len(shorter) < MIN_FACT_CHARS:
+        return False
+    return shorter in longer
+
+
+def _agora_parent_facts(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> tuple[tuple[str, str, str | None], ...]:
+    packed = tuple(facts)
+    replies = [item for item in packed if _is_reply_fact(*item)]
+    if replies:
+        return tuple(replies)
+    return tuple(
+        item for item in packed if item[2] and is_parent_post_url(item[2])
+    )
+
+
+def agora_reason(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+    extra: str | None = None,
+) -> str | None:
+    """Silence when an X reply has no new thought: echo, link-only, or empty."""
+    packed = tuple(facts)
+    parents = _agora_parent_facts(packed)
+    if not parents:
+        return None
+    parent_thoughts = tuple(
+        _fold_agora_thought(text) for _kind, text, _url in parents if _fold_agora_thought(text)
+    )
+
+    def _is_new_thought(text: str) -> bool:
+        folded = _fold_agora_thought(text)
+        if len(folded) < MIN_FACT_CHARS:
+            return False
+        return not any(looks_like_agora_echo(folded, parent) for parent in parent_thoughts)
+
+    if extra is not None:
+        return None if _is_new_thought(extra) else AGORA_NO_NEW_THOUGHT_REASON
+    for kind, text, url in packed:
+        if _is_reply_fact(kind, text, url):
+            continue
+        if kind.strip().lower() == "artifact" or text.strip().casefold() == "ship artifact":
+            continue
+        if url and is_parent_post_url(url) and not _fold_agora_thought(text):
+            continue
+        if _is_new_thought(text):
+            return None
+    return AGORA_NO_NEW_THOUGHT_REASON
+
+
 def looks_like_invented_opinion(text: str) -> bool:
     """True for unsourced praise such as 'users love'. Not a quote."""
     return bool(INVENTED_OPINION_RE.search(text))
@@ -3317,6 +3398,7 @@ __all__ = [
     "WORSE_CLONE_REASON",
     "WORSE_CLONE_RE",
     "EMPTY_TAVERN_REASON",
+    "AGORA_NO_NEW_THOUGHT_REASON",
     "BLUESKY_PACK_WITHOUT_FEED_REASON",
     "LETTER_ASK_WITHOUT_GIFT_REASON",
     "LETTER_ASK_RE",
@@ -3416,11 +3498,13 @@ __all__ = [
     "arena_gate",
     "arena_play",
     "choose_arena",
+    "agora_reason",
     "cafe_reason",
     "cinema_end_reason",
     "court_reason",
     "feedback_excerpt_texts",
     "fair_loop_reason",
+    "has_agora_thought",
     "has_cafe_feed",
     "has_cafe_pack",
     "has_cinema_package",
@@ -3454,6 +3538,7 @@ __all__ = [
     "is_tryable_artifact_url",
     "invented_metric_reason",
     "is_video_host_url",
+    "looks_like_agora_echo",
     "looks_like_bot_author",
     "looks_like_bot_bump_week",
     "looks_like_commit_noise",

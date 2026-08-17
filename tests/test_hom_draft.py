@@ -402,7 +402,8 @@ class HomDraftCostumeTests(unittest.TestCase):
         )
         decision = apply_brief(brief)
         assert decision.draft is not None
-        self.assertIn("Show HN about mikolaj92/influenzer", decision.draft.body)
+        self.assertIn("Local tick scores briefs and emits a draft", decision.draft.body)
+        self.assertNotIn("Show HN about mikolaj92/influenzer", decision.draft.body)
 
     def test_naming_a_predecessor_can_still_dress(self) -> None:
         brief = _ship_brief(
