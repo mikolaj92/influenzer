@@ -1,1 +1,18 @@
-{"paths":["tests/test_e2e_gates.py","influenzer/playbook.py","influenzer/hom.py","influenzer/hom_draft.py"],"source":"deterministic","seed_paths":["thanks/subscribe/outro-logo"],"matched_tokens":["thanks","subscribe","outro","logo","gate","outro-logo"],"notes":["Agentless-style localization: deterministic paths only (no embeddings).","Seed path thanks/subscribe/outro-logo is a token, not a file; cinema/fair end lives in playbook + dress/score.","Empty path list fails closed — run_agent must not start.","Repo tree entries considered: 137."],"worktree":"/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__42-koniec-odcinka-nie-og-asza-ko-ca-95910a1b","wrote":false,"localize_rel":".lokay/localize.json"}
+{
+  "paths": [
+    "tests/test_e2e_gates.py"
+  ],
+  "source": "deterministic",
+  "seed_paths": [],
+  "matched_tokens": [
+    "gate"
+  ],
+  "notes": [
+    "Agentless-style localization: deterministic paths only (no embeddings).",
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
+  ],
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__41-reply-na-x-bez-nowej-my-li-cisza-900e9886",
+  "wrote": false,
+  "localize_rel": ".lokay/localize.json"
+}

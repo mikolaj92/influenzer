@@ -1,20 +1,17 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=42 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=41 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #42 — Koniec odcinka nie ogłasza końca
+Issue: #41 — Reply na X bez nowej myśli = cisza
 
 ## Goal
 
-YouTube/Shorts: zero „thanks for watching”, like&subscribe, outro-logo. Jedno CTA albo pętla, nie oba. Inaczej cisza na cinema/fair.
+Reply na X bez nowej treści to martwy RT. Przy URL-u rodzica (#27) body musi dodać jedną nową myśl, nie echo i nie sam link. Inaczej cisza na agora. Ratio jest z komentarza, nie z pustego cytatu.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — cinema end detector (thanks / like&subscribe / outro-logo)
-- `influenzer/hom.py` — YouTube gate uses cinema_end_reason
-- `influenzer/hom_draft.py` — cinema dress is silence on an announced end
-- `tests/test_e2e_gates.py` — cinema/fair end-of-cut coverage
+- (infer from repo inspection)
 
 ## Test plan
 
