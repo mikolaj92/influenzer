@@ -8,6 +8,8 @@ from github_pack.pack import (
     README_WITHOUT_DEMO_REASON,
     README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
+    SOLICIT_GESTURE_REASON,
+    looks_like_solicit_gesture,
     pack_survey,
     readme_has_copyable_start,
     readme_has_visible_demo,
@@ -1269,6 +1271,7 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertTrue(has_workshop_life(living[1]))
         self.assertFalse(looks_like_dead_star_story(("N stars", living[0])))
         self.assertFalse(looks_like_dead_star_count("star the repo after you try it"))
+        self.assertTrue(looks_like_solicit_gesture("star the repo after you try it"))
         alive = Brief.create(
             project_id="app-1",
             brief_id="b-living-stars",
@@ -1290,6 +1293,92 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "workshop")
         self.assertIn("pip install", draft.body.lower())
         self.assertIn("issue #4", draft.body.lower())
+
+    def test_star_upvote_follow_or_rt_ask_is_silence_not_an_angle(self) -> None:
+        asks = (
+            "star the repo after you try it",
+            "please star us",
+            "give us a star",
+            "please upvote this",
+            "follow us",
+            "RT this",
+            "daj nam gwiazdkę",
+        )
+        self.assertFalse(looks_like_solicit_gesture(""))
+        self.assertFalse(looks_like_solicit_gesture("follow the README to run the demo"))
+        self.assertFalse(looks_like_solicit_gesture("Local tick scores briefs and emits a draft"))
+        for idx, text in enumerate(asks):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_solicit_gesture(text))
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-solicit-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+                survey = {
+                    "meta": {"description": text, "homepageUrl": ""},
+                    "prs": [
+                        {
+                            "number": 12,
+                            "title": "feat: local HoM operator scores briefs",
+                            "url": "https://github.com/mikolaj92/demo/pull/12",
+                        }
+                    ],
+                    "releases": [{"tagName": "v0.1.0", "name": "v0.1.0"}],
+                    "tags": [{"name": "v0.1.0"}],
+                    "readme_text": "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n",
+                    "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                }
+                packed = pack_survey(
+                    {
+                        "status": "ok",
+                        "ok": True,
+                        "repo": "mikolaj92/demo",
+                        "now": "2026-08-17T06:00:00Z",
+                        "survey": survey,
+                    }
+                )
+                self.assertEqual(packed["status"], "noop")
+                self.assertEqual(packed["reason"], SOLICIT_GESTURE_REASON)
+                self.assertIsNone(packed["brief_id"])
+                self.assertNotIn("facts", packed)
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-solicit-alive",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="follow the README to run the demo"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Show HN:"))
+        self.assertIn("follow the README", draft.body)
 
     def test_letter_without_a_gift_is_silence(self) -> None:
         empties = (

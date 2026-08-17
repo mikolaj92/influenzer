@@ -2,7 +2,7 @@
 
 I play Hacker News. Costume: seminar. Game: curiosity auction plus gravity. Tryable thing, not a launch post.
 
-Median Show HN is about 2 points. I need organic first-hour votes and a curious thread. I never solicit upvotes (ban / domain penalty).
+Median Show HN is about 2 points. I need organic first-hour votes and a curious thread. I never solicit upvotes, stars, follows, or RTs (ban / domain penalty).
 
 ## Wave
 

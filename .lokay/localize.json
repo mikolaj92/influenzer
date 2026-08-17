@@ -1,25 +1,30 @@
 {
   "paths": [
-    "influenzer/playbook.py",
-    "influenzer/hom.py",
+    "github_pack",
     "influenzer/hom_draft.py",
-    "skills/influenzer-x/SKILL.md",
-    "skills/influenzer-hom/SKILL.md",
-    "tests/test_e2e_gates.py",
-    "tests/test_hom_operator.py",
-    "tests/test_hom_draft.py"
+    "github_pack/pack.py",
+    "skills/influenzer-hn",
+    "tests/test_github_pack.py",
+    "tests/test_hom_draft.py",
+    "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["brief", "HN", "Influenzer", "influenzer", "gate", "X"],
+  "matched_tokens": [
+    "draft",
+    "kill",
+    "HN",
+    "pack",
+    "Influenzer",
+    "influenzer",
+    "gate"
+  ],
   "notes": [
-    "Refined from admit/scan/adapters: #27 is a score sit, not a look or publish path.",
-    "X sits only with a parent-post URL; empty-feed original falls through to github/HN.",
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__27-x-nie-dostaje-pustego-feedu-fbb12030",
-  "wrote": true,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__28-adnego-ebrania-o-gwiazdki-upvote-follow-24abcebe",
+  "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

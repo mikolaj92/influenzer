@@ -16,13 +16,15 @@ from github_pack.pack import (
     README_WITHOUT_DEMO_REASON,
     README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
+    SOLICIT_GESTURE_REASON,
     looks_like_same_window_revert,
+    looks_like_solicit_gesture,
     readme_has_copyable_start,
     readme_has_visible_demo,
 )
 from github_survey import GhCall, survey_public_repo
 
-from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, b64_readme, merge_log_script, noise_script, repo_json, ship_script, ScriptedGh
 
 INSTALLABLE = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n"
 VISIBLE_DEMO = INSTALLABLE + "\n![demo](docs/demo.gif)\n"
@@ -84,6 +86,20 @@ class HeuristicTests(unittest.TestCase):
         self.assertFalse(
             looks_like_same_window_revert([ship, {"number": 13, "title": "Revert #99"}])
         )
+        asks = (
+            "star the repo after you try it",
+            "please star us",
+            "give us a star",
+            "please upvote this",
+            "follow us",
+            "RT this",
+            "daj nam gwiazdkę",
+        )
+        for text in asks:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_solicit_gesture(text))
+        self.assertFalse(looks_like_solicit_gesture("follow the README to run the demo"))
+        self.assertFalse(looks_like_solicit_gesture("Local tick scores briefs and emits a draft"))
 
 
 class PackSilenceTests(unittest.TestCase):
@@ -308,6 +324,38 @@ class PackSilenceTests(unittest.TestCase):
         )
         self.assertEqual(other["status"], "ok")
         self.assertTrue(other["claims_ship"])
+
+    def test_star_upvote_follow_or_rt_ask_is_silence(self) -> None:
+        asks = (
+            "please star us if this local tick helped",
+            "give us a star after you try it",
+            "please upvote this Show HN",
+            "follow us for more local-first tools",
+            "RT this if the install works",
+        )
+        for text in asks:
+            with self.subTest(text=text):
+                out = self._pack(ship_script(repo=GhCall(0, repo_json(description=text))))
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], SOLICIT_GESTURE_REASON)
+                self.assertTrue(out["ok"])
+                self.assertIsNone(out["brief_id"])
+                self.assertNotIn("facts", out)
+                dumped = json.dumps(out)
+                self.assertNotIn("star the repo", dumped)
+                self.assertNotIn("upvote", dumped.lower())
+                self.assertNotIn("follow us", dumped.lower())
+        readme_ask = self._pack(
+            ship_script(
+                readme=GhCall(
+                    0,
+                    b64_readme(VISIBLE_DEMO + "\nPlease star the repo after you try it.\n"),
+                )
+            )
+        )
+        self.assertEqual(readme_ask["status"], "noop")
+        self.assertEqual(readme_ask["reason"], SOLICIT_GESTURE_REASON)
+        self.assertNotIn("facts", readme_ask)
 
     def test_waitlist_release_is_silence(self) -> None:
         out = self._pack(
