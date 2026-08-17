@@ -1640,6 +1640,101 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertNotIn("the team", draft.body.lower())
         self.assertNotIn("Costume:", draft.body)
 
+    def test_letter_only_when_a_stranger_can_try_it(self) -> None:
+        gift = "Local tick scores briefs and emits a draft"
+        rec = "adjacent tool in the same niche, not a crush"
+        named = "Mikolaj Nowak"
+        feedback = "https://github.com/mikolaj92/influenzer/issues/4#issuecomment-101"
+        silent = (
+            (
+                "tryable-no-ship",
+                False,
+                True,
+                (
+                    Fact(text=gift, artifact_url=SHIP_PR),
+                    Fact(text=rec),
+                    Fact(text=named),
+                ),
+            ),
+            (
+                "artifact-no-tryable",
+                False,
+                False,
+                (
+                    Fact(text=gift, artifact_url=SHIP_PR),
+                    Fact(text=rec),
+                    Fact(text=named),
+                ),
+            ),
+            (
+                "feedback-only",
+                False,
+                False,
+                (
+                    Fact(
+                        kind="issue_comment",
+                        text="@bob: How do I install this when uv is missing?",
+                        artifact_url=feedback,
+                    ),
+                    Fact(text=gift),
+                    Fact(text=named),
+                ),
+            ),
+        )
+        for label, claims_ship, tryable, facts in silent:
+            with self.subTest(label=label):
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-letter-not-tryable-{label}",
+                    facts=facts,
+                    story_kind="major",
+                    claims_ship=claims_ship,
+                    tryable=tryable,
+                    preferred_arena=ArenaId.NEWSLETTER,
+                )
+                blob = "\n".join(
+                    part for part in (*(fact.text for fact in facts), SHIP_PR) if part
+                )
+                self.assertIsNone(_gate_violation(brief, ArenaId.NEWSLETTER, blob))
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+                self.assertEqual(score.reason, "newsletter_no_user_facing_change")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.NEWSLETTER,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.NEWSLETTER].wave,
+                    canon_url=ARENAS[ArenaId.NEWSLETTER].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-letter-ship-tryable",
+            facts=(
+                Fact(text=gift, artifact_url=SHIP_PR),
+                Fact(text=rec),
+                Fact(text=named),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.NEWSLETTER,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.NEWSLETTER)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "letter")
+        self.assertIn("local tick", draft.body.lower())
+        self.assertIn("mikolaj nowak", draft.body.lower())
+        self.assertNotIn("Costume:", draft.body)
+
     def test_show_hn_brand_voice_is_silence(self) -> None:
         brands = (
             "We at Product announced a local tick",

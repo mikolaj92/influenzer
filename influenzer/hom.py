@@ -738,6 +738,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if is_social_arena(chosen):
             return _kill(brief, "monday_without_history")
         return _changelog(brief, "monday_without_history")
+    # Letter only on ship+tryable (a stranger can click and run it).
+    # Patch, typo, internal, feedback-only: silence on the list; changelog on GitHub.
+    if chosen is ArenaId.NEWSLETTER and not (brief.claims_ship and brief.tryable):
+        return _changelog(brief, "newsletter_no_user_facing_change")
     if is_social_arena(chosen):
         if not _enough_social_substance(brief):
             return _changelog(brief, "thin_brief")
