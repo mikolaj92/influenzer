@@ -1534,10 +1534,26 @@ class OrderedLiveGateTests(unittest.TestCase):
             tryable=True,
             preferred_arena=ArenaId.DISCORD,
         )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.DISCORD,
+                claims_ship=False,
+                tryable=True,
+                story_kind="decision",
+                clickable=True,
+            ),
+            ArenaId.GITHUB,
+        )
         decision_score = score_brief(decision)
+        self.assertEqual(decision_score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision_score.arena, ArenaId.GITHUB)
         self.assertNotEqual(decision_score.arena, ArenaId.DISCORD)
-        self.assertIn(decision_score.arena, {ArenaId.GITHUB, None})
-        self.assertIsNone(compose_draft(decision, decision_score))
+        decision_draft = compose_draft(decision, decision_score)
+        assert decision_draft is not None
+        self.assertEqual(decision_draft.costume, "workshop")
+        self.assertNotEqual(decision_draft.costume, "tavern")
+        self.assertIn("Discussions", decision_draft.body)
+        self.assertNotIn("Costume:", decision_draft.body)
         self.assertEqual(
             _gate_violation(decision, ArenaId.DISCORD, "\n".join(("decyzja", *living))),
             (Verdict.KILL, EMPTY_TAVERN_REASON),
@@ -1562,6 +1578,83 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(draft.costume, "workshop")
         self.assertIn("I struggled with timeouts", draft.body)
         self.assertNotIn("Costume:", draft.body)
+
+    def test_decision_does_not_sit_on_discord(self) -> None:
+        # #38: story_kind=decision → warsztat (GitHub), nigdy tawerna.
+        # Discord celebruje merge, nie uchwałę. Not live. One story.
+        living = (
+            "help / show / contribute / lounge",
+            "seed about 10 builders before a public invite",
+        )
+        uchwala = "we chose SQLite over a hosted store so the operator stays local"
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.DISCORD,
+                claims_ship=False,
+                tryable=True,
+                story_kind="decision",
+                clickable=True,
+            ),
+            ArenaId.GITHUB,
+        )
+        self.assertEqual(
+            choose_arena(
+                preferred_arena=ArenaId.DISCORD,
+                claims_ship=False,
+                tryable=True,
+                story_kind="major",
+                clickable=True,
+            ),
+            ArenaId.DISCORD,
+        )
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-decision-not-tavern",
+            facts=(
+                Fact(text=uchwala, artifact_url=SHIP_PR),
+                Fact(text=living[0]),
+                Fact(text=living[1]),
+            ),
+            story_kind="decision",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.DISCORD,
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.GITHUB)
+        self.assertNotEqual(score.arena, ArenaId.DISCORD)
+        self.assertEqual(
+            _gate_violation(brief, ArenaId.DISCORD, "\n".join((uchwala, *living))),
+            (Verdict.KILL, EMPTY_TAVERN_REASON),
+        )
+        draft = compose_draft(brief, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "workshop")
+        self.assertNotEqual(draft.costume, "tavern")
+        self.assertIn("SQLite", draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
+        no_pref = Brief.create(
+            project_id="app-1",
+            brief_id="b-decision-falls-to-github",
+            facts=(
+                Fact(text=uchwala, artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            ),
+            story_kind="decision",
+            claims_ship=False,
+            tryable=True,
+        )
+        no_pref_score = score_brief(no_pref)
+        self.assertEqual(no_pref_score.verdict, Verdict.DRAFT)
+        self.assertEqual(no_pref_score.arena, ArenaId.GITHUB)
+        self.assertNotEqual(no_pref_score.arena, ArenaId.DISCORD)
+        no_pref_draft = compose_draft(no_pref, no_pref_score)
+        assert no_pref_draft is not None
+        self.assertEqual(no_pref_draft.costume, "workshop")
+        self.assertNotEqual(no_pref_draft.costume, "tavern")
+        self.assertNotIn("Costume:", no_pref_draft.body)
 
     def test_bluesky_without_artifact_url_is_silence(self) -> None:
         living = (

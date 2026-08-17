@@ -1,23 +1,19 @@
 {
   "paths": [
     "influenzer/playbook.py",
-    "skills/influenzer-youtube",
+    "skills/influenzer-discord",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": [
-    "YouTube",
-    "Playbook",
-    "influenzer",
-    "gate"
-  ],
+  "matched_tokens": ["Discord", "influenzer", "gate", "choose_arena", "decision"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
+    "Refined after inspection: sit-exception lives in choose_arena.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__37-youtube-bez-pary-tytu-obietnica-cisza-378f1b07",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__38-decyzje-nie-mieszkaj-na-discordzie-6bfa06b5",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
