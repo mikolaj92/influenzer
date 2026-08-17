@@ -12,10 +12,15 @@ from github_pack.classify import (
     looks_like_merged_pr_fact,
     readme_tryable_url,
 )
-from github_pack.pack import README_WITHOUT_DEMO_REASON, readme_has_visible_demo
+from github_pack.pack import (
+    README_WITHOUT_DEMO_REASON,
+    REVERTED_NOT_A_SHIP_REASON,
+    looks_like_same_window_revert,
+    readme_has_visible_demo,
+)
 from github_survey import GhCall, survey_public_repo
 
-from tests.gh_scripts import NOW, REPO, SHIP_RELEASE, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, SHIP_PR, SHIP_RELEASE, b64_readme, merge_log_script, noise_script, ship_script, ScriptedGh
 
 INSTALLABLE = "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n"
 VISIBLE_DEMO = INSTALLABLE + "\n![demo](docs/demo.gif)\n"
@@ -50,6 +55,28 @@ class HeuristicTests(unittest.TestCase):
                     {"text": "Merged PR #12: feat: local HoM operator scores briefs"},
                 ]
             )
+        )
+        ship = {
+            "number": 12,
+            "title": "feat: local HoM operator scores briefs",
+            "url": "https://github.com/mikolaj92/demo/pull/12",
+        }
+        self.assertTrue(
+            looks_like_same_window_revert(
+                [ship, {"number": 13, "title": 'Revert "feat: local HoM operator scores briefs"'}]
+            )
+        )
+        self.assertTrue(
+            looks_like_same_window_revert([ship, {"number": 13, "title": "Revert #12"}])
+        )
+        self.assertTrue(
+            looks_like_same_window_revert(
+                [ship, {"number": 13, "title": "Revert the launch", "body": "This reverts #12."}]
+            )
+        )
+        self.assertFalse(looks_like_same_window_revert([ship]))
+        self.assertFalse(
+            looks_like_same_window_revert([ship, {"number": 13, "title": "Revert #99"}])
         )
 
 
@@ -200,6 +227,67 @@ class PackSilenceTests(unittest.TestCase):
             ),
             url,
         )
+
+    def test_same_window_revert_is_not_a_ship(self) -> None:
+        out = self._pack(
+            ship_script(
+                prs=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "number": 12,
+                                "title": "feat: local HoM operator scores briefs",
+                                "url": SHIP_PR,
+                                "mergedAt": "2026-08-12T12:00:00Z",
+                                "body": "Stranger can clone and run.",
+                            },
+                            {
+                                "number": 13,
+                                "title": 'Revert "feat: local HoM operator scores briefs"',
+                                "url": "https://github.com/mikolaj92/demo/pull/13",
+                                "mergedAt": "2026-08-12T16:00:00Z",
+                                "body": "This reverts #12.",
+                            },
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], REVERTED_NOT_A_SHIP_REASON)
+        self.assertTrue(out["ok"])
+        self.assertIsNone(out["brief_id"])
+        self.assertNotIn("claims_ship", out)
+        self.assertNotIn("facts", out)
+
+        other = self._pack(
+            ship_script(
+                prs=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "number": 12,
+                                "title": "feat: local HoM operator scores briefs",
+                                "url": SHIP_PR,
+                                "mergedAt": "2026-08-12T12:00:00Z",
+                                "body": "Stranger can clone and run.",
+                            },
+                            {
+                                "number": 13,
+                                "title": "Revert #99",
+                                "url": "https://github.com/mikolaj92/demo/pull/13",
+                                "mergedAt": "2026-08-12T16:00:00Z",
+                                "body": "",
+                            },
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(other["status"], "ok")
+        self.assertTrue(other["claims_ship"])
 
     def test_waitlist_release_is_silence(self) -> None:
         out = self._pack(
