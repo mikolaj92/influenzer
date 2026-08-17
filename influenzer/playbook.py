@@ -393,6 +393,9 @@ def choose_arena(
     a thread goes github/HN; not tryable sits so x_empty_feed can kill.
     GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
+    A lab notebook is not Show HN: exploration / decision / failure
+    do not sit here — workshop on GitHub, or silence. Seminar only
+    when a stranger can click and run it.
     Shopping while the window lives is not a new pick — the caller
     kills an explicit change; this keeps the locked costume when
     preferred is empty.
@@ -400,7 +403,21 @@ def choose_arena(
     locked = parse_stack_arena(stack_arena)
     if locked is not None:
         return locked
+    kind = (
+        story_kind
+        if isinstance(story_kind, StoryKind) or story_kind is None
+        else StoryKind(story_kind)
+    )
     seated = parse_stack_arena(preferred_arena)
+    # #40: lab notebook is not Show HN. Exploration / decision / failure
+    # do not sit — workshop or silence. Major / hard_issue still sit so
+    # a missing tryable demo can die as hn_not_tryable.
+    if seated is ArenaId.HN and kind in {
+        StoryKind.EXPLORATION,
+        StoryKind.DECISION,
+        StoryKind.FAILURE,
+    }:
+        seated = None
     if seated is not None:
         return seated
     wanted = None
@@ -413,11 +430,6 @@ def choose_arena(
             )
         except ValueError:
             wanted = None
-    kind = (
-        story_kind
-        if isinstance(story_kind, StoryKind) or story_kind is None
-        else StoryKind(story_kind)
-    )
     # #49/#31: village without disclosure is spam. Sit so a named room
     # without ujawnienie + repo is silence.
     if wanted is ArenaId.REDDIT:

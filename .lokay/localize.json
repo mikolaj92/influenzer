@@ -1,19 +1,18 @@
 {
   "paths": [
     "influenzer/playbook.py",
-    "skills/influenzer-discord",
+    "skills/influenzer-hn",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["Discord", "influenzer", "gate", "choose_arena", "decision"],
+  "matched_tokens": ["HN", "influenzer", "gate", "choose_arena", "tryable"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Refined after inspection: sit-exception lives in choose_arena.",
+    "Inspection refined the sit-path into choose_arena in playbook.py.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__38-decyzje-nie-mieszkaj-na-discordzie-6bfa06b5",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__40-show-hn-bez-tryable-ship-cisza-48225f9a",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

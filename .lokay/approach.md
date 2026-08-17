@@ -1,33 +1,38 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=38 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=40 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #38 — Decyzje nie mieszkają na Discordzie
+Issue: #40 — Show HN bez tryable ship = cisza
 
 ## Goal
 
-`story_kind=decision` → warsztat (GitHub), nigdy tawerna. Discord celebruje merge, nie uchwałę. Durable Q&A idzie do Discussions, nie w search discorda.
+Show HN is not a lab notebook. `story_kind` exploration / decision / failure
+without a tryable ship must not sit on HN. Workshop or silence. Seminar only
+when a stranger can click and run it. Small `choose_arena` block, not a second
+bag. Composes onto #32 (Show HN format). Not live. One story.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — small `choose_arena` sit-exception
-- `skills/influenzer-discord/SKILL.md`
-- `tests/test_e2e_gates.py`
+- `influenzer/playbook.py` — `choose_arena` no longer seats preferred HN for
+  exploration / decision / failure; major / hard_issue still sit so a missing
+  demo can die as `hn_not_tryable`.
+- `skills/influenzer-hn/SKILL.md` — costume note: lab notebook is not Show HN.
+- `tests/test_e2e_gates.py` — e2e gate: those kinds do not pick HN.
 
 ## Test plan
 
-- `python -m unittest tests.test_e2e_gates.OrderedLiveGateTests.test_decision_does_not_sit_on_discord tests.test_e2e_gates.OrderedLiveGateTests.test_durable_qa_does_not_go_to_discord_search tests.test_e2e_gates.OrderedLiveGateTests.test_empty_tavern_does_not_get_an_invite`
+- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_show_hn_without_tryable_ship_does_not_sit tests/test_e2e_gates.py::OrderedLiveGateTests::test_show_hn_is_title_url_and_backstory_or_silence tests/test_hom_operator.py::HomOperatorTests::test_choose_arena_keeps_living_github_or_hn_costume tests/test_hom_operator.py::HomOperatorTests::test_hn_without_tryable_is_killed -q`
 
 ## Non-goals
 
-- Live publish
-- Moving durable Q&A (that's #52)
-- New Discord story-kind reason; reuse existing workshop fallthrough
+- Do not change living-stack / camp behavior after a real Show HN.
+- Do not invent a new reason bag; reuse workshop / existing `hn_not_tryable`.
+- Not live. One story.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- Small block on `choose_arena`: preferred Discord sits for merge/celebration, not for `story_kind=decision`.
+- Localization listed only the HN skill and e2e tests; inspection found the
+  sit-path in `choose_arena` (`parse_stack_arena(preferred)` returned HN
+  before story_kind / tryable). Refined file list accordingly.
