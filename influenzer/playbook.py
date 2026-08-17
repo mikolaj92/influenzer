@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no roadmap, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no roadmap, no webinar, no meetup, no calendar, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -1023,6 +1023,24 @@ ROADMAP_RE = re.compile(
     r"|\bna\s+mapie\s+drogowej\b"
     r"|\bwkr[oó]tce\b"
     r"|\bplanowane\s+na\s+q[1-4]\b"
+    r")"
+)
+# An event is not a ship. Webinar / meetup / calendar / join us Thursday is
+# cisza, not an artifact. Changelog may keep the date. Pair of waitlist
+# (#46, mailing list) and roadmap (#129, coming Q3). This is the date on
+# the wall, not a tryable drop. "calendar year" is not an invite.
+EVENT_NOT_A_SHIP = "event_not_a_ship"
+EVENT_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwebinars?\b"
+    r"|\bmeet[- ]?ups?\b"
+    r"|\bcalendars?\b(?!\s+year\b)"
+    r"|\bkalendarz(?:e|a|u|owi|em|ach)?\b"
+    r"|\bwydarzeni(?:e|a|u|em|om|ami|ach)\b"
+    r"|\bjoin\s+us\s+(?:this\s+|next\s+)?"
+    r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b"
+    r"|\bdo[lł][aą]cz(?:cie)?\s+(?:do\s+nas\s+)?(?:w\s+)?"
+    r"(?:poniedzia[lł]ek|wtorek|[sś]rod[eę]|czwartek|pi[aą]tek)\b"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -2772,6 +2790,13 @@ def looks_like_roadmap(text: str) -> bool:
     return bool(ROADMAP_RE.search(text))
 
 
+def looks_like_event(text: str) -> bool:
+    """True for webinar / meetup / calendar / join us Thursday. Not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(EVENT_RE.search(text))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3596,6 +3621,8 @@ __all__ = [
     "REDDIT_NO_DISCLOSURE_REASON",
     "REDDIT_NO_ROOM_REASON",
     "ROADMAP_RE",
+    "EVENT_NOT_A_SHIP",
+    "EVENT_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -3740,6 +3767,7 @@ __all__ = [
     "looks_like_click_here",
     "looks_like_server_splash",
     "looks_like_roadmap",
+    "looks_like_event",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",

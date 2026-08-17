@@ -85,6 +85,7 @@ from influenzer.playbook import (
     looks_like_click_here,
     looks_like_server_splash,
     looks_like_roadmap,
+    looks_like_event,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -2561,6 +2562,62 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.DRAFT)
         self.assertEqual(score.arena, ArenaId.HN)
         self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_event_is_not_a_ship(self) -> None:
+        vapor = (
+            "webinar Thursday",
+            "join us Thursday",
+            "meetup next week",
+            "add it to the calendar",
+            "wydarzenie w czwartek",
+            "dołącz w czwartek",
+        )
+        for text in vapor:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_event(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "as soon as you install, the local tick scores",
+            "calendar year 2026 on the README",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_event(text))
+
+    def test_event_ship_claim_is_killed(self) -> None:
+        vapor = (
+            "webinar Thursday",
+            "join us Thursday",
+            "meetup next week",
+            "add it to the calendar",
+            "wydarzenie w czwartek",
+        )
+        for text in vapor:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "event_not_a_ship")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_event_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="join us Thursday", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "event_not_a_ship")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
 
     def test_prerelease_ship_claim_is_killed(self) -> None:
         vapor = (

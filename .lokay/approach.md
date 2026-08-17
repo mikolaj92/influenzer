@@ -1,38 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=40 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=138 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #40 — Show HN bez tryable ship = cisza
+Issue: #138 — Wydarzenie nie jest shipem
 
 ## Goal
 
-Show HN is not a lab notebook. `story_kind` exploration / decision / failure
-must not sit on HN. Workshop or silence. Seminar only when a stranger can
-click and run a major or hard-issue ship. Small `choose_arena` block, not a
-second bag. Composes onto #32 (Show HN format). Not live. One story.
+Wydarzenie nie jest shipem. Webinar, meetup, calendar, „join us Thursday” = cisza. Kalendarz nie jest artefaktem.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `choose_arena` no longer seats preferred HN for
-  exploration / decision / failure; major / hard_issue still sit so a missing
-  demo can die as `hn_not_tryable`.
-- `skills/influenzer-hn/SKILL.md` — costume note: lab notebook is not Show HN.
-- `tests/test_e2e_gates.py` — e2e gate: those kinds do not pick HN.
+- `influenzer/playbook.py` — `EVENT_RE` / `looks_like_event` / `EVENT_NOT_A_SHIP`
+- `influenzer/hom.py` — score kill/changelog
+- `influenzer/hom_draft.py` — undress event copy
+- `github_pack/classify.py` + `github_pack/pack.py` — inbound event silence
+- `influenzer/brief_admit.py` — admit fail-closed
+- `tests/test_e2e_gates.py`, `tests/test_hom_operator.py`, `tests/test_github_pack.py`, `tests/test_brief_admit.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_show_hn_without_tryable_ship_does_not_sit tests/test_e2e_gates.py::OrderedLiveGateTests::test_show_hn_is_title_url_and_backstory_or_silence tests/test_e2e_gates.py::OrderedLiveGateTests::test_decision_does_not_sit_on_discord -q`
+- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_event_is_not_a_ship_on_hn_x_or_shorts tests/test_hom_operator.py::ScoreBriefTests::test_event_is_not_a_ship tests/test_hom_operator.py::ScoreBriefTests::test_event_ship_claim_is_killed tests/test_hom_operator.py::ScoreBriefTests::test_event_without_ship_claim_is_changelog_only tests/test_github_pack.py::PackSilenceTests::test_webinar_release_is_silence tests/test_brief_admit.py::AdmitAndComposeTests::test_event_pack_is_silence_not_a_ship -q`
 
 ## Non-goals
 
-- Do not change living-stack / camp behavior after a real Show HN.
-- Do not invent a new reason bag; reuse workshop / existing `hn_not_tryable`.
-- Not live. One story.
+- Do not treat a calendar year mention as an invite.
+- A calendar invite is not a ship artifact even with a GitHub URL.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Localization listed only the HN skill and e2e tests; inspection found the
-  sit-path in `choose_arena` (`parse_stack_arena(preferred)` returned HN
-  before story_kind / tryable). Refined file list accordingly.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.

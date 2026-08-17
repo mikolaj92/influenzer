@@ -43,6 +43,19 @@ _WAITLIST_RE = re.compile(
     r"|\bno\s+demo\b"
     r")"
 )
+_EVENT_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwebinars?\b"
+    r"|\bmeet[- ]?ups?\b"
+    r"|\bcalendars?\b(?!\s+year\b)"
+    r"|\bkalendarz(?:e|a|u|owi|em|ach)?\b"
+    r"|\bwydarzeni(?:e|a|u|em|om|ami|ach)\b"
+    r"|\bjoin\s+us\s+(?:this\s+|next\s+)?"
+    r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b"
+    r"|\bdo[lł][aą]cz(?:cie)?\s+(?:do\s+nas\s+)?(?:w\s+)?"
+    r"(?:poniedzia[lł]ek|wtorek|[sś]rod[eę]|czwartek|pi[aą]tek)\b"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -68,6 +81,13 @@ def looks_like_ship_title(text: str) -> bool:
 
 def looks_like_waitlist(text: str) -> bool:
     return bool(_WAITLIST_RE.search(text))
+
+
+def looks_like_event(text: str) -> bool:
+    """True for webinar / meetup / calendar / join us Thursday. Not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(_EVENT_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

@@ -379,6 +379,28 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "waitlist_not_tryable")
 
+    def test_webinar_release_is_silence(self) -> None:
+        out = self._pack(
+            ship_script(
+                releases=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "tagName": "v0.0.0-event",
+                                "name": "Join us Thursday for the webinar",
+                                "isDraft": False,
+                                "isPrerelease": False,
+                                "publishedAt": "2026-08-12T18:00:00Z",
+                            }
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "event_not_a_ship")
+
     def test_prior_silence_passes_through(self) -> None:
         out = pack_survey({"status": "noop", "ok": True, "reason": "gh_missing", "repo": REPO})
         self.assertEqual(out["reason"], "gh_missing")
