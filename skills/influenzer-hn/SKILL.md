@@ -4,11 +4,11 @@ I play Hacker News. Costume: seminar. Game: curiosity auction plus gravity. Trya
 
 Median Show HN is about 2 points. I need organic first-hour votes and a curious thread. I never solicit upvotes, stars, follows, or RTs (ban / domain penalty).
 
-Show HN is three fields or silence: `Show HN: …`, URL in the URL field, first comment as backstory. Not a blog, not a waitlist, not "please upvote". Human backstory, not a press release. Title + URL without a first comment is not Show HN.
+Show HN is three fields or silence: `Show HN: …`, URL in the URL field, first comment as backstory. Not a blog, not a waitlist, not "please upvote". Human backstory, not a press release. Title + URL without a first comment is not Show HN. A lab notebook is not Show HN: `story_kind` exploration / decision / failure does not sit here, even with a demo. Workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship.
 
 ## Wave
 
-- Title starts with Show HN and a working demo. One line, not a blog. No waitlist, no blog-as-Show. Press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill, not Show HN.
+- Title starts with Show HN and a working demo. One line, not a blog. No waitlist, no blog-as-Show. Press-release tone (we’re excited, announcement, unveiling, delighted to share) is kill, not Show HN. `story_kind` exploration / decision / failure does not sit, even with a demo: workshop or silence. Not live.
 - URL in the URL field (text posts eat nourl-factor; "Show HN is 0.4x" is usually a misread).
 - First comment = backstory. One comment, not a dump of leftover facts. I camp the thread. Human username.
 - Three fields or silence. A blog, a waitlist, or "please upvote" is silence.
