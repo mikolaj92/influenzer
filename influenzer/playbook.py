@@ -371,9 +371,12 @@ def choose_arena(
     Preferred Discord sits so an empty tavern can be silence — public
     invite only with intent split and ~10 builders. Preferred Bluesky
     sits so an artifact-only cafe can be silence — pack onboarduje,
-    feed trzyma. Preferred newsletter sits so subscribe / our launch
-    without a gift, or a letter without a surname, can be silence —
-    give first, sign First Last from the profile, recs are adjacent.
+    feed trzyma. Preferred Reddit sits so a named room without
+    disclosure or a repo at the bottom can be silence — native
+    self-post, say it's ours. Preferred newsletter sits so subscribe /
+    our launch without a gift, or a letter without a surname, can be
+    silence — give first, sign First Last from the profile, recs are
+    adjacent.
     GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
     Shopping while the window lives is not a new pick — the caller
@@ -396,6 +399,10 @@ def choose_arena(
             )
         except ValueError:
             wanted = None
+    # #49/#31: village without disclosure is spam. Sit so a named room
+    # without ujawnienie + repo is silence.
+    if wanted is ArenaId.REDDIT:
+        return ArenaId.REDDIT
     # #57: empty tavern is silence. Sit so a public invite on emptiness dies.
     if wanted is ArenaId.DISCORD:
         return ArenaId.DISCORD
@@ -3088,6 +3095,51 @@ def has_named_subreddit(text: str) -> bool:
     return bool(SUBREDDIT_RE.search(text))
 
 
+# Village without disclosure is spam. A named room (#31) is not enough.
+# Native self-post, say it's ours, repo at the bottom or first comment.
+# Pair of #49 (disclose) and #31 (named room).
+REDDIT_NO_ROOM_REASON = "reddit_no_room"
+REDDIT_NO_DISCLOSURE_REASON = "reddit_no_disclosure"
+REDDIT_DISCLOSE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bdisclos(?:e|ure|ing)\b|"
+    r"\bujawni|"
+    r"\bthis is (?:my|our|mine)\b|"
+    r"\bI (?:built|wrote|made|shipped)\b|"
+    r"\bmy (?:project|tool|repo|app)\b|"
+    r"\bour (?:project|tool|repo|app)\b|"
+    r"\bI['’]m the (?:author|maintainer|dev)\b|"
+    r"\baffiliated\b|"
+    r"\bto nasze\b|"
+    r"\bto m[oó]j(?:e)?\b"
+    r")"
+)
+
+
+def looks_like_reddit_disclose(text: str) -> bool:
+    """True for I built / this is my project / disclose. Affiliation must be said."""
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text or "")
+    return bool(REDDIT_DISCLOSE_RE.search(cleaned))
+
+
+def has_reddit_repo(text: str) -> bool:
+    """True when a ship artifact URL can sit at the bottom or first comment."""
+    for match in _URL_IN_TEXT_RE.finditer(text or ""):
+        url = match.group(0).rstrip(").,;]")
+        if is_ship_artifact_url(url):
+            return True
+    return False
+
+
+def reddit_reason(text: str) -> str | None:
+    """Silence when village would post without a named room, disclosure, or repo."""
+    if not has_named_subreddit(text):
+        return REDDIT_NO_ROOM_REASON
+    if not looks_like_reddit_disclose(text) or not has_reddit_repo(text):
+        return REDDIT_NO_DISCLOSURE_REASON
+    return None
+
+
 def has_cinema_package(text: str) -> bool:
     return bool(CINEMA_PACKAGE_RE.search(text))
 
@@ -3207,6 +3259,9 @@ __all__ = [
     "QUOTE_MARKS",
     "RANKING_DUMP_RE",
     "RANKING_HOSTS",
+    "REDDIT_DISCLOSE_RE",
+    "REDDIT_NO_DISCLOSURE_REASON",
+    "REDDIT_NO_ROOM_REASON",
     "ROADMAP_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
@@ -3247,6 +3302,7 @@ __all__ = [
     "has_monday_history",
     "has_named_subreddit",
     "has_quote_mark",
+    "has_reddit_repo",
     "has_real_feedback",
     "has_tavern_intent_split",
     "has_tavern_seed",
@@ -3320,7 +3376,9 @@ __all__ = [
     "looks_like_letter_team_voice",
     "letter_reason",
     "looks_like_brand_voice",
+    "looks_like_reddit_disclose",
     "looks_like_seminar_first_person",
+    "reddit_reason",
     "seminar_reason",
     "looks_like_dead_link",
     "looks_like_dead_release_asset",

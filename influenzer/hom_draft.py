@@ -45,6 +45,7 @@ from influenzer.playbook import (
     tavern_reason,
     cafe_reason,
     letter_reason,
+    reddit_reason,
     seminar_reason,
     has_cinema_package,
     has_fair_hook,
@@ -463,7 +464,9 @@ def _dress_shorts(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_reddit(bits: CopyBits, score: Score) -> str | None:
-    """Village: native self-post for one named room; receipts at the bottom."""
+    """Village: native self-post, disclose it's ours, repo at the bottom."""
+    if reddit_reason(bits.blob):
+        return None
     if not bits.subreddit or not has_named_subreddit(bits.subreddit):
         return None
     parts = [bits.one_liner]
@@ -610,6 +613,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or (score.arena is ArenaId.DISCORD and tavern_reason(bits.blob))
         or (score.arena is ArenaId.BLUESKY and cafe_reason(bits.blob))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(bits.blob))
+        or (score.arena is ArenaId.REDDIT and reddit_reason(bits.blob))
         or (score.arena is ArenaId.HN and seminar_reason(bits.blob))
     ):
         return None
@@ -649,6 +653,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         )
         or (score.arena is ArenaId.DISCORD and tavern_reason(body))
         or (score.arena is ArenaId.NEWSLETTER and letter_reason(body))
+        or (score.arena is ArenaId.REDDIT and reddit_reason(body))
         or (score.arena is ArenaId.HN and seminar_reason(body))
     ):
         return None

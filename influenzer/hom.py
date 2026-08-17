@@ -31,6 +31,7 @@ from influenzer.playbook import (
     tavern_reason,
     cafe_reason,
     letter_reason,
+    reddit_reason,
     seminar_reason,
     LETTER_WITHOUT_SURNAME_REASON,
     has_cinema_package,
@@ -526,6 +527,10 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
             letter_fail = None
         if letter_fail:
             return Verdict.KILL, letter_fail
+    if arena is ArenaId.REDDIT:
+        village_fail = reddit_reason(blob)
+        if village_fail:
+            return Verdict.KILL, village_fail
     if arena is ArenaId.HN:
         seminar_fail = seminar_reason(blob)
         if seminar_fail:
