@@ -25,6 +25,7 @@ from influenzer.domain import (
     PublishPlan,
     PlanStatus,
 )
+from influenzer.brief_admit import open_story_reason
 from influenzer.playbook import (
     ARENAS,
     ArenaId,
@@ -35,6 +36,7 @@ from influenzer.playbook import (
     LETTER_ASK_WITHOUT_GIFT_REASON,
     HN_CAMP_REASON,
     LETTER_WITHOUT_SURNAME_REASON,
+    LIVING_STACK_REASON,
     REDDIT_NO_DISCLOSURE_REASON,
     SECRET_REASON,
     SEMINAR_BRAND_VOICE_REASON,
@@ -1467,6 +1469,76 @@ class OrderedLiveGateTests(unittest.TestCase):
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertNotIn("Costume:", draft.body)
+
+    def test_open_story_on_one_project_silences_the_other_watch(self) -> None:
+        pending = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-open-app",
+            facts=(Fact(text="already working a story"),),
+            story_kind="major",
+        )
+        self.repo.save_brief(pending)
+        self.assertEqual(open_story_reason(self.repo, self.app.project_id), "pending_brief")
+        self.assertEqual(open_story_reason(self.repo, self.builder.project_id), "pending_brief")
+
+        social = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-open-hn",
+            facts=(
+                Fact(text="I built a local tick that scores briefs", artifact_url=SHIP_PR),
+                Fact(text="I struggled with a queue that never scored a brief"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(social)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        draft = compose_draft(social, score)
+        assert draft is not None
+        self.repo.conn.execute("DELETE FROM briefs")
+        self.repo.save_brief(social)
+        self.repo.persist_operator_decision(social, score, draft, now="2026-08-17T06:00:00Z")
+        self.assertEqual(open_story_reason(self.repo, self.app.project_id), "social_draft")
+        self.assertEqual(open_story_reason(self.repo, self.builder.project_id), "social_draft")
+
+        workshop = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-open-github",
+            facts=(
+                Fact(text="pip install influenzer", artifact_url=SHIP_PR),
+                Fact(text="strangers opened issue #4 after the spike"),
+            ),
+            story_kind="major",
+            claims_ship=False,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        workshop_score = score_brief(workshop)
+        self.assertEqual(workshop_score.verdict, Verdict.DRAFT)
+        self.assertEqual(workshop_score.arena, ArenaId.GITHUB)
+        workshop_draft = compose_draft(workshop, workshop_score)
+        assert workshop_draft is not None
+        self.repo.conn.execute("DELETE FROM operator_drafts")
+        self.repo.conn.execute("DELETE FROM operator_scores")
+        self.repo.conn.execute("DELETE FROM briefs")
+        self.repo.save_brief(workshop)
+        self.repo.persist_operator_decision(
+            workshop, workshop_score, workshop_draft, now="2026-08-17T06:00:00Z"
+        )
+        self.assertEqual(self.repo.living_stack_arena(self.app.project_id, "2026-08-17T06:00:00Z"), ArenaId.GITHUB)
+        self.assertEqual(
+            self.repo.living_stack_arena(self.builder.project_id, "2026-08-17T06:00:00Z"),
+            ArenaId.GITHUB,
+        )
+        self.assertIsNone(open_story_reason(self.repo, self.app.project_id, "2026-08-17T06:00:00Z"))
+        self.assertEqual(
+            open_story_reason(self.repo, self.builder.project_id, "2026-08-17T06:00:00Z"),
+            LIVING_STACK_REASON,
+        )
+        self.assertIsNone(open_story_reason(self.repo, self.builder.project_id, "2026-08-19T06:00:00Z"))
 
 
 if __name__ == "__main__":

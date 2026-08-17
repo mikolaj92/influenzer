@@ -1,7 +1,10 @@
 """Admit 0 or 1 pending brief into state.db.
 
-One story at a time: a pending brief or unprocessed social draft is silence;
-the same ship artifact is not retold. Two watches on the same repo are one
+One story at a time for the whole machine (this state.db), not one
+project_id: a pending brief, unprocessed social draft, or living 48h
+github/hn stack on any project is silence for every watch. Changelog on
+GitHub may wait. The factory does not launch two products in parallel.
+The same ship artifact is not retold. Two watches on the same repo are one
 look: a second brief from the same git is silence, even with another project_id.
 Crash mid-look resumes; it does not start from zero. Look already done and
 look in progress are two states. A second gh on a half-open look is an error.
@@ -33,6 +36,7 @@ from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
+    LIVING_STACK_REASON,
     SECRET_REASON,
     StoryKind,
     is_social_arena,
@@ -74,14 +78,22 @@ def host_error(reason: str, *, project_id: str, repo_slug: str, **extra: Any) ->
     )
 
 
-def open_story_reason(repo: StateRepository, project_id: str) -> str | None:
+def open_story_reason(
+    repo: StateRepository,
+    project_id: str,
+    now: str | None = None,
+) -> str | None:
+    """Lock is state.db, not one project_id. One story on the machine."""
     if repo.get_project(project_id) is None:
         return "project not found"
-    if any(brief.project_id == project_id for brief in repo.list_pending_briefs(project_id)):
+    if repo.list_pending_briefs():
         return "pending_brief"
-    for draft in repo.list_operator_drafts(project_id):
+    for draft in repo.list_operator_drafts():
         if is_social_arena(draft.arena):
             return "social_draft"
+    owner, _arena = repo.living_stack(now)
+    if owner is not None and owner != project_id:
+        return LIVING_STACK_REASON
     return None
 
 
@@ -115,7 +127,11 @@ def admit_pack(
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
         return host_silence(foreign, project_id=project_id, repo_slug=slug)
-    blocked = open_story_reason(repo, project_id)
+    clock = now if isinstance(now, str) and now else None
+    if clock is None:
+        payload_now = payload.get("now")
+        clock = payload_now if isinstance(payload_now, str) else None
+    blocked = open_story_reason(repo, project_id, clock)
     if blocked:
         return host_silence(blocked, project_id=project_id, repo_slug=slug)
     facts_raw = payload.get("facts")
@@ -132,9 +148,7 @@ def admit_pack(
     )
     if already_told(repo, project_id, artifact_urls, brief_id):
         return host_silence("already_told", project_id=project_id, repo_slug=slug)
-    created_at = now or payload.get("now") or utc_now()
-    if not isinstance(created_at, str):
-        created_at = utc_now()
+    created_at = clock or utc_now()
     tryable = bool(payload.get("tryable"))
     if not tryable:
         return host_silence("not_tryable", project_id=project_id, repo_slug=slug)

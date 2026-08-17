@@ -1,28 +1,25 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=87 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=44 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #87 — Revert w tym samym oknie zabija ship
+Issue: #44 — Jedna historia na całą maszynę, nie per repo
 
 ## Goal
 
-Revert w tym samym oknie zabija ship. Jeśli look widzi merge i revert tego samego — nie claims_ship, nie Show HN. Nie reklamujemy rzeczy, której już nie ma na main.
+Otwarty kąt / pending brief / stos 48h na jakimkolwiek projekcie → inne watche milczą społecznie (changelog na GitHubie wolno). Fabryka wielu produktów nie robi równoległych launchy.
 
 ## Files likely touched
 
-- `github_pack/pack.py`
-- `tests/test_github_pack.py`
-- `tests/test_e2e_gates.py`
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python -m unittest tests.test_github_pack tests.test_e2e_gates.OrderedLiveGateTests.test_same_window_revert_is_not_a_ship_or_show_hn`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Do not advertise a thing that is already gone from main.
-- Do not teach HoM/draft a second revert gate; pack fail-closed is enough.
+- (none stated)
 
 ## Notes
 
