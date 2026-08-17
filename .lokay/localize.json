@@ -1,18 +1,26 @@
 {
   "paths": [
-    "github_pack/pack.py",
-    "influenzer/adapters/base.py",
-    "influenzer/config.py",
-    "influenzer/content.py",
+    "influenzer/hom_draft.py",
+    "influenzer/hom_feedback.py",
+    "influenzer/hom_outbox.py",
+    "influenzer/hom_pass.py",
+    "influenzer/hom_verdict.py",
+    "influenzer/hom_watch.py",
     "influenzer/hom.py",
-    "influenzer/domain.py",
-    "github_feedback/feedback.py",
-    "influenzer/brief_admit.py",
+    "skills/influenzer-hom",
+    "tests/test_hom_draft.py",
+    "tests/test_hom_feedback.py",
+    "tests/test_hom_operator.py",
+    "tests/test_hom_outbox.py",
+    "tests/test_hom_pass.py",
+    "tests/test_hom_verdict.py",
+    "tests/test_hom_watch.py",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
+    "HoM",
     "influenzer",
     "gate"
   ],
@@ -21,7 +29,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__138-wydarzenie-nie-jest-shipem-35fa247b",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__142-prompt-i-i-asked-chatgpt-nie-s-k-tem-f16118e0",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

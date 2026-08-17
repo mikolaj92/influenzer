@@ -1612,6 +1612,67 @@ POLL_RE = re.compile(
     r"\bto\s+albo\s+tamto\b"
     r")"
 )
+# A prompt dump or "I asked ChatGPT" is not an angle.
+# Dump of a conversation with a model / as an AI = silence.
+# HoM is not a model in the frame. Neighbor of #117: slogan vs kadr.
+MODEL_HOSTS: frozenset[str] = frozenset(
+    {
+        "chat.openai.com",
+        "chatgpt.com",
+        "claude.ai",
+        "gemini.google.com",
+        "bard.google.com",
+        "perplexity.ai",
+        "copilot.microsoft.com",
+        "grok.x.ai",
+        "grok.com",
+        "chat.mistral.ai",
+    }
+)
+_MODEL_NAME = (
+    r"(?:chat\s*gpt|chatgpt|gpt-?\d(?:\.\d+)?[a-z]?|gpt|"
+    r"claude|gemini|copilot|grok|bard|perplexity|llm)"
+)
+_ASKED_MODEL = r"(?:(?:an?|the)\s+)?(?:" + _MODEL_NAME + r"|model)"
+MODEL_IN_FRAME_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:i|we|they)\s+asked\s+" + _ASKED_MODEL + r"\b"
+    r"|\basked\s+" + _ASKED_MODEL + r"\b"
+    r"|\b(?:i|we)\s+(?:prompted|used)\s+" + _ASKED_MODEL + r"\b"
+    r"|\bas\s+an?\s+ai(?:\s+language\s+model)?\b(?![- ]powered)"
+    r"|\bas\s+a\s+(?:large\s+)?language\s+model\b"
+    r"|\bas\s+(?:chat\s*gpt|chatgpt)\b"
+    r"|\bi(?:['’]m|\s+am)\s+an?\s+ai\b(?![- ]powered)"
+    r"|\bi(?:['’]m|\s+am)\s+a\s+(?:large\s+)?language\s+model\b"
+    r"|\bi(?:['’]m|\s+am)\s+" + _MODEL_NAME + r"\b"
+    r"|\b" + _MODEL_NAME + r"\s+(?:said|wrote|replied|answered|thinks|suggests|told)\b"
+    r"|\baccording\s+to\s+" + _MODEL_NAME + r"\b"
+    r"|\b(?:here'?s|here\s+is)\s+(?:the\s+|my\s+)?prompt\b"
+    r"|\b(?:my|the|our)\s+" + _MODEL_NAME + r"\s+prompt\b"
+    r"|\b" + _MODEL_NAME + r"\s+prompt\b"
+    r"|\bprompt\s+(?:i\s+(?:used|gave|wrote)|dump|i\s+asked)\b"
+    r"|(?:^|(?<=\n))\s*prompt\s*:"
+    r"|\b" + _MODEL_NAME + r"\s+conversation\b"
+    r"|\bconversation\s+with\s+(?:the\s+model|" + _MODEL_NAME + r")\b"
+    r"|\bdump\s+(?:of\s+)?(?:the\s+)?(?:model|" + _MODEL_NAME + r")\b"
+    r"|\byou\s+are\s+a\s+helpful\s+assistant\b"
+    r"|\bsystem\s*:\s*you\s+are\b"
+    r"|\bzapyt\w*\s+(?:chatgpt|(?:an?\s+|the\s+)?(?:model(?:u|em)?|llm))\b"
+    r"|\bużył(?:em|am)\s+chatgpt\b"
+    r"|\bpaste\s+(?:this\s+|the\s+|my\s+)?prompt\s+into\s+" + _MODEL_NAME + r"\b"
+    r"|\brozmow[ayeę]\s+z\s+(?:chatgpt|claude|gemini|modelem)\b"
+    r"|\bzrzut\s+rozmowy\s+z\s+modelem\b"
+    r"|\bjako\s+ai\b(?![- ]powered)"
+    r"|\bjako\s+model\s+j[eę]zykow"
+    r"|\bwklei(?:łem|łam|am)\s+prompt\b"
+    r"|\boto\s+(?:mój\s+)?prompt\b"
+    r"|\bgenerated\s+by\s+(?:an?\s+ai|" + _MODEL_NAME + r")\b"
+    r"|\bwritten\s+by\s+(?:an?\s+ai|" + _MODEL_NAME + r")\b"
+    r")"
+)
+MODEL_DUMP_RE = re.compile(
+    r"(?i)(?:^|\n)\s*(?:user|human)\s*:\s+\S.+\n\s*(?:assistant|chatgpt|claude|gemini|gpt)\s*:"
+)
 # A 1/n serial is not an angle. Numbering / thread / storm is silence.
 # One post, not a serial. OS thread-safe / pthread is not a format.
 THREAD_NUMBER_RE = re.compile(
@@ -1870,6 +1931,11 @@ def is_launch_host_url(url: str | None) -> bool:
 def is_news_host_url(url: str | None) -> bool:
     """True for a newspaper / TV / wire host. A headline is not a tryable demo."""
     return _host_in(url, NEWS_HOSTS)
+
+
+def is_model_host_url(url: str | None) -> bool:
+    """True for a ChatGPT / Claude / Gemini chat host. A model chat is not a product."""
+    return _host_in(url, MODEL_HOSTS)
 
 
 def news_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
@@ -3045,6 +3111,18 @@ def looks_like_poll(text: str) -> bool:
     return bool(POLL_RE.search(cleaned))
 
 
+def looks_like_model_in_frame(text: str) -> bool:
+    """True for a prompt dump, 'I asked ChatGPT', or 'as an AI'. HoM is not a model in the frame."""
+    if not text or not text.strip():
+        return False
+    if any(is_model_host_url(match.group(0)) for match in _URL_IN_TEXT_RE.finditer(text)):
+        return True
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    if MODEL_IN_FRAME_RE.search(cleaned):
+        return True
+    return bool(MODEL_DUMP_RE.search(cleaned))
+
+
 def looks_like_thread(text: str) -> bool:
     """True for a 1/n serial, thread, or storm. One post, not a serial."""
     cleaned = _URL_IN_TEXT_RE.sub(" ", text)
@@ -3325,12 +3403,17 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
         text for kind, text, url in packed if not is_feedback_excerpt_fact(kind, url)
     ]
+    for _kind, text, url in packed:
+        if looks_like_model_in_frame(text) or is_model_host_url(url):
+            return "model_in_frame"
+    if extra and (looks_like_model_in_frame(extra) or is_model_host_url(extra)):
+        return "model_in_frame"
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3605,6 +3688,9 @@ __all__ = [
     "WEEKLY_UPDATE_RE",
     "MIN_FACT_CHARS",
     "MIN_SOCIAL_FACTS",
+    "MODEL_DUMP_RE",
+    "MODEL_HOSTS",
+    "MODEL_IN_FRAME_RE",
     "NEWS_HOSTS",
     "NEWSLETTER_STORY_KINDS",
     "PRESS_RELEASE_REASON",
@@ -3678,6 +3764,7 @@ __all__ = [
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
     "is_merge_log_texts",
+    "is_model_host_url",
     "is_news_host_url",
     "is_primary_arena",
     "is_private_channel_url",
@@ -3705,6 +3792,7 @@ __all__ = [
     "REPLY_SHAPE_RE",
     "looks_like_contest",
     "looks_like_poll",
+    "looks_like_model_in_frame",
     "looks_like_ranking_dump",
     "looks_like_thread",
     "looks_like_engagement_bait",
