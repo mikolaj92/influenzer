@@ -1,21 +1,23 @@
 {
   "paths": [
     "influenzer/playbook.py",
-    "influenzer/hom.py",
-    "influenzer/hom_draft.py",
-    "skills/influenzer-shorts",
     "skills/influenzer-youtube",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["Shorts", "YouTube", "influenzer", "gate", "has_fair_hook"],
+  "matched_tokens": [
+    "YouTube",
+    "Playbook",
+    "influenzer",
+    "gate"
+  ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Inspection refined the seed list: hook fail-closed lives in playbook/hom/hom_draft, not only skill docs.",
-    "kind=hook and the word loop were treating a cinema cut as a fair hook."
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__36-shorts-bez-haczyka-1-3s-cisza-881b544d",
-  "wrote": true,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__37-youtube-bez-pary-tytu-obietnica-cisza-378f1b07",
+  "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

@@ -37,6 +37,7 @@ from influenzer.playbook import (
     BLUESKY_PACK_WITHOUT_FEED_REASON,
     BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
     CINEMA_ANNOUNCES_END_REASON,
+    CINEMA_MISSING_PACKAGE_REASON,
     COURT_NOT_A_LAUNCH_REASON,
     DEAD_STAR_COUNT_REASON,
     EMPTY_TAVERN_REASON,
@@ -58,6 +59,7 @@ from influenzer.playbook import (
     choose_arena,
     has_parent_post,
     cinema_end_reason,
+    cinema_package_reason,
     court_reason,
     fair_hook_reason,
     fair_loop_reason,
@@ -805,6 +807,120 @@ class OrderedLiveGateTests(unittest.TestCase):
             wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
             canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
         )))
+
+    def test_youtube_without_title_promise_pair_is_silence(self) -> None:
+        missing = (
+            "package",
+            "title",
+            "hey guys watch this local tick",
+            "poster of the operator tick",
+            "hook in 1-3s: picture plus voice plus text",
+        )
+        demo = "strangers can click and run the demo today"
+        for idx, text in enumerate(missing):
+            with self.subTest(text=text):
+                self.assertFalse(has_cinema_package(text))
+                self.assertEqual(cinema_package_reason(text), CINEMA_MISSING_PACKAGE_REASON)
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.YOUTUBE,
+                        claims_ship=True,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=True,
+                    ),
+                    ArenaId.YOUTUBE,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-cinema-nopair-{idx}",
+                    facts=(
+                        Fact(kind="package", text=text, artifact_url=SHIP_PR),
+                        Fact(text=demo),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.YOUTUBE,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.YOUTUBE,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.YOUTUBE].wave,
+                    canon_url=ARENAS[ArenaId.YOUTUBE].canon_url,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CINEMA_MISSING_PACKAGE_REASON)
+                self.assertIsNone(score.arena)
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.YOUTUBE, "\n".join((text, demo))),
+                    (Verdict.KILL, CINEMA_MISSING_PACKAGE_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        packaged = "title plus thumb in 0.5s: one-angle operator tick"
+        self.assertTrue(has_cinema_package(packaged))
+        self.assertTrue(has_cinema_package("tytu\u0142+obietnica w 0.5s"))
+        self.assertTrue(has_cinema_package("one message in 0.5s"))
+        self.assertFalse(has_cinema_package("event loop"))
+        self.assertFalse(has_cinema_package("first 3s: obraz+g\u0142os+tekst"))
+        self.assertIsNone(cinema_package_reason(packaged))
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-cinema-pair",
+            facts=(
+                Fact(kind="package", text=packaged, artifact_url=SHIP_PR),
+                Fact(text=demo),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.YOUTUBE,
+        )
+        self.assertIsNone(_gate_violation(brief, ArenaId.YOUTUBE, "\n".join((packaged, demo))))
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.YOUTUBE)
+        draft = compose_draft(brief, score)
+        assert draft is not None
+        self.assertEqual(draft.arena, ArenaId.YOUTUBE)
+        self.assertEqual(draft.costume, "cinema")
+        self.assertIn("0.5s", draft.body)
+        self.assertNotIn("hey guys", draft.body.lower())
+        self.assertNotIn("Costume:", draft.body)
+
+        self.assertEqual(
+            choose_arena(
+                claims_ship=True,
+                tryable=True,
+                story_kind="major",
+                clickable=True,
+            ),
+            ArenaId.HN,
+        )
+        no_pref = Brief.create(
+            project_id="app-1",
+            brief_id="b-cinema-falls-to-hn",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text=demo),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+        )
+        no_pref_score = score_brief(no_pref)
+        self.assertEqual(no_pref_score.verdict, Verdict.DRAFT)
+        self.assertEqual(no_pref_score.arena, ArenaId.HN)
+        self.assertNotEqual(no_pref_score.arena, ArenaId.YOUTUBE)
+        no_pref_draft = compose_draft(no_pref, no_pref_score)
+        assert no_pref_draft is not None
+        self.assertEqual(no_pref_draft.costume, "seminar")
+        self.assertNotEqual(no_pref_draft.costume, "cinema")
 
     def test_cinema_end_does_not_announce_the_end(self) -> None:
         package = "title plus thumb in 0.5s: one-angle operator tick"

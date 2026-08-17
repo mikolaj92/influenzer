@@ -1,34 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=36 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=37 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #36 — Shorts bez haczyka 1–3s = cisza
+Issue: #37 — YouTube bez pary tytuł+obietnica = cisza
 
 ## Goal
 
-Shorts to swipe, nie VOD. Bez haczyka 1–3s (obraz+głos+tekst razem) — cisza na fair. `has_fair_hook` fail-closed. Ten sam cut co YouTube nie przechodzi (inne kostiumy, nie wklejka).
+YouTube to opakowanie, nie odcinek. Bez pary tytuł+obietnica (jedna wiadomość w 0,5s) — cisza na cinema. Żadnego „hey guys”, loga, intro. Playbook ma `has_cinema_package` — ma być fail-closed jak sub na Reddicie.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — tighten `FAIR_HOOK_RE`, add `fair_hook_reason`
-- `influenzer/hom.py` — score fail-closed on missing hook (ignore `kind=hook` label)
-- `influenzer/hom_draft.py` — dress only a real 1–3s hook, never a cinema one-liner
-- `skills/influenzer-shorts/SKILL.md`
+- `influenzer/playbook.py`
 - `skills/influenzer-youtube/SKILL.md`
 - `tests/test_e2e_gates.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_shorts_without_hook_or_youtube_cut_is_silence tests/test_e2e_gates.py::OrderedLiveGateTests::test_shorts_without_loop_or_with_cta_and_loop_is_silence tests/test_hom_operator.py::HomOperatorTests::test_shorts_without_hook_is_killed tests/test_hom_draft.py::HomDraftTests::test_shorts_loop_without_cta_can_still_dress -q`
+- `pytest` cinema/YouTube gates in `tests/test_e2e_gates.py`
+- existing `test_youtube_without_package_is_killed` / `test_youtube_with_package_drafts_cinema_only`
 
 ## Non-goals
 
-- Do not change the Shorts loop / CTA pair from #59.
-- Do not publish live. One story. Small score/dress block only.
+- seating Shorts (issue #36 already owns the fair hook; `choose_arena` still does not sit Shorts)
+- live publish / a second social costume
+- changing `hom.py` / `hom_draft.py` (out of localize scope)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Pair of #59 (loop). A cinema 0.5s title+thumb is not a fair hook.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Cinema pair is title+thumb / tytuł+obietnica in 0.5s. A `kind=package` label, the word title, a poster, or a fair 1–3s hook is not the pair.
+- Preferred YouTube now sits so score can kill `cinema_missing_package` instead of leaking a Show HN. No-pref still falls to github/HN.
