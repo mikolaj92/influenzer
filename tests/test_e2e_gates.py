@@ -35,6 +35,7 @@ from influenzer.playbook import (
     ArenaId,
     AGORA_NO_NEW_THOUGHT_REASON,
     BLUESKY_PACK_WITHOUT_FEED_REASON,
+    BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
     CINEMA_ANNOUNCES_END_REASON,
     COURT_NOT_A_LAUNCH_REASON,
     DEAD_STAR_COUNT_REASON,
@@ -51,6 +52,7 @@ from influenzer.playbook import (
     WORSE_CLONE_REASON,
     Verdict,
     agora_reason,
+    cafe_artifact_reason,
     cafe_reason,
     choose_arena,
     has_parent_post,
@@ -1332,6 +1334,89 @@ class OrderedLiveGateTests(unittest.TestCase):
         assert draft is not None
         self.assertEqual(draft.costume, "workshop")
         self.assertIn("I struggled with timeouts", draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
+    def test_bluesky_without_artifact_url_is_silence(self) -> None:
+        living = (
+            "starter pack of 30 active accounts in the local-first niche",
+            "two custom feeds retain the same people",
+        )
+        almost = (
+            None,
+            "https://example.com/demo",
+            "https://bsky.app/profile/did:plc:demo/post/1",
+            "https://github.com/mikolaj92/influenzer/commit/abc",
+        )
+        for idx, url in enumerate(almost):
+            with self.subTest(url=url):
+                self.assertEqual(
+                    cafe_artifact_reason((url,) if url else ()),
+                    BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-empty-cafe-artifact-{idx}",
+                    facts=(
+                        Fact(text="vibe posting about the operator", artifact_url=url),
+                        Fact(text=living[0]),
+                        Fact(text=living[1]),
+                    ),
+                    story_kind="major",
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.BLUESKY,
+                )
+                self.assertEqual(
+                    choose_arena(
+                        preferred_arena=ArenaId.BLUESKY,
+                        claims_ship=False,
+                        tryable=True,
+                        story_kind="major",
+                        clickable=bool(url),
+                    ),
+                    ArenaId.BLUESKY,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON)
+                self.assertIsNone(score.arena)
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.BLUESKY,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.BLUESKY].wave,
+                    canon_url=ARENAS[ArenaId.BLUESKY].canon_url,
+                )
+                self.assertEqual(
+                    _gate_violation(brief, ArenaId.BLUESKY, "\n".join((url or "", *living))),
+                    (Verdict.KILL, BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON),
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        self.assertIsNone(cafe_artifact_reason((SHIP_PR,)))
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-living-cafe-artifact",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text=living[0]),
+                Fact(text=living[1]),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.BLUESKY,
+        )
+        self.assertIsNone(_gate_violation(alive, ArenaId.BLUESKY, "\n".join((SHIP_PR, *living))))
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.BLUESKY)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertEqual(draft.costume, "newer cafe")
+        self.assertIn(SHIP_PR, draft.body)
         self.assertNotIn("Costume:", draft.body)
 
     def test_bluesky_without_pack_and_feed_is_silence(self) -> None:

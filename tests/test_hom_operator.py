@@ -3354,14 +3354,33 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.reason, "x_empty_feed")
 
     def test_bluesky_without_artifact_is_killed(self) -> None:
-        brief = self._brief(
-            claims_ship=False,
-            preferred_arena=ArenaId.BLUESKY,
-            facts=(Fact(text="vibe posting about the operator"),),
+        living = (
+            "starter pack of 30 active accounts in the local-first niche",
+            "two custom feeds retain the same people",
         )
-        score = score_brief(brief)
-        self.assertEqual(score.verdict, Verdict.KILL)
-        self.assertEqual(score.reason, "bluesky_vibe_without_artifact")
+        almost = (
+            None,
+            "https://example.com/demo",
+            "https://bsky.app/profile/did:plc:demo/post/1",
+            "https://github.com/mikolaj92/influenzer/commit/abc",
+        )
+        for url in almost:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.BLUESKY,
+                    facts=(
+                        Fact(text="vibe posting about the operator", artifact_url=url),
+                        Fact(text=living[0]),
+                        Fact(text=living[1]),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "bluesky_vibe_without_artifact")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
 
     def test_mastodon_ship_claim_is_killed_as_pr_tone(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.MASTODON)

@@ -1,35 +1,39 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=34 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=35 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #34 — Parafia nie dostaje punchline’u z X
+Issue: #35 — Bluesky bez URL-a artefaktu = cisza
 
 ## Goal
 
-Jeśli draft na Mastodon jest tym samym tekstem co X (albo jego obcięciem) — cisza na parish. Wolna rozmowa albo nic, nie broadcast.
+Bluesky to zasięg, GitHub konwertuje. Draft na Bluesky bez URL-a artefaktu (repo, demo, release) = cisza. Vibe bez dowodu nie wychodzi. Pack/feed to kostium, nie treść.
+
+Score already sat preferred Bluesky and killed `bluesky_vibe_without_artifact` when `require_ship_artifact` missed. Dress still needed an explicit cafe artifact fail-closed so a leaked draft cannot go out without a ship URL. Pack/feed (#55) stays a separate costume check.
 
 ## Files likely touched
 
-- `influenzer/hom_draft.py` — parish dresser: skip the X one-liner and clips of it; fail-closed if nothing else remains
-- `skills/influenzer-hom/SKILL.md` — parish is own conversation or silence
-- `tests/test_hom_draft.py` — leaked-score silence + own conversation
-- `tests/test_e2e_gates.py` — compose_draft refuses an X punchline paste
+- `influenzer/playbook.py` — named `cafe_artifact_reason` / `BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON`
+- `influenzer/hom.py` — score Bluesky before draft
+- `influenzer/hom_draft.py` — dress refuses vibe without a ship URL
+- `skills/influenzer-bluesky/SKILL.md`
+- `skills/influenzer-hom/SKILL.md`
+- `tests/test_e2e_gates.py`
+- `tests/test_hom_draft.py`
+- `tests/test_hom_operator.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_draft.py::HomDraftCostumeTests::test_mastodon_x_punchline_or_clip_is_undressable_even_when_score_says_draft tests/test_hom_draft.py::HomDraftCostumeTests::test_mastodon_wears_own_conversation_not_the_x_punchline tests/test_hom_draft.py::HomDraftCostumeTests::test_every_arena_dresser_refuses_the_label_dump tests/test_e2e_gates.py::OrderedLiveGateTests::test_parish_does_not_get_the_x_punchline -q`
+- `python -m unittest tests.test_e2e_gates.OrderedLiveGateTests.test_bluesky_without_artifact_url_is_silence tests.test_e2e_gates.OrderedLiveGateTests.test_bluesky_without_pack_and_feed_is_silence tests.test_hom_draft.HomDraftCostumeTests.test_bluesky_without_artifact_url_is_undressable_even_when_score_says_draft tests.test_hom_draft.HomDraftCostumeTests.test_bluesky_with_pack_and_feed_can_still_dress tests.test_hom_operator.ScoreBriefTests.test_bluesky_without_artifact_is_killed`
 
 ## Non-goals
 
-- No playbook/scoring rewrite outside the Mastodon dress path
-- No publish / live / multi-story changes
-- Do not invent an influenzer-mastodon skill directory
+- Changing pack/feed costume (#55)
+- Publishing or enabling live social
+- Broadening ship-artifact hosts beyond the existing GitHub allowlist
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Leak before the patch: `_dress_mastodon` pasted `one_liner` + rest, so parish wore the same hook X would wear.
-- Mastodon already kills ship-claim as `mastodon_pr_tone`; this issue is the dress fold, not the PR-tone gate.
-- Collector boundary: no collector.
+- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
