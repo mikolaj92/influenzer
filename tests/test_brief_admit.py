@@ -6,12 +6,12 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-from influenzer.brief_admit import SOURCE, admit_pack
+from influenzer.brief_admit import SOURCE, admit_pack, open_story_reason
 from influenzer.brief_scan import scan_github
 from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.playbook import ArenaId, SECRET_REASON, StoryKind
+from influenzer.playbook import ArenaId, LIVING_STACK_REASON, SECRET_REASON, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from github_survey import GhCall
@@ -32,6 +32,32 @@ def _project(repo: StateRepository, project_id: str = "app-1") -> None:
             kind="app",
         )
     )
+
+
+OTHER_REPO = "mikolaj92/other"
+OTHER_SHIP_PR = "https://github.com/mikolaj92/other/pull/4"
+OTHER_SHIP_RELEASE = "https://github.com/mikolaj92/other/releases/tag/v0.2.0"
+
+
+def _other_ship_pack() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "repo": OTHER_REPO,
+        "brief_id": "scan-v0-2-0",
+        "tryable": True,
+        "facts": [
+            {
+                "kind": "release",
+                "text": "Released v0.2.0",
+                "artifact_url": OTHER_SHIP_RELEASE,
+            },
+            {
+                "kind": "pr",
+                "text": "Merged a tryable ship",
+                "artifact_url": OTHER_SHIP_PR,
+            },
+        ],
+    }
 
 
 class AdmitAndComposeTests(unittest.TestCase):
@@ -161,9 +187,104 @@ class AdmitAndComposeTests(unittest.TestCase):
                 now=NOW,
             )
         self.assertEqual(out["status"], "noop")
-        self.assertEqual(out["reason"], "already_told")
+        self.assertEqual(out["reason"], "pending_brief")
         self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-1-0"))
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
+        self.assertEqual(self.repo.list_briefs("app-2"), [])
+
+    def test_other_project_pending_brief_is_machine_silence(self) -> None:
+        self.repo.save_brief(
+            Brief.create(
+                project_id="app-1",
+                brief_id="manual-1",
+                facts=(Fact(text="already working a story"),),
+                story_kind=StoryKind.MAJOR,
+                source="cli",
+            )
+        )
+        _project(self.repo, "app-2")
+        self.assertEqual(open_story_reason(self.repo, "app-2"), "pending_brief")
+        out = admit_pack(self.repo, _other_ship_pack(), project_id="app-2", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "pending_brief")
+        self.assertFalse(out["published"])
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-2-0"))
+        self.assertEqual(self.repo.list_briefs("app-2"), [])
+
+    def test_other_project_social_draft_is_machine_silence(self) -> None:
+        pending = Brief.create(
+            project_id="app-1",
+            brief_id="prior-ship",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        self.repo.save_brief(pending)
+        tick(self.repo, self.cfg, due=(), now=NOW)
+        self.assertIsNotNone(self.repo.get_operator_draft("app-1", "prior-ship"))
+        _project(self.repo, "app-2")
+        self.assertEqual(open_story_reason(self.repo, "app-2", NOW), "social_draft")
+        out = admit_pack(self.repo, _other_ship_pack(), project_id="app-2", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "social_draft")
+        self.assertFalse(out["published"])
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-2-0"))
+
+    def test_other_project_living_stack_is_machine_silence(self) -> None:
+        pending = Brief.create(
+            project_id="app-1",
+            brief_id="prior-github",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        self.repo.save_brief(pending)
+        tick(self.repo, self.cfg, due=(), now=NOW)
+        self.assertEqual(self.repo.living_stack_arena("app-1", NOW), ArenaId.GITHUB)
+        self.assertEqual(self.repo.living_stack_arena("app-2", NOW), ArenaId.GITHUB)
+        self.assertIsNone(open_story_reason(self.repo, "app-1", NOW))
+        _project(self.repo, "app-2")
+        self.assertEqual(open_story_reason(self.repo, "app-2", NOW), LIVING_STACK_REASON)
+        out = admit_pack(self.repo, _other_ship_pack(), project_id="app-2", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], LIVING_STACK_REASON)
+        self.assertFalse(out["published"])
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-2-0"))
+
+        later = "2026-08-19T06:00:00Z"
+        self.assertIsNone(self.repo.living_stack_arena("app-2", later))
+        self.assertIsNone(open_story_reason(self.repo, "app-2", later))
+        after = admit_pack(self.repo, _other_ship_pack(), project_id="app-2", now=later)
+        self.assertEqual(after["status"], "ok")
+        self.assertEqual(after["brief_id"], "scan-v0-2-0")
+        self.assertFalse(after["published"])
+        stored = self.repo.get_brief("app-2", "scan-v0-2-0")
+        assert stored is not None
+        self.assertEqual(stored.status, "pending")
+
+    def test_processed_same_repo_on_another_project_is_already_told(self) -> None:
+        first = self._scan(ship_script())
+        self.assertEqual(first["status"], "ok")
+        tick(self.repo, self.cfg, due=(), now=NOW)
+        self.repo.conn.execute("DELETE FROM operator_drafts")
+        self.repo.conn.execute("DELETE FROM content_revisions")
+        _project(self.repo, "app-2")
+        fake = ScriptedGh(ship_script())
+        with patch("subprocess.run", side_effect=AssertionError("scan must not call subprocess")):
+            out = scan_github(
+                self.repo,
+                project_id="app-2",
+                repo_slug=REPO,
+                gh=fake,
+                now=NOW,
+            )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "already_told")
+        self.assertIsNone(self.repo.get_brief("app-2", "scan-v0-1-0"))
         self.assertEqual(self.repo.list_briefs("app-2"), [])
 
     def test_archived_repo_look_is_silence_even_with_a_ship_window(self) -> None:

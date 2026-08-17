@@ -9,9 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from github_survey import GhCall
-from influenzer.brief_admit import SOURCE
+from influenzer.brief_admit import SOURCE, open_story_reason
 from influenzer.cli import main
-from influenzer.playbook import SECRET_REASON
+from influenzer.hom import Brief, Fact
+from influenzer.playbook import LIVING_STACK_REASON, SECRET_REASON, StoryKind
 from influenzer.storage import StateRepository
 from tests.gh_scripts import NOW, REPO, repo_json, ship_script, ScriptedGh
 
@@ -156,3 +157,75 @@ class GitHubScanCLITests(unittest.TestCase):
         self.assertNotIn(leak, buf.getvalue())
         with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
             self.assertEqual(repo.list_briefs("app-1"), [])
+
+    def test_cli_scan_on_second_project_is_silence_while_first_is_pending(self) -> None:
+        self.assertEqual(
+            main(
+                [
+                    "--config",
+                    str(self.config),
+                    "project",
+                    "create",
+                    "--id",
+                    "app-2",
+                    "--slug",
+                    "other",
+                    "--name",
+                    "Other",
+                    "--display-name",
+                    "Other",
+                    "--voice",
+                    "v",
+                    "--audience",
+                    "a",
+                    "--maintainer",
+                    "mikolaj92",
+                    "--kind",
+                    "app",
+                ]
+            ),
+            0,
+        )
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            repo.save_brief(
+                Brief.create(
+                    project_id="app-1",
+                    brief_id="manual-1",
+                    facts=(Fact(text="already working a story"),),
+                    story_kind=StoryKind.MAJOR,
+                    source="cli",
+                )
+            )
+            self.assertEqual(open_story_reason(repo, "app-2"), "pending_brief")
+        fake = ScriptedGh(ship_script())
+        buf = io.StringIO()
+        fixed = datetime(2026, 8, 13, 6, 0, 0, tzinfo=timezone.utc)
+        with (
+            patch("github_survey.survey.run_gh", fake),
+            patch("github_survey.survey.parse_now", return_value=fixed),
+            patch("influenzer.brief_scan.utc_now", return_value=NOW),
+            patch("subprocess.run", side_effect=AssertionError("cli scan must not call subprocess")),
+            patch("sys.stdout", buf),
+        ):
+            code = main(
+                [
+                    "--config",
+                    str(self.config),
+                    "brief",
+                    "scan",
+                    "--project-id",
+                    "app-2",
+                    "--repo",
+                    REPO,
+                ]
+            )
+        self.assertEqual(code, 0)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["status"], "noop")
+        self.assertEqual(payload["reason"], "pending_brief")
+        self.assertFalse(payload["published"])
+        self.assertIsNone(payload.get("brief_id"))
+        self.assertEqual(fake.calls, [])
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            self.assertEqual(repo.list_briefs("app-2"), [])
+            self.assertEqual(len(repo.list_pending_briefs()), 1)
