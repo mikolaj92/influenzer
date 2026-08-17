@@ -93,8 +93,8 @@ def run_pass(
         now=clock,
         window_days=window_days,
     )
-    if due_block == "not due":
-        feedback = {"status": "noop", "reason": "not due", "brief_id": None}
+    if due_block:
+        feedback = {"status": "noop", "reason": due_block, "brief_id": None}
     else:
         feedback = collect_and_admit(
             repo,

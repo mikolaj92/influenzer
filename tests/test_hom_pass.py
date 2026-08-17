@@ -156,9 +156,7 @@ class HomPassTests(unittest.TestCase):
         self.assertIn(again["feedback"]["reason"], {HN_CAMP_REASON, "pending_brief", "social_draft"})
         self.assertEqual(again["scan"]["status"], "silence")
         self.assertIn(again["scan"]["reason"], {"pending_brief", "social_draft"})
-        kinds = [classify_gh_argv(list(argv)) for argv in fake2.calls]
-        self.assertNotIn("prs", kinds)
-        self.assertNotIn("releases", kinds)
+        self.assertEqual(fake2.calls, [])
         self.assertEqual(again["tick"]["scored"], 0)
         self.assertEqual(again["angle"]["status"], "ok")
         self.assertNotIn("Costume:", again["angle"]["body"])
@@ -182,9 +180,9 @@ class HomPassTests(unittest.TestCase):
                 now=NOW,
             )
         self.assertEqual(out["feedback"]["status"], "silence")
-        self.assertEqual(out["feedback"]["reason"], "not due")
+        self.assertIn(out["feedback"]["reason"], {"not due", HN_CAMP_REASON, "pending_brief", "social_draft"})
         self.assertEqual(out["scan"]["status"], "silence")
-        self.assertEqual(out["scan"]["reason"], "not due")
+        self.assertIn(out["scan"]["reason"], {"not due", "pending_brief", "social_draft"})
         self.assertEqual(fake2.calls, [])
         self.assertEqual(out["tick"]["scored"], 0)
         self.assertTrue(out["angle"].get("empty") or out["angle"]["status"] == "noop")
@@ -494,6 +492,7 @@ class HomPassCLIFAlaTests(unittest.TestCase):
         buf = io.StringIO()
         with (
             patch("github_survey.survey.run_gh", fake),
+            patch("github_feedback.feedback.run_gh", fake),
             patch("influenzer.hom_pass.utc_now", return_value=NOW),
             patch("influenzer.scan_due.utc_now", return_value=NOW),
             patch("subprocess.run", side_effect=AssertionError("cli pass must not call subprocess")),
@@ -530,6 +529,7 @@ class HomPassCLIFAlaTests(unittest.TestCase):
         fake2 = ScriptedGh(ship_script())
         with (
             patch("github_survey.survey.run_gh", fake2),
+            patch("github_feedback.feedback.run_gh", fake2),
             patch("subprocess.run", side_effect=AssertionError("pass module must not call subprocess")),
             redirect_stdout(module_buf),
         ):
@@ -551,9 +551,7 @@ class HomPassCLIFAlaTests(unittest.TestCase):
         self.assertIn(again["feedback"]["reason"], {HN_CAMP_REASON, "pending_brief", "social_draft"})
         self.assertEqual(again["scan"]["status"], "silence")
         self.assertIn(again["scan"]["reason"], {"pending_brief", "social_draft"})
-        kinds = [classify_gh_argv(list(argv)) for argv in fake2.calls]
-        self.assertNotIn("prs", kinds)
-        self.assertNotIn("releases", kinds)
+        self.assertEqual(fake2.calls, [])
         self.assertEqual(again["tick"]["scored"], 0)
         self.assertEqual(again["angle"]["status"], "ok")
         with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:

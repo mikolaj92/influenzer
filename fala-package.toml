@@ -251,14 +251,14 @@ media_types = ["application/json"]
 
 [[capabilities]]
 id = "hom_pass"
-title = "One CMO look: scan-due, score pending briefs, one angle; never publishes"
+title = "One CMO look: listen, scan-due, score pending briefs, one angle; never publishes"
 accepts_impulse_types = ["hom.pass"]
 emits_reaction_kinds = ["hom.pass"]
 
 [[correlation_paths]]
 id = "hom_pass"
-title = "One CMO look: scan-due → tick → one angle"
-description = "Compose existing scan_due, tick_all, and hom_outbox once. Does not invoke verdict, publish, enable live, call gh, know Heimdall, run every tick interval, merge those three modules, or open runtime.db. Requires project-id and repo. Host compose is influenzer pass."
+title = "One CMO look: listen → scan-due → tick → one angle"
+description = "Compose existing hom_feedback, scan_due, tick_all, and hom_outbox once. Does not invoke verdict, publish, enable live, call gh, know Heimdall, run every tick interval, merge those modules, grow github_feedback, or open runtime.db. Requires project-id and repo. Host compose is influenzer pass."
 
 [[correlation_paths.effectors]]
 id = "pass"
