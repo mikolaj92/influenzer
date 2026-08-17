@@ -11,7 +11,7 @@ from influenzer.brief_scan import scan_github
 from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.playbook import ArenaId, StoryKind
+from influenzer.playbook import ArenaId, SECRET_REASON, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from github_survey import GhCall
@@ -383,6 +383,45 @@ class AdmitAndComposeTests(unittest.TestCase):
         out = self._scan(ship_script(repo=GhCall(0, repo_json(description="CI failed"))))
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "failed_ci_not_tryable")
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_secret_in_fact_pack_is_kill_silence_not_almost_redacted(self) -> None:
+        leak = "env:INFLUENZER_TOKEN"
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    },
+                    {"kind": "signal", "text": f"docs mention {leak}"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], SECRET_REASON)
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertNotIn(leak, str(out))
+
+    def test_secret_look_is_silence_so_next_monday_can_look(self) -> None:
+        leak = "keychain:service/account"
+        out = self._scan(ship_script(repo=GhCall(0, repo_json(description=f"docs mention {leak}"))))
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], SECRET_REASON)
         self.assertTrue(out["ok"])
         self.assertFalse(out["published"])
         self.assertIsNone(out["brief_id"])

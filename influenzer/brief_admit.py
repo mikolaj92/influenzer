@@ -33,6 +33,7 @@ from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
+    SECRET_REASON,
     StoryKind,
     is_social_arena,
     looks_like_archived_repo,
@@ -41,6 +42,7 @@ from influenzer.playbook import (
     looks_like_fork,
     looks_like_pending_ci,
     looks_like_private_repo,
+    looks_like_secret,
 )
 from influenzer.storage import StateRepository, StorageError
 
@@ -153,6 +155,8 @@ def admit_pack(
         return host_silence("pending_ci_unknown", project_id=project_id, repo_slug=slug)
     if looks_like_failed_ci(fact_blob):
         return host_silence("failed_ci_not_tryable", project_id=project_id, repo_slug=slug)
+    if looks_like_secret(fact_blob):
+        return host_silence(SECRET_REASON, project_id=project_id, repo_slug=slug)
     try:
         brief = brief_from_mapping(
             {

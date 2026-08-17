@@ -31,6 +31,7 @@ from influenzer.playbook import (
     HN_CAMP_REASON,
     LETTER_WITHOUT_SURNAME_REASON,
     REDDIT_NO_DISCLOSURE_REASON,
+    SECRET_REASON,
     SEMINAR_BRAND_VOICE_REASON,
     Verdict,
     cafe_reason,
@@ -59,6 +60,7 @@ from influenzer.playbook import (
     looks_like_letter_team_voice,
     looks_like_poll,
     looks_like_reddit_disclose,
+    looks_like_secret,
     looks_like_seminar_first_person,
     looks_like_tavern_invite,
     reddit_reason,
@@ -238,6 +240,49 @@ class OrderedLiveGateTests(unittest.TestCase):
             ).fetchone()["project_id"],
             "builder-1",
         )
+
+    def test_secret_token_or_key_is_silence_not_an_angle(self) -> None:
+        auth = "Authorization" + ": " + "Bearer" + " " + "sk" + "-" + "this-is-not-a-live-key-1"
+        leaks = (
+            "docs mention env:INFLUENZER_TOKEN",
+            auth,
+            "paste " + "sk" + "-" + "this-is-not-a-live-key-1 into the demo",
+            "ghp_" + "exampletokenvalue1",
+            "docs mention keychain:service/account",
+        )
+        for idx, text in enumerate(leaks):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_secret(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    SECRET_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-secret-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, SECRET_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
 
     def test_poll_quiz_or_this_or_that_is_silence_not_an_angle(self) -> None:
         polls = (

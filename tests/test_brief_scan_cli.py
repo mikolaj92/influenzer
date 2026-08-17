@@ -8,10 +8,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+from github_survey import GhCall
 from influenzer.brief_admit import SOURCE
 from influenzer.cli import main
+from influenzer.playbook import SECRET_REASON
 from influenzer.storage import StateRepository
-from tests.gh_scripts import NOW, REPO, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, repo_json, ship_script, ScriptedGh
 
 
 class GitHubScanCLITests(unittest.TestCase):
@@ -120,3 +122,37 @@ class GitHubScanCLITests(unittest.TestCase):
             )
         self.assertEqual(code, 1)
         self.assertIn("project not found", buf.getvalue())
+
+    def test_cli_secret_in_scan_is_silence_not_a_pending_brief(self) -> None:
+        leak = "Bearer " + "sk" + "-" + "this-is-not-a-live-key-1"
+        fake = ScriptedGh(ship_script(repo=GhCall(0, repo_json(description=f"docs mention {leak}"))))
+        buf = io.StringIO()
+        fixed = datetime(2026, 8, 13, 6, 0, 0, tzinfo=timezone.utc)
+        with (
+            patch("github_survey.survey.run_gh", fake),
+            patch("github_survey.survey.parse_now", return_value=fixed),
+            patch("influenzer.brief_scan.utc_now", return_value=NOW),
+            patch("subprocess.run", side_effect=AssertionError("cli scan must not call subprocess")),
+            patch("sys.stdout", buf),
+        ):
+            code = main(
+                [
+                    "--config",
+                    str(self.config),
+                    "brief",
+                    "scan",
+                    "--project-id",
+                    "app-1",
+                    "--repo",
+                    REPO,
+                ]
+            )
+        self.assertEqual(code, 0)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["status"], "noop")
+        self.assertEqual(payload["reason"], SECRET_REASON)
+        self.assertFalse(payload["published"])
+        self.assertIsNone(payload.get("brief_id"))
+        self.assertNotIn(leak, buf.getvalue())
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            self.assertEqual(repo.list_briefs("app-1"), [])

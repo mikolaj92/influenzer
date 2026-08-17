@@ -68,6 +68,7 @@ from influenzer.playbook import (
     looks_like_listicle_title,
     looks_like_hire_fundraise,
     looks_like_private_conversation,
+    looks_like_secret,
     looks_like_source_available_as_oss,
     looks_like_press_release,
     looks_like_world_commentary,
@@ -663,6 +664,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, "ranking_not_an_artifact")
     if looks_like_hashtag_wall(blob):
         return _kill(brief, "hashtag_wall")
+    if looks_like_secret(blob):
+        return _kill(brief, "secret")
     if looks_like_private_conversation(blob):
         return _kill(brief, "private_conversation")
     if looks_like_world_commentary(blob) or _news_only_urls(brief):

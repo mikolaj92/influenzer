@@ -1,20 +1,24 @@
 {
   "paths": [
-    "github_pack/pack.py",
-    "tests/gh_scripts.py",
+    "tests/test_brief_admit.py",
+    "tests/test_brief_scan_cli.py",
     "tests/test_e2e_gates.py",
-    "tests/test_github_pack.py"
+    "tests/test_envelope.py",
+    "tests/test_hom_outbox.py",
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
+    "influenzer/hom_outbox.py",
+    "influenzer/brief_admit.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["pack", "gate"],
+  "matched_tokens": ["env", "outbox", "brief", "gate", "secret"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137.",
-    "Inspection: default ship fixture README must carry a GIF so pack can fail closed on text-only without breaking the happy path."
+    "Refined after inspection: score/dress/outbox/admit are the fail-closed secret gate.",
+    "Empty path list fails closed — run_agent must not start."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__48-readme-bez-dema-to-martwa-witryna-bb01f254",
-  "wrote": false,
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }
