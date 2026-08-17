@@ -115,6 +115,7 @@ from influenzer.playbook import (
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_event,
+    looks_like_calendar_filler,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -326,6 +327,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_dead_release_asset(bits.blob)
         or looks_like_roadmap(bits.blob)
         or looks_like_event(bits.blob)
+        or looks_like_calendar_filler(bits.blob)
         or looks_like_worse_clone(bits.blob)
         or looks_like_press_release(bits.blob)
         or looks_like_world_commentary(bits.blob)
@@ -439,7 +441,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     backstory = _hn_backstory(bits)
     if not backstory:
         return None
-    if looks_like_waitlist(backstory) or looks_like_event(backstory) or looks_like_solicit_gesture(backstory):
+    if looks_like_waitlist(backstory) or looks_like_event(backstory) or looks_like_calendar_filler(backstory) or looks_like_solicit_gesture(backstory):
         return None
     return _body_or_none("\n\n".join((title, url, backstory)))
 
@@ -692,6 +694,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_contest(bits.blob)
         or looks_like_poll(bits.blob)
         or looks_like_model_in_frame(bits.blob)
+        or looks_like_calendar_filler(bits.blob)
         or looks_like_thread(bits.blob)
         or looks_like_ranking_dump(bits.blob)
         or looks_like_hashtag_wall(bits.blob)
@@ -765,6 +768,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_contest(body)
         or looks_like_poll(body)
         or looks_like_model_in_frame(body)
+        or looks_like_calendar_filler(body)
         or looks_like_thread(body)
         or looks_like_ranking_dump(body)
         or looks_like_hashtag_wall(body)

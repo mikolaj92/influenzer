@@ -51,6 +51,7 @@ from influenzer.playbook import (
     is_video_host_url,
     invented_metric_reason,
     is_model_host_url,
+    CALENDAR_FILLER_REASON,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
     looks_like_bot_bump_week,
@@ -88,6 +89,7 @@ from influenzer.playbook import (
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_event,
+    looks_like_calendar_filler,
     looks_like_pending_ci,
     looks_like_failed_ci,
     looks_like_prerelease,
@@ -750,6 +752,46 @@ class PlaybookCopyTests(unittest.TestCase):
         for text in allowed:
             with self.subTest(text=text):
                 self.assertFalse(looks_like_poll(text))
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_calendar_filler_is_holiday_repo_birthday_or_happy_friday(self) -> None:
+        greetings = (
+            "happy Friday",
+            "happy friday everyone",
+            "happy holidays from the repo",
+            "merry Christmas",
+            "season's greetings",
+            "repo birthday",
+            "repository anniversary",
+            "birthday of the repo",
+            "the project turns 3",
+            "urodziny repo",
+            "rocznica projektu",
+            "wesołych świąt",
+            "z okazji świąt",
+            "miłego piątku",
+            "TGIF",
+            "święta",
+        )
+        for text in greetings:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_calendar_filler(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    CALENDAR_FILLER_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "follow the README to run the demo",
+            "shipped Friday after the timeout fix",
+            "calendar year 2026 on the README",
+            "happy path still scores the brief",
+            "birthday of the operator is not a ship",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_calendar_filler(text))
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
     def test_model_in_frame_is_prompt_dump_or_i_asked_chatgpt(self) -> None:
@@ -2701,6 +2743,27 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.reason, "event_not_a_ship")
         self.assertIsNone(score.arena)
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_calendar_filler_is_killed(self) -> None:
+        greetings = (
+            "happy Friday",
+            "repo birthday",
+            "urodziny repo",
+            "wesołych świąt",
+        )
+        for text in greetings:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CALENDAR_FILLER_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
 
     def test_prerelease_ship_claim_is_killed(self) -> None:
         vapor = (

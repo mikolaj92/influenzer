@@ -1043,6 +1043,29 @@ EVENT_RE = re.compile(
     r"(?:poniedzia[lł]ek|wtorek|[sś]rod[eę]|czwartek|pi[aą]tek)\b"
     r")"
 )
+# A calendar does not write for us. Holiday / repo birthday / happy Friday
+# is silence, not a product. Neighbor of event (#138, meetup) and world
+# commentary (#131, news of the day). This is the date as a greeting, not
+# a tryable drop. "calendar year" and "shipped Friday" stay.
+CALENDAR_FILLER_REASON = "calendar_filler"
+CALENDAR_FILLER_RE = re.compile(
+    r"(?i)(?:"
+    r"\bhappy\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekend|holidays?)\b"
+    r"|\bhappy\s+new\s+year\b"
+    r"|\bmerry\s+christmas\b"
+    r"|\bseason['’]?s\s+greetings\b"
+    r"|\b(?:repo(?:sitory)?|project)\s+(?:birthday|anniversary)\b"
+    r"|\bbirthday\s+of\s+(?:the\s+)?(?:repo(?:sitory)?|project)\b"
+    r"|\b(?:repo(?:sitory)?|project)\s+turns\s+\d+\b"
+    r"|\burodzin(?:y|om|ach)?\s+(?:repo(?:zytorium)?|projektu)\b"
+    r"|\brocznic[aeyę]\s+(?:repo(?:zytorium)?|projektu)\b"
+    r"|\bweso[lł]ych\s+[sś]wi[aą]t\b"
+    r"|\bz\s+okazji\s+[sś]wi[aą]t\b"
+    r"|\bmi[lł]ego\s+(?:pi[aą]tku|weekendu)\b"
+    r"|\btgif\b"
+    r"|\b[sś]wi[eę]t(?:a|o)\b"
+    r")"
+)
 # Press-release tone is not a social angle. We're excited / announcement /
 # unveiling / delighted to share is kill or changelog, never HN/GitHub/X.
 # Pair of seminar brand voice: we announced as a brand is also silence.
@@ -2863,6 +2886,14 @@ def looks_like_event(text: str) -> bool:
     return bool(EVENT_RE.search(text))
 
 
+def looks_like_calendar_filler(text: str) -> bool:
+    """True for a holiday, repo birthday, or happy Friday. A calendar does not write."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(CALENDAR_FILLER_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3403,7 +3434,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3414,6 +3445,11 @@ def unquotable_reason(
             return "model_in_frame"
     if extra and (looks_like_model_in_frame(extra) or is_model_host_url(extra)):
         return "model_in_frame"
+    for _kind, text, _url in packed:
+        if looks_like_calendar_filler(text):
+            return CALENDAR_FILLER_REASON
+    if extra and looks_like_calendar_filler(extra):
+        return CALENDAR_FILLER_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3709,6 +3745,8 @@ __all__ = [
     "ROADMAP_RE",
     "EVENT_NOT_A_SHIP",
     "EVENT_RE",
+    "CALENDAR_FILLER_REASON",
+    "CALENDAR_FILLER_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -3856,6 +3894,7 @@ __all__ = [
     "looks_like_server_splash",
     "looks_like_roadmap",
     "looks_like_event",
+    "looks_like_calendar_filler",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",

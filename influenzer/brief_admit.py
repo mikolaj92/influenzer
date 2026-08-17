@@ -37,6 +37,7 @@ from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
     EVENT_NOT_A_SHIP,
+    CALENDAR_FILLER_REASON,
     LIVING_STACK_REASON,
     SECRET_REASON,
     StoryKind,
@@ -44,6 +45,7 @@ from influenzer.playbook import (
     looks_like_archived_repo,
     looks_like_empty_repo,
     looks_like_event,
+    looks_like_calendar_filler,
     looks_like_failed_ci,
     looks_like_fork,
     looks_like_pending_ci,
@@ -175,6 +177,8 @@ def admit_pack(
         return host_silence(SECRET_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_event(fact_blob):
         return host_silence(EVENT_NOT_A_SHIP, project_id=project_id, repo_slug=slug)
+    if looks_like_calendar_filler(fact_blob):
+        return host_silence(CALENDAR_FILLER_REASON, project_id=project_id, repo_slug=slug)
     try:
         brief = brief_from_mapping(
             {
