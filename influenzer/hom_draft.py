@@ -44,6 +44,7 @@ from influenzer.playbook import (
     has_parent_post,
     cinema_end_reason,
     court_reason,
+    fair_hook_reason,
     fair_loop_reason,
     tavern_reason,
     cafe_artifact_reason,
@@ -267,7 +268,7 @@ def _copy_bits(brief: Brief) -> CopyBits | None:
         kind = fact.kind.strip().lower()
         if kind == "package" or (package_text is None and has_cinema_package(wearable)):
             package_text = wearable
-        if kind == "hook" or (hook_text is None and has_fair_hook(wearable)):
+        if hook_text is None and has_fair_hook(wearable):
             hook_text = wearable
         if kind == "loop" or (loop_text is None and has_fair_loop(wearable)):
             loop_text = wearable
@@ -521,11 +522,11 @@ def _dress_youtube(bits: CopyBits, score: Score) -> str | None:
 
 
 def _dress_shorts(bits: CopyBits, score: Score) -> str | None:
-    """Fair: hook, then the loop beat. Missing loop or CTA+loop is silence."""
-    if fair_loop_reason(bits.blob):
+    """Fair: 1-3s hook, then the loop beat. A cinema cut or labeled hook is silence."""
+    if fair_hook_reason(bits.blob) or fair_loop_reason(bits.blob):
         return None
-    hook = bits.hook_text or bits.one_liner
-    if not hook:
+    hook = bits.hook_text
+    if not hook or not has_fair_hook(hook):
         return None
     loop = bits.loop_text if bits.loop_text and bits.loop_text != hook else ""
     pay = next(

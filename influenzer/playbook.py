@@ -1249,7 +1249,20 @@ CAFE_FEED_RE = re.compile(
     r"bsky\.app/profile/[^/\s]+/feed/"
     r")"
 )
-FAIR_HOOK_RE = re.compile(r"(?i)\b(?:hook|loop|1-3s|first (?:frame|second|3s))\b")
+FAIR_MISSING_HOOK_REASON = "fair_missing_hook"
+# Fair hook is 1-3s picture+voice+text. The word hook, kind=hook, a loop,
+# or a cinema 0.5s title+thumb is not a swipe hook. Pair of #59 (loop).
+FAIR_HOOK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bhook\s+(?:in\s+)?1\s*[\u2013\-]\s*3s\b|"
+    r"\b1\s*[\u2013\-]\s*3s\s+hook\b|"
+    r"\bhaczyk\s+(?:w\s+)?1\s*[\u2013\-]\s*3s\b|"
+    r"\bfirst\s+(?:1\s*[\u2013\-]\s*3|2|3)s\b|"
+    r"\bfirst\s+(?:one|two|three)\s+seconds?\b|"
+    r"\bpicture\s+(?:plus|\+|and)\s+voice\s+(?:plus|\+|and)\s+text\b|"
+    r"\bobraz\s*(?:\+|i|oraz)\s*g[lł]os\s*(?:\+|i|oraz)\s*tekst\b"
+    r")"
+)
 # Fair loop is last-frame-into-first / rewatch. A tick loop, event loop,
 # or "one loop per state.db" is not a Shorts cut. Pair of #36 (hook) and
 # #42 (one CTA): here the cut must loop, and loop+ask is silence.
@@ -1670,7 +1683,7 @@ ARENA_GATES: dict[ArenaId, ArenaGate] = {
         ),
     ),
     ArenaId.SHORTS: ArenaGate(
-        reason="fair_missing_hook",
+        reason=FAIR_MISSING_HOOK_REASON,
         require_hook=True,
         require_loop=True,
         forbid_cta_with_loop=True,
@@ -3388,7 +3401,15 @@ def has_cinema_package(text: str) -> bool:
 
 
 def has_fair_hook(text: str) -> bool:
-    return bool(FAIR_HOOK_RE.search(text))
+    """True when the cut names a 1-3s picture+voice+text hook. A label is not."""
+    return bool(FAIR_HOOK_RE.search(text or ""))
+
+
+def fair_hook_reason(text: str) -> str | None:
+    """Silence on a fair cut without a 1-3s hook. kind=hook is not proof."""
+    if has_fair_hook(text):
+        return None
+    return FAIR_MISSING_HOOK_REASON
 
 
 def has_fair_loop(text: str) -> bool:
@@ -3470,6 +3491,7 @@ __all__ = [
     "FAIR_CTA_RE",
     "FAIR_HOOK_RE",
     "FAIR_LOOP_RE",
+    "FAIR_MISSING_HOOK_REASON",
     "POLL_RE",
     "THREAD_NUMBER_RE",
     "THREAD_WORD_RE",
@@ -3559,6 +3581,7 @@ __all__ = [
     "cinema_end_reason",
     "court_reason",
     "feedback_excerpt_texts",
+    "fair_hook_reason",
     "fair_loop_reason",
     "has_agora_thought",
     "has_parent_post",

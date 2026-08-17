@@ -1,39 +1,34 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=35 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=36 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #35 — Bluesky bez URL-a artefaktu = cisza
+Issue: #36 — Shorts bez haczyka 1–3s = cisza
 
 ## Goal
 
-Bluesky to zasięg, GitHub konwertuje. Draft na Bluesky bez URL-a artefaktu (repo, demo, release) = cisza. Vibe bez dowodu nie wychodzi. Pack/feed to kostium, nie treść.
-
-Score already sat preferred Bluesky and killed `bluesky_vibe_without_artifact` when `require_ship_artifact` missed. Dress still needed an explicit cafe artifact fail-closed so a leaked draft cannot go out without a ship URL. Pack/feed (#55) stays a separate costume check.
+Shorts to swipe, nie VOD. Bez haczyka 1–3s (obraz+głos+tekst razem) — cisza na fair. `has_fair_hook` fail-closed. Ten sam cut co YouTube nie przechodzi (inne kostiumy, nie wklejka).
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — named `cafe_artifact_reason` / `BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON`
-- `influenzer/hom.py` — score Bluesky before draft
-- `influenzer/hom_draft.py` — dress refuses vibe without a ship URL
-- `skills/influenzer-bluesky/SKILL.md`
-- `skills/influenzer-hom/SKILL.md`
+- `influenzer/playbook.py` — tighten `FAIR_HOOK_RE`, add `fair_hook_reason`
+- `influenzer/hom.py` — score fail-closed on missing hook (ignore `kind=hook` label)
+- `influenzer/hom_draft.py` — dress only a real 1–3s hook, never a cinema one-liner
+- `skills/influenzer-shorts/SKILL.md`
+- `skills/influenzer-youtube/SKILL.md`
 - `tests/test_e2e_gates.py`
-- `tests/test_hom_draft.py`
-- `tests/test_hom_operator.py`
 
 ## Test plan
 
-- `python -m unittest tests.test_e2e_gates.OrderedLiveGateTests.test_bluesky_without_artifact_url_is_silence tests.test_e2e_gates.OrderedLiveGateTests.test_bluesky_without_pack_and_feed_is_silence tests.test_hom_draft.HomDraftCostumeTests.test_bluesky_without_artifact_url_is_undressable_even_when_score_says_draft tests.test_hom_draft.HomDraftCostumeTests.test_bluesky_with_pack_and_feed_can_still_dress tests.test_hom_operator.ScoreBriefTests.test_bluesky_without_artifact_is_killed`
+- `python -m pytest tests/test_e2e_gates.py::OrderedLiveGateTests::test_shorts_without_hook_or_youtube_cut_is_silence tests/test_e2e_gates.py::OrderedLiveGateTests::test_shorts_without_loop_or_with_cta_and_loop_is_silence tests/test_hom_operator.py::HomOperatorTests::test_shorts_without_hook_is_killed tests/test_hom_draft.py::HomDraftTests::test_shorts_loop_without_cta_can_still_dress -q`
 
 ## Non-goals
 
-- Changing pack/feed costume (#55)
-- Publishing or enabling live social
-- Broadening ship-artifact hosts beyond the existing GitHub allowlist
+- Do not change the Shorts loop / CTA pair from #59.
+- Do not publish live. One story. Small score/dress block only.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- Pair of #59 (loop). A cinema 0.5s title+thumb is not a fair hook.
