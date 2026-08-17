@@ -2514,7 +2514,18 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("Costume:", decision.draft.body)
 
     def test_x_is_short_reply_not_a_thread(self) -> None:
-        brief = _ship_brief(preferred_arena=ArenaId.X)
+        brief = _ship_brief(
+            preferred_arena=ArenaId.X,
+            facts=(
+                Fact(
+                    kind="parent",
+                    text="Show HN about mikolaj92/influenzer",
+                    artifact_url="https://news.ycombinator.com/item?id=1",
+                ),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="Dry-run still default"),
+            ),
+        )
         decision = apply_brief(brief)
         assert decision.draft is not None
         body = decision.draft.body
@@ -2794,6 +2805,11 @@ class HomDraftCostumeTests(unittest.TestCase):
         brief = _ship_brief(
             preferred_arena=ArenaId.GITHUB,
             facts=(
+                Fact(
+                    kind="parent",
+                    text="Show HN about mikolaj92/influenzer",
+                    artifact_url="https://news.ycombinator.com/item?id=1",
+                ),
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(kind="package", text="title plus thumb in 0.5s: one-angle operator tick"),
                 Fact(kind="hook", text="hook in 1-3s: brief in, draft out"),

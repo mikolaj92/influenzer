@@ -364,6 +364,7 @@ def choose_arena(
     private_repo: bool = False,
     archived_repo: bool = False,
     server_splash: bool = False,
+    parent_post: bool = False,
 ) -> ArenaId:
     """One primary arena. A living github/hn stack keeps that costume.
 
@@ -383,8 +384,9 @@ def choose_arena(
     our launch without a gift, or a letter without a surname, can be
     silence — give first, sign First Last from the profile, recs are
     adjacent.
-    Preferred X sits so an empty-feed original or a reply without a
-    new thought can be silence — ratio is the comment, not a dead RT.
+    Preferred X sits only on a parent-post URL (reply, borrowed heat).
+    An empty-feed original is not a first costume: tryable ship without
+    a thread goes github/HN; not tryable sits so x_empty_feed can kill.
     GitHub is the website. HN only when there is a
     clickable demo and no stack already chose the other costume.
     Shopping while the window lives is not a new pick — the caller
@@ -421,8 +423,9 @@ def choose_arena(
     if wanted is ArenaId.NEWSLETTER:
         return ArenaId.NEWSLETTER
     # #27/#41: empty-feed original and reply-without-thought are silence.
-    # Sit so agora can die closed instead of leaking a Show HN / dead RT.
-    if wanted is ArenaId.X:
+    # Sit on a parent URL so agora can die closed. No thread: fall through
+    # to github/HN when tryable; not tryable sits so x_empty_feed kills.
+    if wanted is ArenaId.X and (parent_post or not tryable):
         return ArenaId.X
     # #58: court is not a launch channel. Ship stays on github/hn.
     if wanted is ArenaId.LINKEDIN and not claims_ship:
@@ -2872,6 +2875,13 @@ def _agora_parent_facts(
     )
 
 
+def has_parent_post(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> bool:
+    """True when the brief names a parent-post URL. X is reply, not an original."""
+    return bool(_agora_parent_facts(facts))
+
+
 def agora_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str | None = None,
@@ -3511,6 +3521,7 @@ __all__ = [
     "feedback_excerpt_texts",
     "fair_loop_reason",
     "has_agora_thought",
+    "has_parent_post",
     "has_cafe_feed",
     "has_cafe_pack",
     "has_cinema_package",
