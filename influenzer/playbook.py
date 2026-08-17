@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no roadmap, no webinar, no meetup, no calendar, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -1188,6 +1188,36 @@ LEAD_MAGNET_RE = re.compile(
     r"|\bdarmow(?:y|e|a)\s+(?:przewodnik|ebook|e-book|pdf)\b"
     r"|\bza\s+maila\b"
     r"|\bbramk[aąę]\s+mail"
+    r")"
+)
+# A logo reveal is not a ship. Rebrand / palette / moodboard / odsłona
+# logo is cisza, not a product. Neighbor of founder journal (#146,
+# lifestyle) and roadmap (#129, a calendar). Here it is the look, not
+# a tryable drop. "logo intro", "outro-logo", and a README logo stay.
+LOGO_REVEAL_NOT_A_SHIP = "logo_reveal_not_a_ship"
+LOGO_REVEAL_RE = re.compile(
+    r"(?i)(?:"
+    r"\bre-?brands?(?:ing)?\b"
+    r"|\bbrand\s+refresh(?:es)?\b"
+    r"|\bnew\s+brands?\b"
+    r"|\bvisual\s+identity\b"
+    r"|\bbrand\s+identity\b"
+    r"|\b(?:color|colour|brand|new)\s+palettes?\b"
+    r"|\bpalet[aąęy]\b"
+    r"|\bmood[- ]?boards?\b"
+    r"|\blogo\s+reveals?\b"
+    r"|\breveal(?:ing|s|ed)?\s+(?:the\s+|our\s+|a\s+)?(?:new\s+)?logos?\b"
+    r"|\blogo\s+unveil(?:s|ed|ing)?\b"
+    r"|\bunveil(?:ing|s|ed)?\s+(?:the\s+|our\s+|a\s+)?(?:new\s+)?logos?\b"
+    r"|\bnew\s+logos?\b"
+    r"|\blogo\s+drops?\b"
+    r"|\blogo\s+redesigns?\b"
+    r"|\bods[lł]on[aąęy]\s+logo\b"
+    r"|\bods[lł]aniamy\s+logo\b"
+    r"|\bods[lł]oni[eę]cie\s+logo\b"
+    r"|\bnowe\s+logo\b"
+    r"|\bnow[aą]\s+palet"
+    r"|\bnowy\s+branding\b"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -3050,6 +3080,14 @@ def looks_like_lead_magnet(text: str) -> bool:
     return bool(LEAD_MAGNET_RE.search(cleaned))
 
 
+def looks_like_logo_reveal(text: str) -> bool:
+    """True for rebrand / palette / moodboard / logo reveal. A look is not a ship."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(LOGO_REVEAL_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3931,6 +3969,8 @@ __all__ = [
     "FOUNDER_JOURNAL_RE",
     "LEAD_MAGNET_REASON",
     "LEAD_MAGNET_RE",
+    "LOGO_REVEAL_NOT_A_SHIP",
+    "LOGO_REVEAL_RE",
     "PENDING_CI_RE",
     "FAILED_CI_RE",
     "PRERELEASE_RE",
@@ -4083,6 +4123,7 @@ __all__ = [
     "looks_like_fog",
     "looks_like_founder_journal",
     "looks_like_lead_magnet",
+    "looks_like_logo_reveal",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
     "looks_like_prerelease",

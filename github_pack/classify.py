@@ -175,6 +175,31 @@ _LEAD_MAGNET_RE = re.compile(
     r"|\bbramk[aąę]\s+mail"
     r")"
 )
+_LOGO_REVEAL_RE = re.compile(
+    r"(?i)(?:"
+    r"\bre-?brands?(?:ing)?\b"
+    r"|\bbrand\s+refresh(?:es)?\b"
+    r"|\bnew\s+brands?\b"
+    r"|\bvisual\s+identity\b"
+    r"|\bbrand\s+identity\b"
+    r"|\b(?:color|colour|brand|new)\s+palettes?\b"
+    r"|\bpalet[aąęy]\b"
+    r"|\bmood[- ]?boards?\b"
+    r"|\blogo\s+reveals?\b"
+    r"|\breveal(?:ing|s|ed)?\s+(?:the\s+|our\s+|a\s+)?(?:new\s+)?logos?\b"
+    r"|\blogo\s+unveil(?:s|ed|ing)?\b"
+    r"|\bunveil(?:ing|s|ed)?\s+(?:the\s+|our\s+|a\s+)?(?:new\s+)?logos?\b"
+    r"|\bnew\s+logos?\b"
+    r"|\blogo\s+drops?\b"
+    r"|\blogo\s+redesigns?\b"
+    r"|\bods[lł]on[aąęy]\s+logo\b"
+    r"|\bods[lł]aniamy\s+logo\b"
+    r"|\bods[lł]oni[eę]cie\s+logo\b"
+    r"|\bnowe\s+logo\b"
+    r"|\bnow[aą]\s+palet"
+    r"|\bnowy\s+branding\b"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -242,6 +267,13 @@ def looks_like_lead_magnet(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_LEAD_MAGNET_RE.search(text))
+
+
+def looks_like_logo_reveal(text: str) -> bool:
+    """True for rebrand / palette / moodboard / logo reveal. A look is not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(_LOGO_REVEAL_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:
