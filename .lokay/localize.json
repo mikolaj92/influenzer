@@ -1,15 +1,18 @@
 {
   "paths": [
     "influenzer/hom_draft.py",
-    "skills/influenzer-hn",
+    "skills/influenzer-linkedin",
+    "skills/influenzer-linkedin/SKILL.md",
     "tests/test_hom_draft.py",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "HN",
-    "Draft",
+    "LinkedIn",
+    "link",
+    "draft",
+    "kill",
     "Influenzer",
     "influenzer",
     "gate"
@@ -19,7 +22,7 @@
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__32-show-hn-to-tytu-url-i-backstory-nie-blog-00f4bcf4",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__33-linkedin-to-dw-r-nie-stoisko-f2038c4c",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }

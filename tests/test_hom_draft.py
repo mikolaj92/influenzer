@@ -2678,6 +2678,86 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertIn(SHIP_PR, decision.draft.body)
         self.assertNotIn("Costume:", decision.draft.body)
 
+    def test_linkedin_fold_starting_with_pitch_cta_or_url_is_undressable_even_when_score_says_draft(self) -> None:
+        stalls = (
+            "we're launching the operator today",
+            "we’re launching the operator today",
+            "we are launching the operator today",
+            "Learn more in the comments",
+            "Comment if you agree this local tick helps",
+            "https://example.com/launch",
+        )
+        fake = Score(
+            brief_id="b-court-stall",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.LINKEDIN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.LINKEDIN].wave,
+            canon_url=ARENAS[ArenaId.LINKEDIN].canon_url,
+        )
+        for text in stalls:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    brief_id="b-court-stall",
+                    preferred_arena=ArenaId.LINKEDIN,
+                    claims_ship=False,
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text=text),
+                    ),
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "linkedin",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.LINKEDIN].wave),
+                            "canon_url": ARENAS[ArenaId.LINKEDIN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("Costume:", dumped)
+                self.assertNotIn(text, dumped)
+
+    def test_linkedin_skips_a_launch_line_and_wears_the_insight_as_fold(self) -> None:
+        insight = "Dry-run still default on every tick"
+        brief = _ship_brief(
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            facts=(
+                Fact(text="we're launching the operator today"),
+                Fact(text=insight, artifact_url=SHIP_PR),
+            ),
+        )
+        fake = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.LINKEDIN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.LINKEDIN].wave,
+            canon_url=ARENAS[ArenaId.LINKEDIN].canon_url,
+        )
+        draft = dress_brief(brief, fake)
+        assert draft is not None
+        fold = draft.body.split("\n\n", 1)[0]
+        self.assertEqual(fold, insight)
+        self.assertLessEqual(len(fold), 210)
+        self.assertFalse(fold.lower().startswith("we"))
+        self.assertNotIn("http", fold.lower())
+        self.assertNotIn("launching", fold.lower())
+        self.assertIn(SHIP_PR, draft.body)
+        self.assertNotIn("Costume:", draft.body)
+
     def test_x_is_short_reply_not_a_thread(self) -> None:
         brief = _ship_brief(
             preferred_arena=ArenaId.X,

@@ -128,10 +128,22 @@ _FORBIDDEN_IN_BODY = (
     "Wave checklist:",
 )
 
+# Fold (~210) is insight. CTA, URL, or "we're launching" in line one is silence.
 _PITCH_LINE_RE = re.compile(
-    r"^\s*(?:(?:we|i)\s+)?(?:just\s+)?(?:shipped|launched|announcing|introducing)\b|"
-    r"^\s*(?:excited to|proud to|please to|try (?:it|this|ours?)\b|sign up|click here)",
-    re.I,
+    r"(?i)^\s*(?:"
+    r"(?:(?:we|i)\s+)?(?:are\s+|just\s+)?(?:shipped|launched|launching|announcing|introducing|releasing)\b|"
+    r"(?:we|i)['’]re\s+(?:launching|announcing|introducing|shipping|releasing|excited|proud)\b|"
+    r"excited\s+to|proud\s+to|pleased\s+to|please\s+to|"
+    r"try\s+(?:it|this|ours?)\b|"
+    r"sign\s+up|click\s+here|"
+    r"learn\s+more|"
+    r"comment\s+(?:if|below|for)|"
+    r"link\s+in\s+bio|"
+    r"dm\s+me|"
+    r"book\s+a\s+(?:demo|call)|"
+    r"check\s+out\s+(?:the\s+)?link|"
+    r"visit\s+(?:the\s+)?link"
+    r")"
 )
 _URL_IN_TEXT_RE = re.compile(r"https?://", re.I)
 _SUBREDDIT_RE = re.compile(r"\br/[A-Za-z0-9_]+\b")
@@ -446,12 +458,20 @@ def _dress_x(bits: CopyBits, score: Score) -> str | None:
     return _body_or_none(cleaned)
 
 
+def _court_fold_is_stall(text: str) -> bool:
+    """True when the fold is a pitch, CTA, or URL. Court is insight, not a stall."""
+    cleaned = text.strip()
+    if not cleaned:
+        return True
+    return bool(_PITCH_LINE_RE.search(cleaned) or _URL_IN_TEXT_RE.search(cleaned))
+
+
 def _court_insight(bits: CopyBits) -> str | None:
     candidates = (bits.one_liner, *bits.rest)
     for text in candidates:
-        if _URL_IN_TEXT_RE.search(text):
+        if _court_fold_is_stall(text):
             continue
-        if _PITCH_LINE_RE.search(text):
+        if looks_like_linkedin_fold_overflow(text):
             continue
         if text.strip():
             return text.strip()
@@ -459,11 +479,11 @@ def _court_insight(bits: CopyBits) -> str | None:
 
 
 def _dress_linkedin(bits: CopyBits, score: Score) -> str | None:
-    """Court: win the ~210-char fold; insight first; no pitch in line one."""
+    """Court: win the ~210-char fold; insight first; pitch/CTA/URL in line one is silence."""
     insight = _court_insight(bits)
     if insight is None:
         return None
-    if looks_like_linkedin_fold_overflow(insight):
+    if looks_like_linkedin_fold_overflow(insight) or _court_fold_is_stall(insight):
         return None
     fold = " ".join(insight.split())
     leftover = [text for text in (bits.one_liner, *bits.rest) if text.strip() != insight]
@@ -478,7 +498,7 @@ def _dress_linkedin(bits: CopyBits, score: Score) -> str | None:
     if body is None:
         return None
     first = body.split("\n\n", 1)[0]
-    if len(first) > LINKEDIN_FOLD or _PITCH_LINE_RE.search(first) or _URL_IN_TEXT_RE.search(first):
+    if len(first) > LINKEDIN_FOLD or _court_fold_is_stall(first):
         return None
     return body
 
