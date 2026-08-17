@@ -97,6 +97,8 @@ def ship_script(**overrides: GhCall) -> dict[str, GhCall]:
         ),
         "tags": GhCall(0, json.dumps([{"name": "v0.1.0"}])),
         "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n")),
+        "issue_comments": GhCall(0, "[]"),
+        "pull_comments": GhCall(0, "[]"),
     }
     script.update(overrides)
     return script
@@ -137,6 +139,8 @@ def merge_log_script() -> dict[str, GhCall]:
         "releases": GhCall(0, "[]"),
         "tags": GhCall(0, "[]"),
         "readme": GhCall(0, b64_readme("# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n")),
+        "issue_comments": GhCall(0, "[]"),
+        "pull_comments": GhCall(0, "[]"),
     }
 
 
@@ -174,6 +178,8 @@ def noise_script() -> dict[str, GhCall]:
         "releases": GhCall(0, "[]"),
         "tags": GhCall(0, "[]"),
         "readme": GhCall(0, b64_readme("# Demo\nWIP\n")),
+        "issue_comments": GhCall(0, "[]"),
+        "pull_comments": GhCall(0, "[]"),
     }
 
 

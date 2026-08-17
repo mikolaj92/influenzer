@@ -122,7 +122,10 @@ def loop_status(envelope: Mapping[str, Any]) -> dict[str, Any]:
             "published": False,
         }
     scan = envelope.get("scan")
-    if isinstance(scan, Mapping) and scan.get("status") == "admitted":
+    feedback = envelope.get("feedback")
+    if (isinstance(scan, Mapping) and scan.get("status") == "admitted") or (
+        isinstance(feedback, Mapping) and feedback.get("status") == "admitted"
+    ):
         status = "admitted"
     else:
         tick_out = envelope.get("tick")
