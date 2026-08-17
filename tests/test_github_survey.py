@@ -47,6 +47,7 @@ class ClassifyArgvTests(unittest.TestCase):
         self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/readme"]), "readme")
         self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/issues/comments"]), "issue_comments")
         self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/pulls/comments"]), "pull_comments")
+        self.assertEqual(classify_gh_argv(["api", f"repos/{REPO}/issues?state=open"]), "issues")
         self.assertEqual(classify_gh_argv(["auth", "status"]), "other")
 
 
@@ -373,6 +374,12 @@ class RunGhTests(unittest.TestCase):
             )
         )
         self.assertTrue(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/pulls/comments?per_page=100"]))
+        self.assertTrue(
+            allowlisted_gh_argv(
+                ["gh", "api", f"repos/{REPO}/issues?per_page=100&state=open&since=2026-08-15T06:00:00Z"]
+            )
+        )
+        self.assertFalse(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/issues?state=all"]))
         self.assertFalse(allowlisted_gh_argv(["repo", "view", REPO]))
         self.assertFalse(allowlisted_gh_argv(["gh", "auth", "status"]))
         self.assertFalse(allowlisted_gh_argv(["gh", "api", f"repos/{REPO}/readme", "-X", "GET"]))

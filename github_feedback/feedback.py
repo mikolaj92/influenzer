@@ -1,5 +1,7 @@
-"""Collect public issue/PR comments. No storage. No replies.
+"""Collect public issue/PR comments and new open issues. No storage. No replies.
 
+A new open question/bug on the watched repo in the ~48h launch window
+is one excerpt in this bag, not a second collector. +1 / thanks is silence.
 Feedback is gh api only. git clone / worktree on the host is silence.
 Mini is not a checkout cache.
 Look stops after N pages. Whole-repo history in one look is silence.
@@ -47,6 +49,7 @@ from github_survey.survey import (
 from github_pack.pack import sanitize_inbound_facts, strip_inbound_instructions
 
 SOURCE = "github-feedback"
+LAUNCH_WINDOW_DAYS = 2
 MAX_FACTS = 8
 MAX_FACT_CHARS = 240
 # @login: prefix on a clipped body. Longer than this is a dump, not an excerpt.
@@ -237,7 +240,15 @@ def is_feedback_signal(text: str) -> bool:
 def is_noise_comment(item: dict[str, Any]) -> bool:
     if is_bot_user(item.get("user")):
         return True
-    return not is_feedback_signal(str(item.get("body") or ""))
+    return not is_feedback_signal(_item_signal_text(item))
+
+
+def _item_signal_text(item: dict[str, Any]) -> str:
+    body = str(item.get("body") or "").strip()
+    title = str(item.get("title") or "").strip()
+    if body and title:
+        return f"{title}\n{body}"
+    return body or title
 
 
 def _items(raw: Any) -> list[dict[str, Any]]:
@@ -251,12 +262,14 @@ def _comment_url(item: dict[str, Any]) -> str:
 
 
 def _fact_from_comment(item: dict[str, Any], *, kind: str) -> dict[str, Any] | None:
+    if item.get("pull_request") is not None:
+        return None
     if is_noise_comment(item):
         return None
     url = _comment_url(item)
     if not url.startswith("https://github.com/"):
         return None
-    body = strip_inbound_instructions(_clip(str(item.get("body") or "")))
+    body = strip_inbound_instructions(_clip(_item_signal_text(item)))
     if not body or is_noise_body(body) or not is_feedback_signal(body):
         return None
     login = _login(item.get("user")) or "someone"
@@ -288,6 +301,7 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
         return None, "private_repo"
 
     since = (now - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    launch_since = (now - timedelta(days=LAUNCH_WINDOW_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
     issues_raw, reason = required_json(
         gh(["api", f"repos/{repo_slug}/issues/comments?per_page=100&since={since}"])
     )
@@ -297,6 +311,12 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
     if look_payload_reason(pulls_call):
         return None, "empty_feedback"
     pulls_raw = optional_json(pulls_call, [])
+    open_call = gh(
+        ["api", f"repos/{repo_slug}/issues?per_page=100&state=open&since={launch_since}"]
+    )
+    if look_payload_reason(open_call):
+        return None, "empty_feedback"
+    open_raw = optional_json(open_call, [])
     comments: list[tuple[str, dict[str, Any]]] = []
     for item in _items(issues_raw):
         if in_window(str(item.get("created_at") or ""), now=now):
@@ -304,6 +324,11 @@ def collect_comments(repo_slug: str, *, gh: GhRunner, now: Any) -> tuple[dict[st
     for item in _items(pulls_raw):
         if in_window(str(item.get("created_at") or ""), now=now):
             comments.append(("pull_comment", item))
+    for item in _items(open_raw):
+        if item.get("pull_request") is not None:
+            continue
+        if in_window(str(item.get("created_at") or ""), now=now, days=LAUNCH_WINDOW_DAYS):
+            comments.append(("excerpt", item))
     comments.sort(key=lambda pair: str(pair[1].get("created_at") or ""))
     collected = {"comments": comments}
     if look_bytes_over_limit(collected) or state_bytes_over_limit(collected):

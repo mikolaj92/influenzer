@@ -22,6 +22,7 @@ from influenzer.playbook import HN_CAMP_REASON, ArenaId, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from tests.gh_scripts import (
+    ISSUE,
     ISSUE_COMMENT,
     NOW,
     REPO,
@@ -29,6 +30,7 @@ from tests.gh_scripts import (
     SHIP_PR,
     feedback_noise_script,
     feedback_question_script,
+    gh_issue,
     repo_json,
 )
 
@@ -138,6 +140,53 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
         self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_open_issue_in_launch_window_admits_one_feedback_brief(self) -> None:
+        script = feedback_noise_script()
+        script["issues"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_issue(
+                        html_url=ISSUE,
+                        title="How do I install this when uv is missing?",
+                        body="The Windows install fails with a traceback",
+                    )
+                ]
+            ),
+        )
+        out = self._run(script)
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["brief_id"], "fb-9")
+        self.assertEqual(out["source"], SOURCE)
+        self.assertEqual(out["story_kind"], StoryKind.HARD_ISSUE.value)
+        self.assertFalse(out["claims_ship"])
+        self.assertFalse(out["tryable"])
+        self.assertTrue(out["pending"])
+        self.assertFalse(out["published"])
+        stored = self.repo.get_brief("app-1", "fb-9")
+        assert stored is not None
+        self.assertEqual(stored.source, SOURCE)
+        self.assertEqual(stored.story_kind, StoryKind.HARD_ISSUE)
+        urls = {fact.artifact_url for fact in stored.facts if fact.artifact_url}
+        self.assertIn(ISSUE, urls)
+        self.assertTrue(any(fact.kind == "excerpt" for fact in stored.facts))
+        self.assertEqual(len(self.repo.list_pending_briefs("app-1")), 1)
+        events = [row["event_type"] for row in self.repo.events("app-1")]
+        self.assertIn("brief.feedback", events)
+        self.assertFalse((self.home / "runtime.db").exists())
+
+    def test_thanks_issue_in_launch_window_writes_no_brief(self) -> None:
+        script = feedback_noise_script()
+        script["issues"] = GhCall(
+            0,
+            json.dumps([gh_issue(html_url=ISSUE, title="thanks", body="+1")]),
+        )
+        out = self._run(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "comment_noise")
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_real_question_admits_one_brief_with_multiple_facts(self) -> None:
         out = self._run(feedback_question_script())
