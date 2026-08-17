@@ -1882,7 +1882,7 @@ class OrderedLiveGateTests(unittest.TestCase):
         workshop_score = score_brief(workshop)
         self.assertEqual(workshop_score.verdict, Verdict.DRAFT)
         self.assertEqual(workshop_score.arena, ArenaId.GITHUB)
-        workshop_draft = compose_draft(workshop, workshop_score)
+        workshop_draft = compose_draft(workshop, workshop_score, now="2026-08-17T06:00:00Z")
         assert workshop_draft is not None
         self.repo.conn.execute("DELETE FROM operator_drafts")
         self.repo.conn.execute("DELETE FROM operator_scores")
@@ -1896,12 +1896,32 @@ class OrderedLiveGateTests(unittest.TestCase):
             self.repo.living_stack_arena(self.builder.project_id, "2026-08-17T06:00:00Z"),
             ArenaId.GITHUB,
         )
-        self.assertIsNone(open_story_reason(self.repo, self.app.project_id, "2026-08-17T06:00:00Z"))
+        self.assertEqual(
+            open_story_reason(self.repo, self.app.project_id, "2026-08-17T06:00:00Z"),
+            LIVING_STACK_REASON,
+        )
         self.assertEqual(
             open_story_reason(self.repo, self.builder.project_id, "2026-08-17T06:00:00Z"),
             LIVING_STACK_REASON,
         )
-        self.assertIsNone(open_story_reason(self.repo, self.builder.project_id, "2026-08-19T06:00:00Z"))
+        again = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="b-second-github",
+            facts=(
+                Fact(text="a stranger can click and run the demo from the README", artifact_url=SHIP_PR),
+                Fact(text="Dry-run still default"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        again_score = score_brief(again, stack_arena=ArenaId.GITHUB)
+        self.assertEqual(again_score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(again_score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(again_score.arena)
+        self.assertIsNone(compose_draft(again, again_score))
+        self.assertIsNone(open_story_reason(self.repo, self.builder.project_id, "2026-08-19T06:00:01Z"))
 
 
 if __name__ == "__main__":

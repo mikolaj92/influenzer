@@ -24,6 +24,8 @@ A clock that goes backward is silence, not a second look. Look is monotonic.
 Two watches on the same repo are one look. A second brief or angle from the
 same git is silence, even with another project_id. That is the machine lock,
 not a second survey.
+A living 48h github/hn stack is silence, not a second social angle. Pass does
+not unlock another look; hold or a dead window can.
 Two ticks the same Monday are one look. The second run sees the done look
 and stays silent: no second gh, no second brief. A race on scan/admit is
 CAS silence.

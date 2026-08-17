@@ -225,10 +225,13 @@ def parse_arena(value: str | None) -> ArenaId | None:
 
 
 # Launch stack: one 24–48h github/hn costume. Pair of #61 (primary) and #26 (window).
-# Next look keeps that costume. Hold or a dead window can change it. Shopping is silence.
-# #61: we sit on github (feedback) and hn (camp). X/LI/YT/shorts/discord/bsky
-# without a listener are not a first costume. Ship goes where we sit.
-# #50: after Show HN, sit in the thread. Score does not pick HN again.
+# One wearable github/hn angle in that window. Next scan/score is changelog or
+# silence — not a second social angle, even after verdict pass. Hold or a dead
+# window can change it. Shopping is silence. #63: format stays because we do
+# not emit a second costume. #61: we sit on github (feedback) and hn (camp).
+# X/LI/YT/shorts/discord/bsky without a listener are not a first costume.
+# Ship goes where we sit. #50: after Show HN, sit in the thread. Score does
+# not pick HN again.
 STACK_HOURS = 48
 STACK_ARENAS: frozenset[ArenaId] = frozenset({ArenaId.GITHUB, ArenaId.HN})
 PRIMARY_ARENAS: frozenset[ArenaId] = STACK_ARENAS
@@ -363,6 +366,9 @@ def choose_arena(
     server_splash: bool = False,
 ) -> ArenaId:
     """One primary arena. A living github/hn stack keeps that costume.
+
+    Score/scan do not emit a second social angle while the window lives —
+    this only names the locked costume. Changelog or silence is the caller.
 
     We sit on github (feedback) and hn (camp). Preferred X / YouTube /
     shorts without a listener is not a first costume — ship goes where

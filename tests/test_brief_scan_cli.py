@@ -12,10 +12,12 @@ from github_survey import GhCall
 from github_pack.pack import README_WITHOUT_QUICKSTART_REASON
 from influenzer.brief_admit import SOURCE, open_story_reason
 from influenzer.cli import main
+from influenzer.config import load_config
 from influenzer.hom import Brief, Fact
-from influenzer.playbook import LIVING_STACK_REASON, SECRET_REASON, StoryKind
+from influenzer.playbook import ArenaId, LIVING_STACK_REASON, SECRET_REASON, StoryKind
+from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
-from tests.gh_scripts import NOW, REPO, b64_readme, repo_json, ship_script, ScriptedGh
+from tests.gh_scripts import NOW, REPO, SHIP_PR, b64_readme, repo_json, ship_script, ScriptedGh
 
 
 class GitHubScanCLITests(unittest.TestCase):
@@ -266,3 +268,48 @@ class GitHubScanCLITests(unittest.TestCase):
         with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
             self.assertEqual(repo.list_briefs("app-2"), [])
             self.assertEqual(len(repo.list_pending_briefs()), 1)
+
+    def test_cli_scan_on_living_github_stack_is_silence(self) -> None:
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            repo.save_brief(
+                Brief.create(
+                    project_id="app-1",
+                    brief_id="prior-github",
+                    facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+                    story_kind=StoryKind.MAJOR,
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.GITHUB,
+                )
+            )
+            cfg = load_config(self.config)
+            tick(repo, cfg, due=(), now=NOW)
+            self.assertEqual(repo.living_stack_arena("app-1", NOW), ArenaId.GITHUB)
+            self.assertEqual(open_story_reason(repo, "app-1", NOW), LIVING_STACK_REASON)
+        fake = ScriptedGh(ship_script())
+        buf = io.StringIO()
+        with (
+            patch("github_survey.survey.run_gh", fake),
+            patch("influenzer.brief_scan.utc_now", return_value=NOW),
+            patch("subprocess.run", side_effect=AssertionError("cli scan must not call subprocess")),
+            patch("sys.stdout", buf),
+        ):
+            code = main(
+                [
+                    "--config",
+                    str(self.config),
+                    "brief",
+                    "scan",
+                    "--project-id",
+                    "app-1",
+                    "--repo",
+                    REPO,
+                ]
+            )
+        self.assertEqual(code, 0)
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["status"], "noop")
+        self.assertEqual(payload["reason"], LIVING_STACK_REASON)
+        self.assertFalse(payload["published"])
+        self.assertIsNone(payload.get("brief_id"))
+        self.assertEqual(fake.calls, [])

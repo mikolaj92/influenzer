@@ -1823,14 +1823,13 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "discord_pre_pmf")
 
-    def test_living_stack_keeps_github_costume_on_the_next_look(self) -> None:
+    def test_living_stack_is_changelog_not_a_second_github_angle(self) -> None:
         brief = self._brief()
         decision = apply_brief(brief, now="2026-08-13T06:00:00Z", stack_arena=ArenaId.GITHUB)
-        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
-        self.assertEqual(decision.score.arena, ArenaId.GITHUB)
-        assert decision.draft is not None
-        self.assertEqual(decision.draft.costume, "workshop")
-        self.assertFalse(decision.draft.body.lstrip().startswith("Show HN:"))
+        self.assertEqual(decision.score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(decision.score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(decision.score.arena)
+        self.assertIsNone(decision.draft)
 
     def test_shopping_another_arena_while_the_stack_lives_is_silence(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.X)
@@ -1840,11 +1839,13 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertIsNone(score.arena)
         self.assertIsNone(compose_draft(brief, score))
 
-    def test_same_github_or_hn_costume_on_a_living_stack_is_kept(self) -> None:
+    def test_same_github_costume_on_a_living_stack_is_changelog(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.GITHUB)
         score = score_brief(brief, stack_arena=ArenaId.GITHUB)
-        self.assertEqual(score.verdict, Verdict.DRAFT)
-        self.assertEqual(score.arena, ArenaId.GITHUB)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, LIVING_STACK_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
 
     def test_open_hn_stack_does_not_pick_a_second_show(self) -> None:
         brief = self._brief(preferred_arena=ArenaId.HN)
@@ -3872,7 +3873,7 @@ class TickBriefPathTests(unittest.TestCase):
         drafts = list(self.repo.conn.execute("SELECT draft_id FROM operator_drafts"))
         self.assertEqual(len(drafts), 1)
 
-    def test_next_look_in_a_living_stack_keeps_the_github_or_hn_costume(self) -> None:
+    def test_next_look_in_a_living_stack_is_changelog_not_a_second_angle(self) -> None:
         first = Brief.create(
             project_id="app-1",
             brief_id="stack-1",
@@ -3904,13 +3905,9 @@ class TickBriefPathTests(unittest.TestCase):
         self.repo.save_brief(next_look)
         again = tick(self.repo, self.cfg, due=(), now="2026-08-14T04:00:00Z")
         outcome = again["operator"]["outcomes"][0]
-        self.assertEqual(outcome["verdict"], "draft")
-        self.assertEqual(outcome["arena"], "github")
-        second = self.repo.get_operator_draft("app-1", "stack-2")
-        assert second is not None
-        self.assertEqual(second.arena, ArenaId.GITHUB)
-        self.assertEqual(second.costume, "workshop")
-        self.assertFalse(second.body.lstrip().startswith("Show HN:"))
+        self.assertEqual(outcome["verdict"], "changelog_only")
+        self.assertEqual(outcome["reason"], LIVING_STACK_REASON)
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "stack-2"))
 
         shop = Brief.create(
             project_id="app-1",
@@ -4021,8 +4018,8 @@ class TickBriefPathTests(unittest.TestCase):
         self.repo.save_brief(copy)
         again = tick(self.repo, self.cfg, due=(), now="2026-08-13T06:00:00Z")
         outcome = again["operator"]["outcomes"][0]
-        self.assertEqual(outcome["verdict"], "kill")
-        self.assertEqual(outcome["reason"], "same_angle_body")
+        self.assertEqual(outcome["verdict"], "changelog_only")
+        self.assertEqual(outcome["reason"], LIVING_STACK_REASON)
         self.assertIsNone(outcome.get("body"))
         self.assertIsNone(self.repo.get_operator_draft("app-1", "ship-2"))
         drafts = list(self.repo.conn.execute("SELECT draft_id FROM operator_drafts"))
@@ -4041,13 +4038,10 @@ class TickBriefPathTests(unittest.TestCase):
         self.repo.save_brief(fresh)
         third = tick(self.repo, self.cfg, due=(), now="2026-08-13T07:00:00Z")
         third_outcome = third["operator"]["outcomes"][0]
-        self.assertEqual(third_outcome["verdict"], "draft")
-        third_draft = self.repo.get_operator_draft("app-1", "ship-3")
-        assert third_draft is not None
-        self.assertNotEqual(third_draft.body, first_draft.body)
-        self.assertNotEqual(third_draft.content_hash, first_draft.content_hash)
-        self.assertFalse(third_draft.body.startswith("Show HN:"))
-        self.assertNotIn("Costume:", third_draft.body)
+        self.assertEqual(third_outcome["verdict"], "changelog_only")
+        self.assertEqual(third_outcome["reason"], LIVING_STACK_REASON)
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "ship-3"))
+        self.assertEqual(len(list(self.repo.conn.execute("SELECT draft_id FROM operator_drafts"))), 1)
 
     def test_second_show_on_a_living_hn_stack_is_camp_not_a_repeat_angle(self) -> None:
         first = Brief.create(

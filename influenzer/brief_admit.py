@@ -91,8 +91,8 @@ def open_story_reason(
     for draft in repo.list_operator_drafts():
         if is_social_arena(draft.arena):
             return "social_draft"
-    owner, _arena = repo.living_stack(now)
-    if owner is not None and owner != project_id:
+    _owner, arena = repo.living_stack(now)
+    if arena is not None:
         return LIVING_STACK_REASON
     return None
 

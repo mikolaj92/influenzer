@@ -1,26 +1,21 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=25 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=26 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #25 — Nie reklamować zepsutej witryny
+Issue: #26 — Launch to jeden stos 24–48h, nie drugi kąt społeczny
 
 ## Goal
 
-Watch-repo bez działającego quickstartu w README (jedna strona: one-liner → start) to fałszywy launch. Brief ze `claims_ship` pada na changelog/kill, nie na kąt społeczny. HN/X nie dostają waitlisty ani „Show HN” bez `uv run`/`pip`/`brew` które da się skopiować.
+Launch to jeden stos 24–48h, nie tydzień kranika. Jeśli w oknie 48h jest już noszalny draft github/hn (nawet po verdict pass), kolejny scan/score nie puszcza drugiego kąta społecznego — changelog albo cisza. Jedna historia, jeden stos.
 
 ## Files likely touched
 
-- `github_pack/pack.py` — fail-closed pack gate: prose pip/uv/brew is not a start
-- `tests/test_github_pack.py` — pack silence without a copyable one-liner
-- `tests/test_e2e_gates.py` — no Show HN / waitlist from a broken README
-- `tests/test_brief_admit.py` — look/admit inherit pack silence
-- `tests/test_brief_scan_cli.py` — CLI scan writes no brief
-- `tests/test_hom_watch.py` — due watch stays cisza, no social angle
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python -m unittest tests.test_github_pack tests.test_e2e_gates tests.test_brief_admit tests.test_brief_scan_cli tests.test_hom_watch`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
