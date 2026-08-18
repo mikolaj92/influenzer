@@ -20,7 +20,15 @@ from github_pack.pack import (
 from influenzer.adapters.base import AdapterRequest
 from influenzer.config import Config
 from influenzer.content import create_revision, persist_revision
-from influenzer.hom import Brief, Fact, Score, _gate_violation, compose_draft, score_brief
+from influenzer.hom import (
+    SAME_RELEASE_REASON,
+    Brief,
+    Fact,
+    Score,
+    _gate_violation,
+    compose_draft,
+    score_brief,
+)
 from influenzer.host import (
     AGE_GATE_NOT_TRYABLE,
     ARTIFACT_5XX_NOT_TRYABLE,
@@ -4573,6 +4581,57 @@ class OrderedLiveGateTests(unittest.TestCase):
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertNotIn("Costume:", draft.body)
+
+    def test_same_release_after_history_is_silence_even_with_a_new_angle(self) -> None:
+        release = "https://github.com/mikolaj92/influenzer/releases/tag/v0.2.0"
+        first = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="release-v0-2-0-first",
+            facts=(
+                Fact(kind="release", text="Released v0.2.0", artifact_url=release),
+                Fact(text="Local tick now scores a bounded batch"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+            status="processed",
+            created_at="2026-08-10T06:00:00Z",
+        )
+        self.repo.save_brief(first)
+
+        second = Brief.create(
+            project_id=self.builder.project_id,
+            brief_id="release-v0-2-0-another-angle",
+            facts=(
+                Fact(kind="release", text="Released queue recovery", artifact_url=release),
+                Fact(text="A different angle for the same runnable release"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            created_at="2026-08-17T06:00:00Z",
+        )
+        self.repo.save_brief(second)
+
+        out = tick(
+            self.repo,
+            Config(home=self.home, scheduler_live_enabled=False),
+            due=(),
+            now="2026-08-17T06:00:00Z",
+        )
+        outcome = out["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "kill")
+        self.assertEqual(outcome["reason"], SAME_RELEASE_REASON)
+        self.assertIsNone(outcome.get("body"))
+        self.assertIsNone(
+            self.repo.get_operator_draft(self.builder.project_id, second.brief_id)
+        )
+        self.assertEqual(
+            self.repo.get_operator_score(self.builder.project_id, second.brief_id).reason,
+            SAME_RELEASE_REASON,
+        )
 
     def test_open_story_on_one_project_silences_the_other_watch(self) -> None:
         pending = Brief.create(

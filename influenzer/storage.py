@@ -19,7 +19,16 @@ from .domain import (
     PublicationAttempt, AccountStatus, PlanStatus, AttemptStatus,
 )
 from .domain import content_hash
-from .hom import Brief, Draft, Score, angle_body_hash, brief_to_mapping, parse_facts_json
+from .hom import (
+    Brief,
+    Draft,
+    ReleaseKey,
+    Score,
+    angle_body_hash,
+    brief_to_mapping,
+    parse_facts_json,
+    release_story_keys,
+)
 from .migrations import MigrationError, migrate
 from .playbook import (
     ArenaId,
@@ -1003,6 +1012,19 @@ class StateRepository:
             return None
         last = max(drafts, key=lambda draft: (draft.created_at, draft.draft_id))
         return angle_body_hash(last.body)
+
+    def release_story_keys(
+        self,
+        *,
+        exclude: tuple[str, str] | None = None,
+    ) -> frozenset[ReleaseKey]:
+        """Tags/releases that already had any admitted story on this machine."""
+        found: set[ReleaseKey] = set()
+        for brief in self.list_briefs():
+            if exclude == (brief.project_id, brief.brief_id):
+                continue
+            found.update(release_story_keys(brief.facts))
+        return frozenset(found)
 
     def living_stack(self, now: str | None) -> tuple[str | None, ArenaId | None]:
         """Owner and costume of the open github/hn stack on this state.db."""

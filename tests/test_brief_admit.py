@@ -10,7 +10,7 @@ from influenzer.brief_admit import SOURCE, admit_pack, open_story_reason
 from influenzer.brief_scan import scan_github
 from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
-from influenzer.hom import Brief, Fact
+from influenzer.hom import SAME_RELEASE_REASON, Brief, Fact
 from github_pack.pack import README_WITHOUT_QUICKSTART_REASON
 from influenzer.playbook import APOLOGY_WITHOUT_SHIP_REASON, SUNSET_NOT_A_SHIP_REASON, ArenaId, CALENDAR_FILLER_REASON, CLOUD_DRIVE_REASON, COUNTER_THANKS_REASON, DECK_REASON, EVENT_NOT_A_SHIP, FOG_REASON, FOMO_REASON, FOUNDER_JOURNAL_REASON, LEAD_MAGNET_REASON, LINKTREE_REASON, LOGO_REVEAL_NOT_A_SHIP, LIVING_STACK_REASON, MEME_REASON, SECRET_REASON, StoryKind
 from influenzer.scheduler import tick
@@ -173,6 +173,91 @@ class AdmitAndComposeTests(unittest.TestCase):
         out = self._scan(ship_script())
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "already_told")
+
+    def test_same_release_tag_with_new_pr_is_silence_after_history(self) -> None:
+        self.repo.save_brief(
+            Brief.create(
+                project_id="app-1",
+                brief_id="old-release-story",
+                facts=(
+                    Fact(
+                        kind="release",
+                        text="Released v0.1.0",
+                        artifact_url=SHIP_RELEASE,
+                    ),
+                ),
+                story_kind=StoryKind.MAJOR,
+                claims_ship=True,
+                tryable=True,
+                source=SOURCE,
+                status="processed",
+                created_at="2026-08-10T06:00:00Z",
+            )
+        )
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "fresh-angle-id",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released queue recovery",
+                        "artifact_url": "https://www.github.com/Mikolaj92/Demo/releases/tag/v0.1.0",
+                    },
+                    {
+                        "kind": "pull",
+                        "text": "Merged a new angle for the old release",
+                        "artifact_url": "https://github.com/mikolaj92/demo/pull/99",
+                    },
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], SAME_RELEASE_REASON)
+        self.assertIsNone(out["brief_id"])
+        self.assertIsNone(self.repo.get_brief("app-1", "fresh-angle-id"))
+
+    def test_tag_history_silences_later_release_for_the_same_ref(self) -> None:
+        self.repo.save_brief(
+            Brief.create(
+                project_id="app-1",
+                brief_id="tag-before-release",
+                facts=(
+                    Fact(kind="tag", text="Tag v0.1.0"),
+                    Fact(text="Repository proof", artifact_url=f"https://github.com/{REPO}"),
+                ),
+                story_kind=StoryKind.MAJOR,
+                source=SOURCE,
+                status="processed",
+                created_at="2026-08-10T06:00:00Z",
+            )
+        )
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "release-after-tag",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released v0.1.0",
+                        "artifact_url": SHIP_RELEASE,
+                    }
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], SAME_RELEASE_REASON)
+        self.assertIsNone(self.repo.get_brief("app-1", "release-after-tag"))
 
     def test_same_repo_on_another_project_is_already_told(self) -> None:
         first = self._scan(ship_script())

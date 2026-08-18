@@ -9,8 +9,11 @@ Scoring lives here. Costume-native copy is influenzer.hom_draft (thin call).
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Mapping
+from urllib.parse import unquote, urlparse
 
 from influenzer.domain import DomainError, PAID_UNDISCLOSED_REASON, content_hash, paid_disclosure_reason, require_slug, utc_now
 from influenzer.host import (
@@ -281,6 +284,75 @@ class Score:
             canon_url=self.canon_url,
             score_hash=content_hash(payload),
         )
+
+
+ReleaseKey = tuple[str, str]
+SAME_RELEASE_REASON = "same_release"
+
+
+def _fact_parts(fact: Fact | Mapping[str, Any]) -> tuple[str, str, str | None]:
+    if isinstance(fact, Mapping):
+        kind = str(fact.get("kind") or "signal")
+        text = str(fact.get("text") or "")
+        raw_url = fact.get("artifact_url")
+        return kind, text, None if raw_url in (None, "") else str(raw_url)
+    return fact.kind, fact.text, fact.artifact_url
+
+
+def _github_release_url_key(url: str | None) -> tuple[str | None, ReleaseKey | None]:
+    """Return the GitHub repo and optional release-tag identity from a URL."""
+    if not url:
+        return None, None
+    parsed = urlparse(url.strip())
+    host = (parsed.hostname or "").casefold()
+    if parsed.scheme.casefold() not in {"http", "https"} or host not in {
+        "github.com",
+        "www.github.com",
+    }:
+        return None, None
+    parts = [unquote(part) for part in parsed.path.strip("/").split("/") if part]
+    if len(parts) < 2:
+        return None, None
+    repo = f"{parts[0].casefold()}/{parts[1].casefold()}"
+    if (
+        len(parts) >= 5
+        and parts[2].casefold() == "releases"
+        and parts[3].casefold() == "tag"
+    ):
+        tag = "/".join(parts[4:]).strip()
+        if tag:
+            return repo, (repo, tag)
+    return repo, None
+
+
+def release_story_keys(
+    facts: Iterable[Fact | Mapping[str, Any]],
+) -> frozenset[ReleaseKey]:
+    """Stable repo+tag identities represented by release URLs or tag facts.
+
+    A survey can see a tag before GitHub exposes it as a release. Bind an
+    explicit ``Tag ...`` fact to its single GitHub repo so promoting that tag
+    later cannot create a fresh angle. Tags remain case-sensitive, as git refs
+    are; owner/repository spelling does not.
+    """
+    packed = tuple(_fact_parts(fact) for fact in facts)
+    repos: set[str] = set()
+    keys: set[ReleaseKey] = set()
+    for _kind, _text, url in packed:
+        repo, key = _github_release_url_key(url)
+        if repo:
+            repos.add(repo)
+        if key:
+            keys.add(key)
+    if len(repos) == 1:
+        repo = next(iter(repos))
+        for kind, text, _url in packed:
+            if kind.strip().casefold() != "tag":
+                continue
+            match = re.fullmatch(r"\s*tag\s+(.+?)\s*", text, re.IGNORECASE)
+            if match and match.group(1).strip():
+                keys.add((repo, match.group(1).strip()))
+    return frozenset(keys)
 
 
 def angle_body_hash(body: str) -> str:
@@ -936,6 +1008,23 @@ def drop_repeat_angle(
     )
 
 
+def drop_repeat_release(
+    decision: OperatorDecision,
+    previous_release_keys: Iterable[ReleaseKey],
+) -> OperatorDecision:
+    """A tag/release that already had a story cannot get another angle."""
+    if decision.draft is None:
+        return decision
+    current = release_story_keys(decision.brief.facts)
+    if not current or current.isdisjoint(previous_release_keys):
+        return decision
+    return OperatorDecision(
+        brief=decision.brief,
+        score=_kill(decision.brief, SAME_RELEASE_REASON),
+        draft=None,
+    )
+
+
 def decision_to_dict(decision: OperatorDecision) -> dict[str, Any]:
     score = decision.score
     draft = decision.draft
@@ -1042,6 +1131,8 @@ __all__ = [
     "Fact",
     "HomError",
     "OperatorDecision",
+    "ReleaseKey",
+    "SAME_RELEASE_REASON",
     "Score",
     "angle_body_hash",
     "apply_brief",
@@ -1051,8 +1142,10 @@ __all__ = [
     "compose_draft",
     "decision_to_dict",
     "drop_repeat_angle",
+    "drop_repeat_release",
     "fact_from_mapping",
     "is_ship_artifact",
     "parse_facts_json",
+    "release_story_keys",
     "score_brief",
 ]
