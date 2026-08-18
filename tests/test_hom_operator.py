@@ -42,6 +42,7 @@ from influenzer.playbook import (
     living_stack_arena,
     stack_costume_reason,
     is_blog_host_url,
+    is_cloud_drive_host_url,
     is_deck_host_url,
     is_linktree_host_url,
     is_launch_host_url,
@@ -59,6 +60,7 @@ from influenzer.playbook import (
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
     FOMO_REASON,
+    CLOUD_DRIVE_REASON,
     MEME_REASON,
     DECK_REASON,
     LINKTREE_REASON,
@@ -108,6 +110,7 @@ from influenzer.playbook import (
     looks_like_lead_magnet,
     looks_like_fomo,
     looks_like_meme,
+    looks_like_cloud_drive,
     looks_like_deck,
     looks_like_linktree,
     looks_like_logo_reveal,
@@ -1222,6 +1225,68 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_linktree_host_url("https://notlinktr.ee/local-tick"))
         self.assertFalse(is_linktree_host_url("https://linktr.ee.evil.com/local-tick"))
         self.assertFalse(is_linktree_host_url("https://docs.google.com/document/d/abc123/edit"))
+
+    def test_cloud_drive_is_a_file_not_a_site(self) -> None:
+        drives = (
+            "Google Drive folder for the local tick",
+            "our Dropbox",
+            "WeTransfer of the zip",
+            "cloud drive instead of a website",
+            "dysk w chmurze zamiast produktu",
+            "dysk google zamiast witryny",
+            "chmurowy dysk",
+            "dysk w chmurze nie jest witryną",
+        )
+        for text in drives:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_cloud_drive(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    CLOUD_DRIVE_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "SSD drive in the laptop",
+            "screenshot of the local tick demo",
+            "hard drive of the build machine",
+            "join the waitlist",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_cloud_drive(text))
+                if text == "join the waitlist":
+                    continue
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_cloud_drive_host_is_drive_dropbox_or_wetransfer_not_a_repo(self) -> None:
+        drives = (
+            "https://drive.google.com/file/d/abc123/view",
+            "https://docs.google.com/document/d/abc123/edit",
+            "https://www.dropbox.com/s/abc123/local-tick.zip",
+            "https://dl.dropboxusercontent.com/s/abc123/local-tick.zip",
+            "https://wetransfer.com/downloads/abc123",
+            "https://we.tl/t-abc123",
+            "https://1drv.ms/u/s!abc123",
+            "https://onedrive.live.com/redir?resid=abc123",
+        )
+        for url in drives:
+            with self.subTest(url=url):
+                self.assertTrue(is_cloud_drive_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+                self.assertFalse(is_store_host_url(url))
+                self.assertFalse(is_blog_host_url(url))
+                self.assertFalse(is_launch_host_url(url))
+                self.assertFalse(is_ranking_host_url(url))
+                self.assertFalse(is_deck_host_url(url))
+                self.assertFalse(is_linktree_host_url(url))
+        self.assertFalse(is_cloud_drive_host_url(SHIP_REPO))
+        self.assertFalse(is_cloud_drive_host_url(SHIP_PR))
+        self.assertFalse(is_cloud_drive_host_url("https://example.com/dropbox"))
+        self.assertFalse(is_cloud_drive_host_url("https://notdropbox.com/local-tick"))
+        self.assertFalse(is_cloud_drive_host_url("https://dropbox.com.evil.com/local-tick"))
+        self.assertFalse(is_cloud_drive_host_url("https://docs.google.com/presentation/d/abc123/edit"))
 
     def test_logo_reveal_is_look_not_a_product(self) -> None:
         looks = (
@@ -3502,6 +3567,28 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_cloud_drive_is_killed(self) -> None:
+        drives = (
+            "Google Drive folder for the local tick",
+            "Dropbox of the launch",
+            "WeTransfer of the zip",
+            "dysk w chmurze zamiast produktu",
+            "cloud drive instead of a website",
+        )
+        for text in drives:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CLOUD_DRIVE_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_logo_reveal_ship_claim_is_killed(self) -> None:
         looks = (
             "rebrand of the local tick",
@@ -4761,6 +4848,68 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertIn(SHIP_REPO, decision.draft.body)
         self.assertNotIn("linktr.ee", decision.draft.body)
+
+    def test_drive_dropbox_or_wetransfer_as_only_url_is_not_a_site(self) -> None:
+        drives = (
+            "https://drive.google.com/file/d/abc123/view",
+            "https://www.dropbox.com/s/abc123/local-tick.zip",
+            "https://wetransfer.com/downloads/abc123",
+            "https://we.tl/t-abc123",
+            "https://1drv.ms/u/s!abc123",
+            "https://docs.google.com/document/d/abc123/edit",
+        )
+        for url in drives:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="see the file", artifact_url=url),
+                        Fact(text="strangers can click the page today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CLOUD_DRIVE_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_cloud_drive_next_to_repo_is_still_killed_when_copy_is_a_file(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Google Drive folder for the local tick", artifact_url=SHIP_REPO),
+                Fact(
+                    text="zip as evidence",
+                    artifact_url="https://www.dropbox.com/s/abc123/local-tick.zip",
+                ),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, CLOUD_DRIVE_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_cloud_drive_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="zip as evidence",
+                    artifact_url="https://www.dropbox.com/s/abc123/local-tick.zip",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("dropbox.com", decision.draft.body)
 
     def test_hn_front_star_chart_or_badge_as_only_url_is_not_an_artifact(self) -> None:
         charts = (

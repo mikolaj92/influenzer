@@ -599,6 +599,28 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "linktree_not_an_artifact")
 
+    def test_cloud_drive_release_is_silence(self) -> None:
+        out = self._pack(
+            ship_script(
+                releases=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "tagName": "v0.0.0-drive",
+                                "name": "Google Drive folder for the local tick",
+                                "isDraft": False,
+                                "isPrerelease": False,
+                                "publishedAt": "2026-08-12T18:00:00Z",
+                            }
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "cloud_drive_not_a_site")
+
     def test_rebrand_release_is_silence(self) -> None:
         out = self._pack(
             ship_script(

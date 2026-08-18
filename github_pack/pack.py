@@ -40,6 +40,7 @@ from github_pack.classify import (
     looks_like_lead_magnet,
     looks_like_fomo,
     looks_like_meme,
+    looks_like_cloud_drive,
     looks_like_deck,
     looks_like_linktree,
     looks_like_logo_reveal,
@@ -380,6 +381,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
         return _silence("deck_not_an_artifact", repo=slug)
     if looks_like_linktree(blob):
         return _silence("linktree_not_an_artifact", repo=slug)
+    if looks_like_cloud_drive(blob):
+        return _silence("cloud_drive_not_a_site", repo=slug)
     if looks_like_logo_reveal(blob):
         return _silence("logo_reveal_not_a_ship", repo=slug)
     meta = survey.get("meta") if isinstance(survey.get("meta"), dict) else {}
