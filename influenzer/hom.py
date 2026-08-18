@@ -287,7 +287,9 @@ class Score:
 
 
 ReleaseKey = tuple[str, str]
+HNUrlKey = str
 SAME_RELEASE_REASON = "same_release"
+SAME_HN_URL_REASON = "same_hn_url"
 
 
 def _fact_parts(fact: Fact | Mapping[str, Any]) -> tuple[str, str, str | None]:
@@ -355,6 +357,69 @@ def release_story_keys(
     return frozenset(keys)
 
 
+def hn_url_key(url: str | None) -> HNUrlKey | None:
+    """Canonical identity for a URL submitted to HN.
+
+    Fragments never reach the server. GitHub redirects ``www`` and treats the
+    owner/repository spelling case-insensitively, so those spellings cannot
+    bypass the no-resubmit gate. The rest of the path and query stay intact.
+    """
+    if not url or not isinstance(url, str):
+        return None
+    parsed = urlparse(url.strip())
+    scheme = parsed.scheme.casefold()
+    host = (parsed.hostname or "").casefold().rstrip(".")
+    if scheme not in {"http", "https"} or not host:
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    if host == "www.github.com":
+        host = "github.com"
+    netloc = host
+    if port is not None and not (
+        (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
+    ):
+        netloc = f"{host}:{port}"
+    path = parsed.path or "/"
+    if host == "github.com":
+        parts = [part for part in path.split("/") if part]
+        if len(parts) >= 2:
+            parts[0] = parts[0].casefold()
+            parts[1] = parts[1].casefold()
+            path = "/" + "/".join(parts)
+        elif path != "/":
+            path = path.rstrip("/")
+    return parsed._replace(
+        scheme=scheme,
+        netloc=netloc,
+        path=path,
+        params="",
+        fragment="",
+    ).geturl()
+
+
+def hn_submission_url_key(
+    facts: Iterable[Fact | Mapping[str, Any]],
+) -> HNUrlKey | None:
+    """URL the HN costume would put in its URL field, if the facts have one."""
+    packed = tuple(_fact_parts(fact) for fact in facts)
+    ship = next(
+        (url for _kind, _text, url in packed if is_ship_artifact_url(url)),
+        None,
+    )
+    if ship:
+        return hn_url_key(ship)
+    candidate = next(
+        (url for _kind, _text, url in packed if is_tryable_artifact_url(url)),
+        None,
+    )
+    return hn_url_key(candidate)
+
+
 def angle_body_hash(body: str) -> str:
     """Hash of the wearable body only. Stack format stays; text must be new."""
     return content_hash({"body": body})
@@ -398,6 +463,17 @@ class OperatorDecision:
     brief: Brief
     score: Score
     draft: Draft | None
+
+
+def hn_draft_url_key(draft: Draft) -> HNUrlKey | None:
+    """Canonical URL field from a stored HN draft; other costumes have no HN URL."""
+    if draft.arena is not ArenaId.HN:
+        return None
+    for line in draft.body.splitlines():
+        candidate = line.strip()
+        if is_tryable_artifact_url(candidate):
+            return hn_url_key(candidate)
+    return None
 
 
 def is_ship_artifact(url: str | None) -> bool:
@@ -1025,6 +1101,24 @@ def drop_repeat_release(
     )
 
 
+def drop_repeat_hn_url(
+    decision: OperatorDecision,
+    previous_url_keys: Iterable[HNUrlKey],
+) -> OperatorDecision:
+    """A URL that already had an HN draft is silence; never resubmit it."""
+    draft = decision.draft
+    if draft is None or draft.arena is not ArenaId.HN:
+        return decision
+    current = hn_draft_url_key(draft)
+    if current is None or current not in previous_url_keys:
+        return decision
+    return OperatorDecision(
+        brief=decision.brief,
+        score=_kill(decision.brief, SAME_HN_URL_REASON),
+        draft=None,
+    )
+
+
 def decision_to_dict(decision: OperatorDecision) -> dict[str, Any]:
     score = decision.score
     draft = decision.draft
@@ -1129,9 +1223,11 @@ __all__ = [
     "Brief",
     "Draft",
     "Fact",
+    "HNUrlKey",
     "HomError",
     "OperatorDecision",
     "ReleaseKey",
+    "SAME_HN_URL_REASON",
     "SAME_RELEASE_REASON",
     "Score",
     "angle_body_hash",
@@ -1142,8 +1238,12 @@ __all__ = [
     "compose_draft",
     "decision_to_dict",
     "drop_repeat_angle",
+    "drop_repeat_hn_url",
     "drop_repeat_release",
     "fact_from_mapping",
+    "hn_draft_url_key",
+    "hn_submission_url_key",
+    "hn_url_key",
     "is_ship_artifact",
     "parse_facts_json",
     "release_story_keys",
