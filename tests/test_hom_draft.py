@@ -2837,6 +2837,81 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("mixed content", decision.draft.body.lower())
         self.assertNotIn("martwy tls", decision.draft.body.lower())
 
+    def test_empty_github_release_is_undressable_even_when_score_says_draft(self) -> None:
+        release = "https://github.com/mikolaj92/influenzer/releases/tag/v0.2.0"
+        for text in ("v0.2.0", "Release v0.2.0", "GitHub Release v0.2.0", "Published v0.2.0"):
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(kind="release", text=text, artifact_url=release),
+                        Fact(text="Local operator with a working install"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.GITHUB,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.GITHUB].wave,
+                    canon_url=ARENAS[ArenaId.GITHUB].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "github",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.GITHUB].wave),
+                            "canon_url": ARENAS[ArenaId.GITHUB].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                self.assertNotIn(text, json.dumps(payload))
+
+    def test_github_release_with_notes_or_asset_can_still_dress(self) -> None:
+        release = "https://github.com/mikolaj92/influenzer/releases/tag/v0.2.0"
+        asset = "https://github.com/mikolaj92/influenzer/releases/download/v0.2.0/influenzer.tar.gz"
+        for facts in (
+            (
+                Fact(
+                    kind="release",
+                    text="Release v0.2.0: bounded retries keep the queue moving",
+                    artifact_url=release,
+                ),
+                Fact(text="strangers can click and run the fixed queue today"),
+            ),
+            (
+                Fact(kind="release", text="Release v0.2.0", artifact_url=release),
+                Fact(kind="asset", text="Download the runnable archive", artifact_url=asset),
+            ),
+            (
+                Fact(kind="release", text="Release v0.2.0", artifact_url=release),
+                Fact(kind="release_asset", text="Download the runnable archive"),
+            ),
+        ):
+            with self.subTest(facts=facts):
+                brief = _ship_brief(preferred_arena=ArenaId.GITHUB, facts=facts)
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.GITHUB,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.GITHUB].wave,
+                    canon_url=ARENAS[ArenaId.GITHUB].canon_url,
+                )
+                draft = dress_brief(brief, fake)
+                self.assertIsNotNone(draft)
+                assert draft is not None
+                self.assertIn(release, draft.body)
+
     def test_dead_release_asset_is_undressable_even_when_score_says_draft(self) -> None:
         corpses = (
             "asset on the list 404",
