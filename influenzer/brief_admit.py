@@ -34,7 +34,13 @@ from influenzer.config import load_config
 from influenzer.domain import foreign_owner_reason, utc_now
 from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
-from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
+from influenzer.hom import (
+    SAME_RELEASE_REASON,
+    HomError,
+    brief_from_mapping,
+    is_ship_artifact,
+    release_story_keys,
+)
 from influenzer.playbook import (
     EVENT_NOT_A_SHIP,
     APOLOGY_WITHOUT_SHIP_REASON,
@@ -177,6 +183,8 @@ def admit_pack(
     )
     if already_told(repo, project_id, artifact_urls, brief_id):
         return host_silence("already_told", project_id=project_id, repo_slug=slug)
+    if release_story_keys(facts_raw) & repo.release_story_keys():
+        return host_silence(SAME_RELEASE_REASON, project_id=project_id, repo_slug=slug)
     created_at = clock or utc_now()
     tryable = bool(payload.get("tryable"))
     if not tryable:

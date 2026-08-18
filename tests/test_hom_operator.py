@@ -21,7 +21,9 @@ from influenzer.hom import (
     brief_from_mapping,
     compose_draft,
     drop_repeat_angle,
+    drop_repeat_release,
     is_ship_artifact,
+    release_story_keys,
     score_brief,
 )
 from influenzer.playbook import (
@@ -263,6 +265,67 @@ class PlaybookCopyTests(unittest.TestCase):
         )
         self.assertIsNone(stack_costume_reason(ArenaId.HN, ArenaId.HN))
         self.assertIsNone(stack_costume_reason(None, ArenaId.HN))
+
+    def test_release_story_keys_are_repo_and_tag_not_url_spelling(self) -> None:
+        release = Fact(
+            kind="release",
+            text="Released v0.1.0",
+            artifact_url=SHIP_RELEASE,
+        )
+        same_www = Fact(
+            kind="release",
+            text="Released queue recovery",
+            artifact_url="https://www.github.com/Mikolaj92/Influenzer/releases/tag/v0.1.0",
+        )
+        later_tag = Fact(kind="tag", text="Tag v0.2.0")
+        proof = Fact(text="repo proof", artifact_url=SHIP_REPO)
+        self.assertEqual(
+            release_story_keys((release,)),
+            {("mikolaj92/influenzer", "v0.1.0")},
+        )
+        self.assertEqual(
+            release_story_keys((same_www,)),
+            {("mikolaj92/influenzer", "v0.1.0")},
+        )
+        self.assertEqual(
+            release_story_keys((later_tag, proof)),
+            {("mikolaj92/influenzer", "v0.2.0")},
+        )
+        self.assertFalse(release_story_keys((Fact(text="operator emits drafts", artifact_url=SHIP_PR),)))
+        first = Brief.create(
+            project_id="app-1",
+            brief_id="copy-1",
+            facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR), Fact(text="a stranger can run it")),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        decision = apply_brief(first, now="2026-08-13T05:00:00Z")
+        assert decision.draft is not None
+        self.assertIs(
+            drop_repeat_release(decision, {("mikolaj92/influenzer", "v0.1.0")}).draft,
+            decision.draft,
+        )
+        same = Brief.create(
+            project_id="app-1",
+            brief_id="copy-2",
+            facts=(
+                Fact(kind="release", text="Released queue recovery", artifact_url=SHIP_RELEASE),
+                Fact(text="a different angle for the same release"),
+            ),
+            story_kind=StoryKind.MAJOR,
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+        )
+        same_decision = apply_brief(same, now="2026-08-13T06:00:00Z")
+        assert same_decision.draft is not None
+        silenced = drop_repeat_release(
+            same_decision, {("mikolaj92/influenzer", "v0.1.0")}
+        )
+        self.assertIsNone(silenced.draft)
+        self.assertEqual(silenced.score.reason, "same_release")
 
     def test_ship_artifact_accepts_repo_pr_issue_release(self) -> None:
         self.assertTrue(is_ship_artifact(SHIP_PR))
