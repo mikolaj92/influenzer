@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=175 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=176 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #175 — Diff nie jest artefaktem
+Issue: #176 — Limit gh to cisza, nie wyjątek
 
 ## Goal
 
-Diff nie jest artefaktem. URL compare albo pojedynczy commit = cisza. To zmiana, nie produkt do kliknięcia.
+Limit gh to cisza, nie wyjątek. 429, secondary rate limit = ten look milczy, pętla żyje. Nie puchniemy logów body.
 
 ## Files likely touched
 

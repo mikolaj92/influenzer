@@ -16,7 +16,8 @@ An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
 50MB in state.db is silence. The loop lives.
-Pad gh (auth, network, rate) is empty, not death of the loop. Survey
+Pad gh (auth, network, rate, including secondary rate limits) is empty,
+not death of the loop. Survey
 returns empty and the interval sleeps. Provider fail-closed, not a
 crash-in-the-middle-of-state.
 """
@@ -42,6 +43,7 @@ from github_survey.gh import (
     allowlisted_gh_argv,
     classify_gh_argv,
     gh_argv,
+    gh_reason,
     invalid_repo_reason,
     optional_json,
     required_json,
@@ -573,11 +575,11 @@ def collect_survey(repo_slug: str, *, gh: GhRunner, now: datetime) -> tuple[dict
         return None, "empty_survey"
 
     tags_call = gh(["api", f"repos/{repo_slug}/tags?per_page=20"])
-    if look_payload_reason(tags_call):
+    if look_payload_reason(tags_call) or gh_reason(tags_call) == "gh_rate":
         return None, "empty_survey"
     tags_raw = optional_json(tags_call, [])
     readme_call = gh(["api", f"repos/{repo_slug}/readme"])
-    if look_payload_reason(readme_call):
+    if look_payload_reason(readme_call) or gh_reason(readme_call) == "gh_rate":
         return None, "empty_survey"
     readme_raw = optional_json(readme_call, {})
     readme_text = decode_readme(readme_raw)
