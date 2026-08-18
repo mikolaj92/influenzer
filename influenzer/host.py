@@ -23,6 +23,20 @@ BATTERY_LAPTOP_REASON = (
     "interval tick refuses battery laptops; run on an always-on host (Mac mini)"
 )
 PRIVATE_HOST_NOT_TRYABLE = "private_host_not_tryable"
+ARTIFACT_5XX_NOT_TRYABLE = "artifact_5xx_not_tryable"
+
+# A server error is not a public, working artifact. Require a status context so
+# an unrelated number such as an audience count does not silence a real demo.
+_ARTIFACT_5XX_RE = re.compile(
+    r"(?ix)(?:"
+    r"\b(?:http(?:/\d+(?:\.\d+)?)?|status(?:[ _-]code)?|response(?:[ _-]status)?|"
+    r"error|code|kod|b[łl][aą]d)\b[^\d]{0,12}\b5\d\d\b"
+    r"|\b(?:artifact|demo|site|url|server|look|probe|health)\b[^\d]{0,36}"
+    r"\b(?:returns?|returned|got|received|zwraca|dosta[łl])\b[^\d]{0,12}\b5\d\d\b"
+    r"|\b5\d\d\s+(?:internal(?:\s+server)?\s+error|bad\s+gateway|"
+    r"service\s+unavailable)\b"
+    r")"
+)
 
 _LOOPBACK_NAMES = frozenset(
     {
@@ -143,6 +157,41 @@ def is_non_public_tryable_host(host: str | None) -> bool:
         or parsed.is_multicast
         or parsed.is_reserved
     )
+
+
+def is_artifact_5xx_status(status: int | str | None) -> bool:
+    """True when an artifact response is an HTTP server error."""
+    if isinstance(status, bool):
+        return False
+    if isinstance(status, int):
+        return 500 <= status <= 599
+    if not isinstance(status, str):
+        return False
+    try:
+        return 500 <= int(status.strip()) <= 599
+    except ValueError:
+        return False
+
+
+def looks_like_artifact_5xx(evidence: str | None) -> bool:
+    """True for reported HTTP 5xx evidence; a stranger cannot use it now."""
+    return bool(evidence and _ARTIFACT_5XX_RE.search(evidence))
+
+
+def artifact_tryable_reason(
+    *, status: int | str | None = None, evidence: str | None = None
+) -> str | None:
+    """Return the fail-closed reason when an artifact cannot be offered."""
+    if is_artifact_5xx_status(status) or looks_like_artifact_5xx(evidence):
+        return ARTIFACT_5XX_NOT_TRYABLE
+    return None
+
+
+def is_tryable_artifact(
+    *, status: int | str | None = None, evidence: str | None = None
+) -> bool:
+    """Whether an artifact is currently safe to offer to a stranger."""
+    return artifact_tryable_reason(status=status, evidence=evidence) is None
 
 
 def is_private_host_url(url: str | None) -> bool:

@@ -19,6 +19,13 @@ from influenzer.adapters.base import AdapterRequest
 from influenzer.config import Config
 from influenzer.content import create_revision, persist_revision
 from influenzer.hom import Brief, Fact, Score, _gate_violation, compose_draft, score_brief
+from influenzer.host import (
+    ARTIFACT_5XX_NOT_TRYABLE,
+    artifact_tryable_reason,
+    is_artifact_5xx_status,
+    is_tryable_artifact,
+    looks_like_artifact_5xx,
+)
 from influenzer.domain import (
     AccountStatus,
     AttemptStatus,
@@ -940,6 +947,33 @@ class OrderedLiveGateTests(unittest.TestCase):
                     canon_url=ARENAS[ArenaId.HN].canon_url,
                 )
                 self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_artifact_5xx_is_silence_not_tryable(self) -> None:
+        evidence = (
+            "HTTP 500 Internal Server Error at the demo",
+            "artifact response status: 502 Bad Gateway",
+            "the URL returns 503 Service Unavailable",
+            "look got 500 from the artifact host",
+        )
+        for status in (500, 502, 503, "500", "502", "503"):
+            with self.subTest(status=status):
+                self.assertTrue(is_artifact_5xx_status(status))
+                self.assertFalse(is_tryable_artifact(status=status))
+                self.assertEqual(
+                    artifact_tryable_reason(status=status), ARTIFACT_5XX_NOT_TRYABLE
+                )
+        for status in (None, False, 499, 600, "503 Service Unavailable"):
+            with self.subTest(status=status):
+                self.assertFalse(is_artifact_5xx_status(status))
+        self.assertFalse(looks_like_artifact_5xx("500 requests completed successfully"))
+        self.assertTrue(is_tryable_artifact(status=200, evidence="the demo returns HTTP 200"))
+        for text in evidence:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_artifact_5xx(text))
+                self.assertFalse(is_tryable_artifact(evidence=text))
+                self.assertEqual(
+                    artifact_tryable_reason(evidence=text), ARTIFACT_5XX_NOT_TRYABLE
+                )
 
     def test_linktree_is_silence_not_an_artifact(self) -> None:
         boards = (
