@@ -38,6 +38,7 @@ from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
     EVENT_NOT_A_SHIP,
     APOLOGY_WITHOUT_SHIP_REASON,
+    SUNSET_NOT_A_SHIP_REASON,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
@@ -58,6 +59,7 @@ from influenzer.playbook import (
     looks_like_empty_repo,
     looks_like_event,
     looks_like_apology,
+    looks_like_sunset,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -200,6 +202,8 @@ def admit_pack(
         return host_silence(SECRET_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_event(fact_blob):
         return host_silence(EVENT_NOT_A_SHIP, project_id=project_id, repo_slug=slug)
+    if looks_like_sunset(fact_blob):
+        return host_silence(SUNSET_NOT_A_SHIP_REASON, project_id=project_id, repo_slug=slug)
     fact_triples = tuple(
         (
             str(item.get("kind") or "signal"),

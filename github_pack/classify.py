@@ -226,6 +226,39 @@ _APOLOGY_RE = re.compile(
     r"|\bkryzysow(?:y|a|e)\s+(?:post|wpis|komunikat|o[sś]wiadczenie)\b"
     r")"
 )
+# Product EOL is a tombstone, not a launch. Keep technical shutdown features
+# (graceful shutdown, worker cleanup) out unless the copy says the product ends.
+_SUNSET_RE = re.compile(
+    r"(?im)(?:"
+    r"(?:^|\n)\s*(?:eol|end[- ]of[- ]life|sunset(?:ting)?|shutting\s+down|"
+    r"we(?:['’]re|\s+are)\s+shutting\s+down|"
+    r"(?:product|service|app(?:lication)?|project|platform|api|tool)\s+shutdown)"
+    r"\s*[.!]?\s*(?=$|\n)"
+    r"|\breleased?\s+(?:the\s+|our\s+)?(?:eol|end[- ]of[- ]life|sunset)"
+    r"(?:\s+(?:notice|announcement))?\s*(?:[.!]|$)"
+    r"|\b(?:eol|end[- ]of[- ]life)\s+(?:announcement|notice|for|of)\b"
+    r"|\b(?:announc(?:e|es|ed|ing)|reaches?|reached)\s+"
+    r"(?:the\s+|its\s+|our\s+)?(?:eol|end[- ]of[- ]life)\b"
+    r"|\bwe(?:['’]re|\s+are|\s+will\s+be|['’]ll\s+be)\s+"
+    r"(?:shutting\s+down|sunsetting|discontinuing)\b"
+    r"|\b(?:shutting\s+down|sunsetting|discontinuing|retiring)\s+"
+    r"(?:the\s+|our\s+|this\s+)?"
+    r"(?:product|service|app(?:lication)?|project|platform|api|tool|repo(?:sitory)?)\b"
+    r"|\b(?:product|service|app(?:lication)?|project|platform|api|tool|repo(?:sitory)?)\s+"
+    r"(?:(?:is|will\s+be|has\s+been|is\s+being)\s+)?"
+    r"(?:shutting\s+down|being\s+sunset|sunset(?:ted)?|discontinued|retired)\b"
+    r"|\b(?:ceas(?:e|es|ed|ing)|end(?:s|ed|ing)?)\s+(?:all\s+)?operations\b"
+    r"|\b(?:wy[lł][aą]czeni\w*|wy[lł][aą]cz(?:amy|ymy|ony|ona|one|yć)|"
+    r"wygasz(?:amy|anie|any|ana|ane|ać)|zamykamy)\s+"
+    r"(?:ten\s+|t[eę]\s+|nasz(?:ą|a|e)?\s+)?"
+    r"(?:produkt\w*|us[lł]ug\w*|aplikacj\w*|serwis\w*|platform\w*|projekt\w*)\b"
+    r"|\b(?:produkt\w*|us[lł]ug\w*|aplikacj\w*|serwis\w*|platform\w*|projekt\w*)\s+"
+    r"(?:(?:zostanie|zostaje|jest|b[eę]dzie)\s+)?"
+    r"(?:wy[lł][aą]cz\w*|wygasz\w*|zamkni[eę]t\w*)\b"
+    r"|\bkoniec\s+(?:[zż]ycia|wsparcia)\s+(?:dla\s+)?"
+    r"(?:produkt\w*|us[lł]ug\w*|aplikacj\w*|serwis\w*|platform\w*|projekt\w*)\b"
+    r")"
+)
 _LOGO_REVEAL_RE = re.compile(
     r"(?i)(?:"
     r"\bre-?brands?(?:ing)?\b"
@@ -425,6 +458,13 @@ def looks_like_apology(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_APOLOGY_RE.search(text))
+
+
+def looks_like_sunset(text: str) -> bool:
+    """True when copy announces product EOL or shutdown. A tombstone is not a ship."""
+    if not text or not text.strip():
+        return False
+    return bool(_SUNSET_RE.search(text))
 
 
 def looks_like_logo_reveal(text: str) -> bool:

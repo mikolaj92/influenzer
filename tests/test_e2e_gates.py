@@ -10,6 +10,7 @@ from github_pack.pack import (
     README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
     APOLOGY_WITHOUT_SHIP_REASON,
+    SUNSET_NOT_A_SHIP_REASON,
     SOLICIT_GESTURE_REASON,
     looks_like_solicit_gesture,
     pack_survey,
@@ -69,6 +70,7 @@ from influenzer.playbook import (
     ArenaId,
     AGORA_NO_NEW_THOUGHT_REASON,
     APOLOGY_WITHOUT_SHIP_REASON as HOM_APOLOGY_WITHOUT_SHIP_REASON,
+    SUNSET_NOT_A_SHIP_REASON as HOM_SUNSET_NOT_A_SHIP_REASON,
     BLUESKY_PACK_WITHOUT_FEED_REASON,
     BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
     CINEMA_ANNOUNCES_END_REASON,
@@ -132,6 +134,7 @@ from influenzer.playbook import (
     looks_like_press_release,
     looks_like_event,
     looks_like_apology,
+    looks_like_sunset,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -656,6 +659,74 @@ class OrderedLiveGateTests(unittest.TestCase):
         shipped_score = score_brief(shipped)
         self.assertEqual(shipped_score.verdict, Verdict.DRAFT)
         self.assertIsNotNone(compose_draft(shipped, shipped_score))
+
+    def test_sunset_is_changelog_or_social_silence(self) -> None:
+        sunsets = (
+            "EOL",
+            "End-of-life announcement for the service",
+            "We're shutting down",
+            "Shutting down",
+            "We will be sunsetting the product on September 1",
+            "Discontinuing our API",
+            "The platform has been retired",
+            "Wyłączamy produkt",
+            "Usługa zostanie wygaszona",
+            "Zamykamy aplikację",
+        )
+        self.assertEqual(SUNSET_NOT_A_SHIP_REASON, HOM_SUNSET_NOT_A_SHIP_REASON)
+        allowed = (
+            "Graceful shutdown support for workers",
+            "Shutdown hooks now flush the queue",
+            "EOL validation catches a missing newline",
+            "Sunset colors are available in the theme",
+            "Local tick scores briefs and emits a draft",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_sunset(text))
+        for idx, text in enumerate(sunsets):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_sunset(text))
+                social = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-sunset-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="the existing README still has a runnable demo"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(social)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, SUNSET_NOT_A_SHIP_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(social, score))
+                leaked = Score(
+                    brief_id=social.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(social, leaked))
+
+        changelog = Brief.create(
+            project_id="app-1",
+            brief_id="b-sunset-changelog",
+            facts=(Fact(text="The service reaches end-of-life"),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        changelog_score = score_brief(changelog)
+        self.assertEqual(changelog_score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(changelog_score.reason, SUNSET_NOT_A_SHIP_REASON)
+        self.assertIsNone(compose_draft(changelog, changelog_score))
 
     def test_calendar_filler_is_silence_not_an_angle(self) -> None:
         greetings = (

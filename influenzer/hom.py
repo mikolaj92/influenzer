@@ -117,6 +117,7 @@ from influenzer.playbook import (
     looks_like_roadmap,
     looks_like_event,
     looks_like_apology,
+    looks_like_sunset,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -134,6 +135,7 @@ from influenzer.playbook import (
     looks_like_waitlist,
     EVENT_NOT_A_SHIP,
     APOLOGY_WITHOUT_SHIP_REASON,
+    SUNSET_NOT_A_SHIP_REASON,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
@@ -669,6 +671,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
     unsourced = unquotable_reason(_fact_triples(brief))
     if unsourced:
         return _kill(brief, unsourced)
+    if looks_like_sunset(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, SUNSET_NOT_A_SHIP_REASON)
+        return _changelog(brief, SUNSET_NOT_A_SHIP_REASON)
     if looks_like_apology(blob) and not apology_has_new_ship(_fact_triples(brief)):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, APOLOGY_WITHOUT_SHIP_REASON)

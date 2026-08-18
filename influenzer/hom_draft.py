@@ -128,6 +128,7 @@ from influenzer.playbook import (
     looks_like_roadmap,
     looks_like_event,
     looks_like_apology,
+    looks_like_sunset,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -375,6 +376,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_dead_release_asset(bits.blob)
         or looks_like_roadmap(bits.blob)
         or looks_like_event(bits.blob)
+        or looks_like_sunset(bits.blob)
         or looks_like_calendar_filler(bits.blob)
         or looks_like_counter_thanks(bits.blob)
         or looks_like_fog(bits.blob)
@@ -755,6 +757,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_contest(bits.blob)
         or looks_like_poll(bits.blob)
         or looks_like_model_in_frame(bits.blob)
+        or looks_like_sunset(bits.blob)
         or (
             looks_like_apology(bits.blob)
             and not apology_has_new_ship(triples)
@@ -845,6 +848,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_contest(body)
         or looks_like_poll(body)
         or looks_like_model_in_frame(body)
+        or looks_like_sunset(body)
         or (looks_like_apology(body) and not apology_has_new_ship(triples))
         or looks_like_calendar_filler(body)
         or looks_like_counter_thanks(body)

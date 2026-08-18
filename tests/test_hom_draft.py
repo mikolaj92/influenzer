@@ -823,6 +823,51 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertIn(SHIP_RELEASE, decision.draft.body)
 
+    def test_sunset_is_undressable_even_when_score_says_draft(self) -> None:
+        sunsets = (
+            "EOL",
+            "We're shutting down",
+            "Shutting down",
+            "Sunsetting the product on September 1",
+            "Discontinuing our API",
+            "Wyłączamy produkt",
+        )
+        for text in sunsets:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="the existing README still has a runnable demo"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                self.assertNotIn(text, json.dumps(payload))
+
     def test_calendar_filler_is_undressable_even_when_score_says_draft(self) -> None:
         greetings = (
             "happy Friday",
