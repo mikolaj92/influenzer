@@ -490,7 +490,7 @@ SOCIAL_ARENAS: frozenset[ArenaId] = frozenset(
 )
 
 # Ship claims must point at a tryable GitHub artifact: the repo (the website),
-# a PR, a release, or an issue — not a vibe, landing page, commit, or GitHub chrome.
+# a PR, a release, or an issue — not a vibe, landing page, diff, or commit.
 # Repo root may have a trailing slash. Gist/wiki/compare/commit/tree/blob/actions/
 # settings and user/org profile URLs are not ship artifacts.
 SHIP_ARTIFACT_RE = re.compile(
@@ -498,6 +498,10 @@ SHIP_ARTIFACT_RE = re.compile(
     r"(?!(?:gist|orgs|settings|users)/)"
     r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
     r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))?)?$"
+)
+_GITHUB_DIFF_PATH_RE = re.compile(
+    r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:compare|commit)(?:/|$)",
+    re.I,
 )
 # A film is not click-and-run. YouTube/Vimeo/Loom as the only URL is silence
 # on seminar. A film next to a repo can stay as evidence. Cinema is separate.
@@ -1588,7 +1592,8 @@ _SHIP_URL_IN_TEXT_RE = re.compile(
     r"https://github\.com/"
     r"(?!(?:gist|orgs|settings|users)/)"
     r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
-    r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))?)",
+    r"(?!/(?:compare|commit)(?:/|$))"
+    r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+)))?",
     re.I,
 )
 _DUNK_SUBJECT_STOP = frozenset(
@@ -2338,6 +2343,11 @@ def is_tryable_artifact_url(url: str | None) -> bool:
     if parsed.username is not None or parsed.password is not None:
         return False
     if _host_allowed(parsed.hostname, SHORTENER_HOSTS):
+        return False
+    if (
+        _host_allowed(parsed.hostname, TRYABLE_ARTIFACT_HOSTS)
+        and _GITHUB_DIFF_PATH_RE.match(parsed.path)
+    ):
         return False
     if _has_utm_farm_query(parsed.query) or CLICK_HERE_RE.search(raw):
         return False

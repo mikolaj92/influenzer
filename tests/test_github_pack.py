@@ -241,6 +241,8 @@ class PackSilenceTests(unittest.TestCase):
             "https://bit.ly/try-this",
             "https://github.com/mikolaj92/demo?utm_source=hn",
             "https://github.com/mikolaj92/demo/click-here",
+            "https://github.com/mikolaj92/demo/compare/main...feature",
+            "https://github.com/mikolaj92/demo/commit/0123456789abcdef",
         )
         for url in untrusted:
             with self.subTest(url=url):
@@ -293,6 +295,8 @@ class PackSilenceTests(unittest.TestCase):
         url = "https://github.com/mikolaj92/demo/blob/main/README.md"
         self.assertTrue(is_trusted_artifact_url(url))
         self.assertTrue(is_trusted_artifact_url("https://www.github.com/mikolaj92/demo"))
+        self.assertFalse(is_trusted_artifact_url("https://github.com/mikolaj92/demo/compare/main...feature"))
+        self.assertFalse(is_trusted_artifact_url("https://github.com/mikolaj92/demo/commit/0123456789abcdef"))
         self.assertEqual(
             readme_tryable_url(
                 {
