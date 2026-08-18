@@ -43,6 +43,7 @@ from influenzer.playbook import (
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
     FOMO_REASON,
+    MEME_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     LIVING_STACK_REASON,
     SECRET_REASON,
@@ -57,6 +58,7 @@ from influenzer.playbook import (
     looks_like_founder_journal,
     looks_like_lead_magnet,
     looks_like_fomo,
+    looks_like_meme,
     looks_like_logo_reveal,
     looks_like_failed_ci,
     looks_like_fork,
@@ -201,6 +203,8 @@ def admit_pack(
         return host_silence(LEAD_MAGNET_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_fomo(fact_blob):
         return host_silence(FOMO_REASON, project_id=project_id, repo_slug=slug)
+    if looks_like_meme(fact_blob):
+        return host_silence(MEME_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_logo_reveal(fact_blob):
         return host_silence(LOGO_REVEAL_NOT_A_SHIP, project_id=project_id, repo_slug=slug)
     try:

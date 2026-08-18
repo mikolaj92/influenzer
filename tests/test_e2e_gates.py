@@ -105,6 +105,7 @@ from influenzer.playbook import (
     looks_like_founder_journal,
     looks_like_lead_magnet,
     looks_like_fomo,
+    looks_like_meme,
     looks_like_logo_reveal,
     looks_like_waitlist,
     looks_like_worse_clone,
@@ -115,6 +116,7 @@ from influenzer.playbook import (
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
     FOMO_REASON,
+    MEME_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     reddit_reason,
     seminar_reason,
@@ -775,6 +777,55 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, FOMO_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_meme_is_silence_not_an_angle(self) -> None:
+        pictures = (
+            "drake meme for the local tick",
+            "wojak of the local tick",
+            "reaction image without a demo",
+            "tablica z memami",
+            "ściana memów",
+        )
+        self.assertFalse(looks_like_meme(""))
+        self.assertFalse(looks_like_meme("   "))
+        self.assertFalse(looks_like_meme("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_meme("remember the timeout fix"))
+        self.assertFalse(looks_like_meme("screenshot of the local tick demo"))
+        self.assertFalse(looks_like_meme("join the waitlist"))
+        for idx, text in enumerate(pictures):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_meme(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    MEME_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-meme-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, MEME_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(

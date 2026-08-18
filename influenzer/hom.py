@@ -105,6 +105,7 @@ from influenzer.playbook import (
     looks_like_founder_journal,
     looks_like_lead_magnet,
     looks_like_fomo,
+    looks_like_meme,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -117,6 +118,7 @@ from influenzer.playbook import (
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
     FOMO_REASON,
+    MEME_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     PRESS_RELEASE_REASON,
     WORSE_CLONE_REASON,
@@ -704,6 +706,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, LEAD_MAGNET_REASON)
     if looks_like_fomo(blob):
         return _kill(brief, FOMO_REASON)
+    if looks_like_meme(blob):
+        return _kill(brief, MEME_REASON)
     if looks_like_logo_reveal(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, LOGO_REVEAL_NOT_A_SHIP)
