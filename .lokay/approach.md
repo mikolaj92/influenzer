@@ -1,25 +1,32 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=159 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=160 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #159 — Tag a friend to cisza
+Issue: #160 — Captcha nie jest tryable
 
 ## Goal
 
-„Tag a friend” to cisza. Send this to, quote this, chain = bait, nie produkt.
+Captcha nie jest tryable. Challenge, bot wall, „verify you are human” na artefakcie = cisza. Gość nie klika w bramkę.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/host.py` — classify CAPTCHA / bot-wall evidence as not tryable
+- `influenzer/hom.py` — fail closed at score time
+- `influenzer/hom_draft.py` — refuse leaked draft scores
+- `influenzer/playbook.py` — record the HN gate
+- `tests/test_e2e_gates.py` — detector, score, and leaked-draft coverage
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- Run the CAPTCHA e2e gate and the focused e2e/draft suites
+- Run existing pack suite to check neighboring gates; record unrelated operator-suite failures if present
 
 ## Non-goals
 
-- (none stated)
+- Do not click, solve, or bypass CAPTCHA challenges
+- Do not add network probing or collection
+- Do not classify product features that merely mention CAPTCHA as a blocked artifact
 
 ## Notes
 

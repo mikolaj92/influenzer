@@ -24,6 +24,7 @@ BATTERY_LAPTOP_REASON = (
 )
 PRIVATE_HOST_NOT_TRYABLE = "private_host_not_tryable"
 ARTIFACT_5XX_NOT_TRYABLE = "artifact_5xx_not_tryable"
+CAPTCHA_NOT_TRYABLE = "captcha_not_tryable"
 
 # A server error is not a public, working artifact. Require a status context so
 # an unrelated number such as an audience count does not silence a real demo.
@@ -35,6 +36,49 @@ _ARTIFACT_5XX_RE = re.compile(
     r"\b(?:returns?|returned|got|received|zwraca|dosta[łl])\b[^\d]{0,12}\b5\d\d\b"
     r"|\b5\d\d\s+(?:internal(?:\s+server)?\s+error|bad\s+gateway|"
     r"service\s+unavailable)\b"
+    r")"
+)
+
+# A CAPTCHA / bot challenge is a gate, not a demo. Keep generic product copy
+# such as "CAPTCHA support" usable; require challenge language or a bare gate.
+_CAPTCHA_CHALLENGE_RE = re.compile(
+    r"(?ix)(?:"
+    r"^\s*(?:an?\s+)?(?:re-?captcha|hcaptcha|cloudflare\s+turnstile|captcha|"
+    r"bot\s+wall|anti[- ]?bot\s+(?:wall|challenge)|human\s+verification|"
+    r"challenge\s+page)\s*[.!]?\s*$"
+    r"|\b(?:re-?captcha|hcaptcha|cloudflare\s+turnstile|captcha)\s+"
+    r"(?:challenge|wall|gate|check|page|prompt|required|verification|protected|blocks?|blocked)\b"
+    r"|\b(?:behind|blocked\s+by|stopped\s+by)\s+(?:an?\s+)?"
+    r"(?:re-?captcha|hcaptcha|cloudflare\s+turnstile|captcha|bot\s+wall|"
+    r"anti[- ]?bot\s+challenge|human\s+verification|challenge\s+page)\b"
+    r"|\b(?:bot|anti[- ]?bot)\s+(?:wall|challenge|gate|check)\b"
+    r"|\b(?:cloudflare|browser|security)\s+challenge(?:\s+page)?\b"
+    r"|\b(?:captcha|challenge|bot\s+wall|human\s+verification)\s+(?:on|at)\s+"
+    r"(?:the\s+)?(?:artifact|demo|site|url|page)\b"
+    r"|\b(?:artifact|demo|site|url|page)\b[^\n]{0,36}\b"
+    r"(?:returns?|returned|shows?|showed|presents?|presented|serves?|served)\s+"
+    r"(?:an?\s+|the\s+)?(?:re-?captcha|hcaptcha|captcha|bot\s+wall|challenge\s+page)\b"
+    r"|\b(?:verify|confirm|prove)\s+(?:that\s+)?(?:"
+    r"you(?:['’]re|\s+are)\s+(?:a\s+)?human|"
+    r"you(?:['’]re|\s+are)\s+not\s+(?:a\s+)?(?:robot|bot))\b"
+    r"|\bare\s+you\s+(?:a\s+)?(?:human|robot|bot)\b"
+    r"|\bi(?:['’]m|\s+am)\s+not\s+(?:a\s+)?robot\b"
+    r"|\b(?:complete|solve|pass)\s+(?:an?\s+|the\s+)?"
+    r"(?:re-?captcha|hcaptcha|captcha|human\s+verification|security\s+challenge)\s+"
+    r"(?:to|before)\s+(?:continue|view|access|see|try|run|use)\b"
+    r"|\b(?:requires?|must)\s+(?:you\s+to\s+)?(?:complete|solve|pass)\s+"
+    r"(?:an?\s+|the\s+)?(?:re-?captcha|hcaptcha|captcha|human\s+verification|"
+    r"security\s+challenge)\b"
+    r"|\bchecking\s+(?:your\s+)?browser\s+before\s+(?:accessing|continuing)\b"
+    r"|\bchecking\s+if\s+(?:the\s+)?site\s+connection\s+is\s+secure\b"
+    r"|\battention\s+required\s*!?\s*(?:\||[-—])\s*cloudflare\b"
+    r"|\b(?:zweryfikuj|potwierd[zź]|udowodnij)(?:,\s*)?(?:[zż]e\s+)?(?:"
+    r"jeste[sś]\s+cz[lł]owiekiem|nie\s+jeste[sś]\s+robotem)\b"
+    r"|\bnie\s+jestem\s+robotem\b"
+    r"|\bweryfikacj[aeęi]\s+cz[lł]owieka\b"
+    r"|\bbramk[aąeęi]\s+anty[- ]?botow\w*\b"
+    r"|\b(?:captcha|challenge|bot\s+wall|weryfikacja\s+cz[lł]owieka)\s+na\s+"
+    r"(?:artefakcie|demo|stronie)\b"
     r")"
 )
 
@@ -178,12 +222,19 @@ def looks_like_artifact_5xx(evidence: str | None) -> bool:
     return bool(evidence and _ARTIFACT_5XX_RE.search(evidence))
 
 
+def looks_like_captcha_challenge(evidence: str | None) -> bool:
+    """True for a CAPTCHA, bot wall, or human-verification gate."""
+    return bool(evidence and _CAPTCHA_CHALLENGE_RE.search(evidence))
+
+
 def artifact_tryable_reason(
     *, status: int | str | None = None, evidence: str | None = None
 ) -> str | None:
     """Return the fail-closed reason when an artifact cannot be offered."""
     if is_artifact_5xx_status(status) or looks_like_artifact_5xx(evidence):
         return ARTIFACT_5XX_NOT_TRYABLE
+    if looks_like_captcha_challenge(evidence):
+        return CAPTCHA_NOT_TRYABLE
     return None
 
 
