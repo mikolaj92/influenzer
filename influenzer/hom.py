@@ -88,6 +88,7 @@ from influenzer.playbook import (
     looks_like_launch_pitch,
     looks_like_superlative,
     looks_like_dead_link,
+    looks_like_dead_tls,
     looks_like_dead_release_asset,
     looks_like_issues_disabled,
     looks_like_fork,
@@ -691,6 +692,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "dead_link_not_tryable")
         return _changelog(brief, "dead_link_not_tryable")
+    if looks_like_dead_tls(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, "dead_tls_not_tryable")
+        return _changelog(brief, "dead_tls_not_tryable")
     if looks_like_issues_disabled(blob):
         if is_social_arena(brief.preferred_arena):
             return _kill(brief, "issues_disabled_no_camp")

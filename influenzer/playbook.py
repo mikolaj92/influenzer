@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no linktree, no Carrd, no bio site, no list of links, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no linktree, no Carrd, no bio site, no list of links, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no dead TLS, no cert error, no mixed content, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -868,6 +868,35 @@ DEAD_LINK_RE = re.compile(
     r"|\b(?:404|410)\s+(?:not\s+found|gone)\b"
     r"|\bdead\s+link\b"
     r"|\bmartw[yiae]\s+link\b"
+    r")"
+)
+# A dead TLS artifact is not tryable. Certificate error, mixed content,
+# HTTPS the browser rejects = silence. Neighbor of #77 (https only)
+# and #92 (404/410 corpse): here it is the cert, not the scheme or a
+# 404. Do not click the warning. A working handshake stays.
+DEAD_TLS_REASON = "dead_tls_not_tryable"
+DEAD_TLS_RE = re.compile(
+    r"(?i)(?:"
+    r"\b(?:ssl|tls)\s+(?:error|handshake\s+fail(?:ed|ure)?|alert)\b"
+    r"|\b(?:certificate|cert)\s+(?:error|warning|invalid|expired|untrusted|rejected|mismatch)\b"
+    r"|\b(?:expired|invalid|untrusted|self[- ]signed|rejected)\s+(?:ssl\s+|tls\s+)?(?:certificate|cert)\b"
+    r"|\bmixed[- ]content\b"
+    r"|\bnet::err_cert"
+    r"|\berr_cert_(?:authority_invalid|common_name_invalid|date_invalid)\b"
+    r"|\bssl_error_"
+    r"|\byour\s+connection\s+is\s+not\s+private\b"
+    r"|\bthis\s+site\s+is\s+not\s+secure\b"
+    r"|\bhttps\s+(?:rejected|odrzucon)\b"
+    r"|\bbrowser\s+reject(?:s|ed|ing)?\s+https\b"
+    r"|\bhttps\s+kt[oó]r[yiae]\s+przegl[aą]darka\s+odrzuca\b"
+    r"|\bprzegl[aą]darka\s+odrzuca\s+https\b"
+    r"|\bclick\s+(?:through|past)\s+(?:the\s+)?(?:cert(?:ificate)?|tls|ssl|security)\s+warning\b"
+    r"|\bkliknij\s+w\s+ostrze[zż]enie\b"
+    r"|\bmartw[yiae]\s+tls\b"
+    r"|\bb[lł][aą]d\s+(?:ssl|tls|certyfikat)"
+    r"|\bcertyfikat\s+(?:odrzucon|niewa[zż]n|wygas)"
+    r"|\bodrzucon[yiae]\s+https\b"
+    r"|\bpo[lł][aą]czenie\s+nie\s+jest\s+prywatne\b"
     r")"
 )
 # Issues disabled is not a camp. Show HN and the social angle sit on the
@@ -3141,6 +3170,13 @@ def looks_like_dead_link(text: str) -> bool:
     return bool(DEAD_LINK_RE.search(text))
 
 
+def looks_like_dead_tls(text: str) -> bool:
+    """True for a cert error / mixed content / rejected HTTPS. Do not click the warning."""
+    if not text or not text.strip():
+        return False
+    return bool(DEAD_TLS_RE.search(text))
+
+
 def looks_like_issues_disabled(text: str) -> bool:
     """True when the issue tracker is off. No camp, no Show HN, no social angle."""
     if not text or not text.strip():
@@ -4143,6 +4179,8 @@ __all__ = [
     "LICENSE_FILE_RE",
     "LISTICLE_TITLE_RE",
     "DEAD_LINK_RE",
+    "DEAD_TLS_REASON",
+    "DEAD_TLS_RE",
     "DEAD_RELEASE_ASSET_RE",
     "DEAD_STAR_COUNT_RE",
     "DEAD_STAR_COUNT_REASON",
@@ -4339,6 +4377,7 @@ __all__ = [
     "reddit_reason",
     "seminar_reason",
     "looks_like_dead_link",
+    "looks_like_dead_tls",
     "looks_like_dead_release_asset",
     "looks_like_dead_star_count",
     "looks_like_dead_star_story",

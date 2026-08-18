@@ -106,6 +106,7 @@ from influenzer.playbook import (
     looks_like_lead_magnet,
     looks_like_fomo,
     looks_like_meme,
+    looks_like_dead_tls,
     looks_like_deck,
     looks_like_linktree,
     looks_like_logo_reveal,
@@ -119,6 +120,7 @@ from influenzer.playbook import (
     LEAD_MAGNET_REASON,
     FOMO_REASON,
     MEME_REASON,
+    DEAD_TLS_REASON,
     DECK_REASON,
     LINKTREE_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
@@ -879,6 +881,51 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, DECK_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_dead_tls_is_silence_not_tryable(self) -> None:
+        corpses = (
+            "certificate error",
+            "mixed content",
+            "HTTPS rejected",
+            "martwy TLS",
+            "błąd certyfikatu",
+        )
+        self.assertFalse(looks_like_dead_tls(""))
+        self.assertFalse(looks_like_dead_tls("   "))
+        self.assertFalse(looks_like_dead_tls("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_dead_tls("TLS 1.3 handshake on the demo"))
+        self.assertFalse(looks_like_dead_tls("HEAD 404"))
+        self.assertFalse(looks_like_dead_tls("behind a login"))
+        for idx, text in enumerate(corpses):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dead_tls(text))
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-dead-tls-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, DEAD_TLS_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(

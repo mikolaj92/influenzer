@@ -87,6 +87,7 @@ from influenzer.playbook import (
     looks_like_person_mention,
     looks_like_private_conversation,
     looks_like_dead_link,
+    looks_like_dead_tls,
     looks_like_dead_release_asset,
     looks_like_issues_disabled,
     looks_like_fork,
@@ -2035,6 +2036,47 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_dead_link(text))
 
+    def test_dead_tls_is_not_tryable(self) -> None:
+        corpses = (
+            "certificate error",
+            "expired certificate",
+            "self-signed certificate",
+            "mixed content",
+            "HTTPS rejected",
+            "browser rejects HTTPS",
+            "your connection is not private",
+            "this site is not secure",
+            "NET::ERR_CERT_AUTHORITY_INVALID",
+            "SSL handshake failed",
+            "martwy TLS",
+            "błąd certyfikatu",
+            "przeglądarka odrzuca HTTPS",
+            "odrzucony HTTPS",
+            "kliknij w ostrzeżenie",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dead_tls(text))
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "Show HN: local tick scores briefs",
+            "HTTP 200 on the demo",
+            "HEAD 404",
+            "GET 410",
+            "dead link",
+            "HEAD 401",
+            "behind a login",
+            "TLS 1.3 handshake on the demo",
+            "certificate pinning in the client",
+            "we rotate the certificate",
+            "HTTPS only on the demo",
+            "mixed feelings about the demo",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_dead_tls(text))
+
     def test_dead_release_asset_is_not_a_ship(self) -> None:
         corpses = (
             "asset on the list 404",
@@ -3058,6 +3100,54 @@ class ScoreBriefTests(unittest.TestCase):
             facts=(
                 Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
                 Fact(text="HTTP 200 on the demo"),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        self.assertEqual(score.arena, ArenaId.HN)
+        self.assertIsNotNone(compose_draft(brief, score))
+
+    def test_dead_tls_ship_claim_is_killed(self) -> None:
+        corpses = (
+            "certificate error",
+            "mixed content",
+            "HTTPS rejected",
+            "martwy TLS",
+            "kliknij w ostrzeżenie",
+        )
+        for text in corpses:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, "dead_tls_not_tryable")
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_dead_tls_without_ship_claim_is_changelog_only(self) -> None:
+        brief = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="certificate error", artifact_url=SHIP_PR),),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, "dead_tls_not_tryable")
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_product_copy_without_dead_tls_can_still_draft(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="TLS 1.3 handshake on the demo"),
             ),
         )
         score = score_brief(brief)
