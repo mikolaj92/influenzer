@@ -221,6 +221,20 @@ _FOMO_RE = re.compile(
     r"|\bodliczani"
     r")"
 )
+_MEME_RE = re.compile(
+    r"(?i)(?:"
+    r"\bmemes?\b"
+    r"|\bdrake\b"
+    r"|\bhotline\s+bling\b"
+    r"|\bwojaks?\b"
+    r"|\bsoyjaks?\b"
+    r"|\breaction\s+(?:images?|gifs?|memes?|pics?|pictures?)\b"
+    r"|\bmeme\s+(?:templates?|formats?|dumps?|boards?|walls?)\b"
+    r"|\btablic[aąęy]\s+z\s+mem"
+    r"|\b(?:sciana|ściana)\s+mem"
+    r"|\bmem(?:y|ów|ow|ami|em|ie|ach|om)\b"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -302,6 +316,13 @@ def looks_like_fomo(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_FOMO_RE.search(text))
+
+
+def looks_like_meme(text: str) -> bool:
+    """True for Drake / wojak / reaction image / a meme board. A picture is not a product."""
+    if not text or not text.strip():
+        return False
+    return bool(_MEME_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

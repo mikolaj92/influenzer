@@ -1,40 +1,39 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=149 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=150 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #149 — Sztuczny FOMO nie jest kątem
+Issue: #150 — Sam meme nie jest kątem
 
 ## Goal
 
-Sztuczny FOMO nie jest kątem. „Only N spots”, countdown, last chance = cisza. To nie produkt.
+Sam meme nie jest kątem. Drake, wojak, reaction image bez artefaktu = cisza. Kostium nie jest tablicą z memami.
 
 ## Files likely touched
 
-- `influenzer/playbook.py`
-- `influenzer/hom.py`
-- `influenzer/hom_draft.py`
-- `influenzer/brief_admit.py`
-- `github_pack/classify.py`
-- `github_pack/pack.py`
-- `tests/test_e2e_gates.py`
-- `tests/test_hom_operator.py`
-- `tests/test_hom_draft.py`
-- `tests/test_brief_admit.py`
-- `tests/test_github_pack.py`
+- `influenzer/playbook.py` — `looks_like_meme` / `MEME_REASON`
+- `influenzer/hom.py` — kill at score
+- `influenzer/hom_draft.py` — refuse to dress a leaked meme draft
+- `influenzer/brief_admit.py` — pack admit silence
+- `github_pack/classify.py` + `github_pack/pack.py` — survey pack silence
+- tests: e2e, operator, draft, admit, pack
 
 ## Test plan
 
-- Run the smallest useful tests for files touched: playbook detector, score, dress, pack, admit
+- Run the smallest useful tests for files touched:
+  - `tests/test_e2e_gates.py`
+  - `tests/test_hom_operator.py`
+  - `tests/test_hom_draft.py`
+  - `tests/test_brief_admit.py`
+  - `tests/test_github_pack.py`
 
 ## Non-goals
 
-- Do not treat waitlist, click-bait, or a contest as this gate
-- Do not start a collection job
+- Do not invent a costume that posts memes.
+- Do not treat a demo screenshot or "remember" as a meme.
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Coding agent may refine details but should stay on the stated goal and non-goals.
-- Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- No explicit file paths in issue; infer from repo inspection.
+- Fail closed at score, dress, pack, and admit — same shape as #149 FOMO and #134 ranking dump.
+- Neighbor of #45 (voice mix) and #134 (vanity chart). Here it is the picture, not a product.

@@ -57,6 +57,7 @@ from influenzer.playbook import (
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
     FOMO_REASON,
+    MEME_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
@@ -101,6 +102,7 @@ from influenzer.playbook import (
     looks_like_founder_journal,
     looks_like_lead_magnet,
     looks_like_fomo,
+    looks_like_meme,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -1025,6 +1027,53 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_fomo(text))
                 if text in {"join the waitlist", "like if this local tick helped"}:
+                    continue
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_meme_is_picture_not_a_product(self) -> None:
+        pictures = (
+            "meme for the local tick",
+            "memes of the launch",
+            "drake meme for the local tick",
+            "hotline bling format",
+            "wojak of the local tick",
+            "wojaks in the thread",
+            "soyjak of the stranger",
+            "reaction image without a demo",
+            "reaction gif of the launch",
+            "reaction meme for the local tick",
+            "meme template of the local tick",
+            "meme format for the launch",
+            "meme dump of the week",
+            "meme board for the local tick",
+            "meme wall of screenshots",
+            "tablica z memami",
+            "tablicę z memami",
+            "ściana memów",
+            "sciana memow",
+            "memy o lokalnym ticku",
+            "memem o ticku",
+        )
+        for text in pictures:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_meme(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    MEME_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "remember the timeout fix",
+            "screenshot of the local tick demo",
+            "membership for the local tick",
+            "remembered after the demo",
+            "join the waitlist",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_meme(text))
+                if text == "join the waitlist":
                     continue
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
@@ -3149,6 +3198,28 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, FOMO_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_meme_is_killed(self) -> None:
+        pictures = (
+            "drake meme for the local tick",
+            "wojak of the local tick",
+            "reaction image without a demo",
+            "tablica z memami",
+            "ściana memów",
+        )
+        for text in pictures:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, MEME_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 

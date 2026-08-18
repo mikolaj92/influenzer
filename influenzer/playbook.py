@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -1243,6 +1243,26 @@ FOMO_RE = re.compile(
     r"|\btylko\s+(?:n|\d+)\s+miejsc"
     r"|\bostatni[ae]\s+miejsc"
     r"|\bodliczani"
+    r")"
+)
+# A meme is not an angle. Drake / wojak / reaction image
+# without a thing is silence. Neighbor of voice mix (#45)
+# and ranking dump (#134, a vanity chart). Here it is the
+# picture, not a product. A screenshot of the demo and
+# "remember" stay. Costume is not a meme board.
+MEME_REASON = "meme"
+MEME_RE = re.compile(
+    r"(?i)(?:"
+    r"\bmemes?\b"
+    r"|\bdrake\b"
+    r"|\bhotline\s+bling\b"
+    r"|\bwojaks?\b"
+    r"|\bsoyjaks?\b"
+    r"|\breaction\s+(?:images?|gifs?|memes?|pics?|pictures?)\b"
+    r"|\bmeme\s+(?:templates?|formats?|dumps?|boards?|walls?)\b"
+    r"|\btablic[aąęy]\s+z\s+mem"
+    r"|\b(?:sciana|ściana)\s+mem"
+    r"|\bmem(?:y|ów|ow|ami|em|ie|ach|om)\b"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -3121,6 +3141,14 @@ def looks_like_fomo(text: str) -> bool:
     return bool(FOMO_RE.search(cleaned))
 
 
+def looks_like_meme(text: str) -> bool:
+    """True for Drake / wojak / reaction image / a meme board. A picture is not a product."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(MEME_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3661,7 +3689,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3702,6 +3730,11 @@ def unquotable_reason(
             return FOMO_REASON
     if extra and looks_like_fomo(extra):
         return FOMO_REASON
+    for _kind, text, _url in packed:
+        if looks_like_meme(text):
+            return MEME_REASON
+    if extra and looks_like_meme(extra):
+        return MEME_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -4009,6 +4042,8 @@ __all__ = [
     "LEAD_MAGNET_RE",
     "FOMO_REASON",
     "FOMO_RE",
+    "MEME_REASON",
+    "MEME_RE",
     "LOGO_REVEAL_NOT_A_SHIP",
     "LOGO_REVEAL_RE",
     "PENDING_CI_RE",
@@ -4164,6 +4199,7 @@ __all__ = [
     "looks_like_founder_journal",
     "looks_like_lead_magnet",
     "looks_like_fomo",
+    "looks_like_meme",
     "looks_like_logo_reveal",
     "looks_like_pending_ci",
     "looks_like_failed_ci",

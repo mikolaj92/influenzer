@@ -1,26 +1,27 @@
 {
   "paths": [
-    "influenzer/playbook.py",
-    "influenzer/hom.py",
-    "influenzer/hom_draft.py",
-    "influenzer/brief_admit.py",
-    "github_pack/classify.py",
     "github_pack/pack.py",
-    "tests/test_e2e_gates.py",
-    "tests/test_hom_operator.py",
-    "tests/test_hom_draft.py",
-    "tests/test_brief_admit.py",
-    "tests/test_github_pack.py"
+    "influenzer/adapters/base.py",
+    "influenzer/config.py",
+    "influenzer/content.py",
+    "influenzer/hom.py",
+    "influenzer/domain.py",
+    "github_feedback/feedback.py",
+    "influenzer/brief_admit.py",
+    "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["fomo", "gate", "silence"],
+  "matched_tokens": [
+    "influenzer",
+    "gate"
+  ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Artificial FOMO (only N spots / countdown / last chance) is silence, not an angle.",
-    "Fail closed at score, dress, pack, and admit."
+    "Empty path list fails closed — run_agent must not start.",
+    "Repo tree entries considered: 137."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__149-sztuczny-fomo-nie-jest-k-tem-4663ec55",
-  "wrote": true,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__150-sam-meme-nie-jest-k-tem-dec2fb80",
+  "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }
