@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from influenzer.domain import paid_disclosure_reason, utc_now
+from influenzer.host import looks_like_captcha_challenge
 from influenzer.hom import (
     Brief,
     Draft,
@@ -351,6 +352,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_failed_ci(bits.blob)
         or looks_like_prerelease(bits.blob)
         or looks_like_login_gate(bits.blob)
+        or looks_like_captcha_challenge(bits.blob)
         or looks_like_shortener(bits.blob)
         or looks_like_utm_farm(bits.blob)
         or looks_like_click_here(bits.blob)

@@ -21,10 +21,12 @@ from influenzer.content import create_revision, persist_revision
 from influenzer.hom import Brief, Fact, Score, _gate_violation, compose_draft, score_brief
 from influenzer.host import (
     ARTIFACT_5XX_NOT_TRYABLE,
+    CAPTCHA_NOT_TRYABLE,
     artifact_tryable_reason,
     is_artifact_5xx_status,
     is_tryable_artifact,
     looks_like_artifact_5xx,
+    looks_like_captcha_challenge,
 )
 from influenzer.domain import (
     AccountStatus,
@@ -1023,6 +1025,80 @@ class OrderedLiveGateTests(unittest.TestCase):
                 self.assertEqual(
                     artifact_tryable_reason(evidence=text), ARTIFACT_5XX_NOT_TRYABLE
                 )
+
+    def test_captcha_bot_wall_is_silence_not_tryable(self) -> None:
+        challenges = (
+            "CAPTCHA challenge on the artifact",
+            "the demo is blocked by reCAPTCHA",
+            "the artifact returns a challenge page",
+            "CAPTCHA protected demo",
+            "Cloudflare Turnstile required",
+            "Verify you are human to continue",
+            "Are you a robot?",
+            "I'm not a robot",
+            "Checking your browser before accessing the demo",
+            "bot wall on the site",
+            "bramka antybotowa na artefakcie",
+            "zweryfikuj, że jesteś człowiekiem",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "CAPTCHA support is part of the product",
+            "we replaced reCAPTCHA with local validation",
+            "challenge-response authentication uses a nonce",
+            "human review improved the release",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_captcha_challenge(text))
+                self.assertTrue(is_tryable_artifact(evidence=text))
+        for idx, text in enumerate(challenges):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_captcha_challenge(text))
+                self.assertFalse(is_tryable_artifact(evidence=text))
+                self.assertEqual(
+                    artifact_tryable_reason(evidence=text), CAPTCHA_NOT_TRYABLE
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-captcha-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CAPTCHA_NOT_TRYABLE)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-captcha-changelog",
+            facts=(Fact(text="CAPTCHA challenge on the artifact", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, CAPTCHA_NOT_TRYABLE)
+        self.assertIsNone(compose_draft(quiet, score))
 
     def test_parked_domain_is_silence_not_a_website(self) -> None:
         parked = (
