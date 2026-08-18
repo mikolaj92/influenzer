@@ -26,6 +26,7 @@ PRIVATE_HOST_NOT_TRYABLE = "private_host_not_tryable"
 ARTIFACT_5XX_NOT_TRYABLE = "artifact_5xx_not_tryable"
 CAPTCHA_NOT_TRYABLE = "captcha_not_tryable"
 AGE_GATE_NOT_TRYABLE = "age_gate_not_tryable"
+COOKIE_WALL_NOT_TRYABLE = "cookie_wall_not_tryable"
 GEO_BLOCK_NOT_TRYABLE = "geo_block_not_tryable"
 
 # A server error is not a public, working artifact. Require a status context so
@@ -129,6 +130,65 @@ _AGE_GATE_RE = re.compile(
     r"|\b(?:musisz|trzeba)\s+mie[cć]\s+(?:uko[nń]czone\s+)?18\s+lat\s+"
     r"(?:aby|[zż]eby)\s+(?:kontynuowa[cć]|wej[sś][cć]|zobaczy[cć]|skorzysta[cć])\b"
     r"|\btylko\s+dla\s+(?:os[oó]b\s+)?pe[lł]noletnich\b"
+    r")"
+)
+
+# A cookie-consent wall that hides the product until a click is a gate, not a
+# demo. A passive cookie notice or product copy about consent remains usable.
+_COOKIE_WALL_RE = re.compile(
+    r"(?imx)(?:"
+    r"^\s*(?:an?\s+)?(?:"
+    r"(?:cookie(?:[ -]+consent)?|gdpr)[ -]+(?:wall|overlay|gate)"
+    r"|consent[ -]+wall"
+    r"|[sś]cian(?:a|ą|ę|y)\s+ciasteczek"
+    r"|nak[lł]adk(?:a|ą|ę|i)\s+(?:rodo|cookies?|ciasteczek)"
+    r")\s*[.!]?\s*$"
+    r"|\b(?:cookie(?:[ -]+consent)?|gdpr)[ -]+(?:wall|overlay|gate)\s+"
+    r"(?:on|at)\s+(?:the\s+)?(?:artifact|demo|site|url|page|product)\b"
+    r"|\b(?:artifact|demo|site|url|page|product)\b[^\n]{0,36}\b"
+    r"(?:is\s+)?(?:behind|blocked|covered|hidden|obscured)\s+"
+    r"(?:by\s+)?(?:an?\s+|the\s+)?(?:"
+    r"(?:cookie(?:[ -]+consent)?|gdpr(?:[ -]+consent)?|consent)[ -]+"
+    r"(?:wall|overlay|gate|modal|banner)"
+    r")\b"
+    r"|\b(?:cookie(?:[ -]+consent)?|gdpr(?:[ -]+consent)?|consent)[ -]+"
+    r"(?:wall|overlay|gate|modal|banner|notice|prompt|popup|dialog)\b[^\n]{0,36}\b"
+    r"(?:blocks?|covers?|hides?|obscures?|prevents?|zas[lł]ania|blokuje|ukrywa)\s+"
+    r"(?:(?:access|entry)\s+to\s+)?(?:the\s+)?"
+    r"(?:artifact|demo|site|url|page|product|artefakt|stron[ęe]|produkt)\b"
+    r"|\b(?:accept|allow|enable|agree\s+to|consent\s+to)\s+(?:all\s+)?cookies\s+"
+    r"(?:(?:in\s+order\s+)?to|before)\s+"
+    r"(?:continu(?:e|ing)|view(?:ing)?|access(?:ing)?|see(?:ing)?|try(?:ing)?|"
+    r"run(?:ning)?|us(?:e|ing)|enter(?:ing)?)\b"
+    r"|\b(?:before\s+you\s+continu(?:e|ing)|to\s+continu(?:e|ing))\b"
+    r"[^\n]{0,36}\baccept\s+(?:all\s+)?cookies\b"
+    r"|\b(?:cookie(?:[ -]+consent)?|consent\s+to\s+cookies)\s+"
+    r"(?:is\s+)?required\s+(?:to|before)\s+"
+    r"(?:continu(?:e|ing)|view(?:ing)?|access(?:ing)?|see(?:ing)?|try(?:ing)?|"
+    r"run(?:ning)?|us(?:e|ing)|enter(?:ing)?)\b"
+    r"|\b(?:[sś]cian(?:a|ą|ę|y)\s+ciasteczek|"
+    r"nak[lł]adk(?:a|ą|ę|i)\s+(?:rodo|cookies?|ciasteczek))\s+na\s+"
+    r"(?:artefakcie|demo|stronie|produkcie)\b"
+    r"|\b(?:baner|nak[lł]adk(?:a|ą|ę|i))\s+(?:rodo|cookies?|ciasteczek)\b"
+    r"[^\n]{0,36}\b(?:zas[lł]ania|blokuje|ukrywa)\s+"
+    r"(?:produkt|demo|stron[ęe]|artefakt)\b"
+    r"|\b(?:zaakceptuj|zaakceptowa[cć]|zezw[oó]l\s+na|"
+    r"wyra[zź]\s+zgod[ęe]\s+na)\s+(?:wszystkie\s+)?(?:ciasteczka|cookies)"
+    r"\s*[,;:]?\s+(?:aby|[zż]eby|przed)\s+"
+    r"(?:kontynuowa[cć]|wej[sś][cć]|zobaczy[cć]|skorzysta[cć])\b"
+    r")"
+)
+_COOKIE_WALL_CLEARED_RE = re.compile(
+    r"(?ix)(?:"
+    r"\b(?:removed|disabled|dismissed|eliminated)\s+(?:the\s+)?"
+    r"(?:cookie(?:[ -]+consent)?|gdpr)[ -]+(?:wall|overlay|gate)"
+    r"(?:\s+from\s+(?:the\s+)?(?:artifact|demo|site|page|product))?"
+    r"|\b(?:cookie(?:[ -]+consent)?|gdpr)[ -]+(?:wall|overlay|gate)\s+"
+    r"(?:was\s+|is\s+)?(?:removed|disabled|dismissed|eliminated)\b"
+    r"|\b(?:cookie(?:[ -]+consent)?|gdpr|consent)[ -]+"
+    r"(?:overlay|modal|banner|notice|prompt)\s+"
+    r"(?:no\s+longer|does\s+not|doesn['’]t)\s+"
+    r"(?:blocks?|covers?|hides?|obscures?)\b"
     r")"
 )
 
@@ -339,6 +399,14 @@ def looks_like_age_gate(evidence: str | None) -> bool:
     return bool(evidence and _AGE_GATE_RE.search(evidence))
 
 
+def looks_like_cookie_wall(evidence: str | None) -> bool:
+    """True when cookie consent hides the product until a guest clicks."""
+    if not evidence:
+        return False
+    active_evidence = _COOKIE_WALL_CLEARED_RE.sub("", evidence)
+    return bool(_COOKIE_WALL_RE.search(active_evidence))
+
+
 def looks_like_geo_block(evidence: str | None) -> bool:
     """True for a 451 / country wall / not-available-in-your-region gate."""
     return bool(evidence and _GEO_BLOCK_RE.search(evidence))
@@ -356,6 +424,8 @@ def artifact_tryable_reason(
         return CAPTCHA_NOT_TRYABLE
     if looks_like_age_gate(evidence):
         return AGE_GATE_NOT_TRYABLE
+    if looks_like_cookie_wall(evidence):
+        return COOKIE_WALL_NOT_TRYABLE
     return None
 
 

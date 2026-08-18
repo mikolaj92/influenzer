@@ -23,6 +23,7 @@ from influenzer.host import (
     AGE_GATE_NOT_TRYABLE,
     ARTIFACT_5XX_NOT_TRYABLE,
     CAPTCHA_NOT_TRYABLE,
+    COOKIE_WALL_NOT_TRYABLE,
     GEO_BLOCK_NOT_TRYABLE,
     artifact_tryable_reason,
     is_artifact_5xx_status,
@@ -31,6 +32,7 @@ from influenzer.host import (
     looks_like_age_gate,
     looks_like_artifact_5xx,
     looks_like_captcha_challenge,
+    looks_like_cookie_wall,
     looks_like_geo_block,
 )
 from influenzer.domain import (
@@ -1235,6 +1237,87 @@ class OrderedLiveGateTests(unittest.TestCase):
         score = score_brief(quiet)
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertEqual(score.reason, AGE_GATE_NOT_TRYABLE)
+        self.assertIsNone(compose_draft(quiet, score))
+
+    def test_cookie_wall_is_silence_not_tryable(self) -> None:
+        gated = (
+            "cookie wall",
+            "GDPR overlay",
+            "cookie consent gate",
+            "cookie wall on the artifact",
+            "the product is hidden behind a cookie consent overlay",
+            "cookie banner covers the demo",
+            "GDPR consent popup blocks the product",
+            "Accept all cookies to continue",
+            "Before you continue, accept all cookies",
+            "To continue to the product, accept all cookies",
+            "Cookie consent is required to access the product",
+            "ściana ciasteczek na artefakcie",
+            "nakładka RODO na stronie",
+            "baner cookies zasłania produkt",
+            "zaakceptuj wszystkie ciasteczka, aby kontynuować",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "cookie settings are part of the product",
+            "we use cookies to remember preferences",
+            "this site uses cookies",
+            "GDPR compliance support shipped",
+            "cookie consent banner does not block the product",
+            "we removed the cookie wall from the demo",
+            "the cookie overlay was dismissed",
+            "accept cookies in the settings panel",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_cookie_wall(text))
+                self.assertTrue(is_tryable_artifact(evidence=text))
+        for idx, text in enumerate(gated):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_cookie_wall(text))
+                self.assertFalse(is_tryable_artifact(evidence=text))
+                self.assertEqual(
+                    artifact_tryable_reason(evidence=text), COOKIE_WALL_NOT_TRYABLE
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-cookie-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, COOKIE_WALL_NOT_TRYABLE)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-cookie-changelog",
+            facts=(Fact(text="Accept all cookies to continue", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, COOKIE_WALL_NOT_TRYABLE)
         self.assertIsNone(compose_draft(quiet, score))
 
     def test_geo_block_is_silence_not_tryable(self) -> None:

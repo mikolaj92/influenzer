@@ -1,25 +1,35 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=164 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=165 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #164 — Strona maintenance nie jest tryable
+Issue: #165 — Ściana ciasteczek nie jest tryable
 
 ## Goal
 
-Strona maintenance nie jest tryable. „We'll be back”, planned downtime, nawet przy HTTP 200 = cisza.
+Treat a cookie-consent wall / blocking GDPR overlay as not tryable. Ship claims
+and social arenas go silent; a non-ship brief is changelog-only. A guest does
+not click through the overlay to reveal the product.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/host.py` — focused detector + `artifact_tryable_reason`
+- `influenzer/hom.py` — score kill / changelog
+- `influenzer/hom_draft.py` — fail closed if a leaked score says draft
+- `influenzer/playbook.py` — HN wave
+- `skills/influenzer-hn/SKILL.md` — seminar guidance
+- `tests/test_e2e_gates.py` — gate cases and passive-notice/product-copy negatives
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- Run the cookie-wall e2e test, then the full e2e gate module
 
 ## Non-goals
 
-- (none stated)
+- Clicking, accepting, or bypassing cookie consent
+- Live HTTP/browser probing
+- Treating a passive cookie notice or generic cookie/GDPR product copy as a wall
+- Changing login-wall, CAPTCHA, age-gate, geo-block, or maintenance behavior
 
 ## Notes
 
