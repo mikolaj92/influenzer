@@ -58,6 +58,7 @@ from influenzer.playbook import (
     has_named_subreddit,
     looks_like_fair_cta,
     is_blog_host_url,
+    is_deck_host_url,
     is_launch_host_url,
     is_merge_log_texts,
     is_news_host_url,
@@ -122,6 +123,7 @@ from influenzer.playbook import (
     looks_like_lead_magnet,
     looks_like_fomo,
     looks_like_meme,
+    looks_like_deck,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -232,6 +234,7 @@ def _clickable_urls(brief: Brief) -> tuple[str, ...]:
         if (
             is_tryable_artifact_url(url)
             and not is_ranking_host_url(url)
+            and not is_deck_host_url(url)
             and url not in found
         ):
             found.append(url)
@@ -341,6 +344,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_lead_magnet(bits.blob)
         or looks_like_fomo(bits.blob)
         or looks_like_meme(bits.blob)
+        or looks_like_deck(bits.blob)
         or looks_like_logo_reveal(bits.blob)
         or looks_like_worse_clone(bits.blob)
         or looks_like_press_release(bits.blob)
@@ -442,6 +446,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
         or is_blog_host_url(url)
         or is_launch_host_url(url)
         or is_ranking_host_url(url)
+        or is_deck_host_url(url)
         or is_news_host_url(url)
     ):
         return None
@@ -455,7 +460,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     backstory = _hn_backstory(bits)
     if not backstory:
         return None
-    if looks_like_waitlist(backstory) or looks_like_event(backstory) or looks_like_calendar_filler(backstory) or looks_like_counter_thanks(backstory) or looks_like_fog(backstory) or looks_like_founder_journal(backstory) or looks_like_lead_magnet(backstory) or looks_like_fomo(backstory) or looks_like_meme(backstory) or looks_like_logo_reveal(backstory) or looks_like_solicit_gesture(backstory):
+    if looks_like_waitlist(backstory) or looks_like_event(backstory) or looks_like_calendar_filler(backstory) or looks_like_counter_thanks(backstory) or looks_like_fog(backstory) or looks_like_founder_journal(backstory) or looks_like_lead_magnet(backstory) or looks_like_fomo(backstory) or looks_like_meme(backstory) or looks_like_deck(backstory) or looks_like_logo_reveal(backstory) or looks_like_solicit_gesture(backstory):
         return None
     return _body_or_none("\n\n".join((title, url, backstory)))
 
@@ -715,6 +720,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_lead_magnet(bits.blob)
         or looks_like_fomo(bits.blob)
         or looks_like_meme(bits.blob)
+        or looks_like_deck(bits.blob)
         or looks_like_logo_reveal(bits.blob)
         or looks_like_thread(bits.blob)
         or looks_like_ranking_dump(bits.blob)
@@ -796,6 +802,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_lead_magnet(body)
         or looks_like_fomo(body)
         or looks_like_meme(body)
+        or looks_like_deck(body)
         or looks_like_logo_reveal(body)
         or looks_like_thread(body)
         or looks_like_ranking_dump(body)

@@ -42,6 +42,7 @@ from influenzer.playbook import (
     living_stack_arena,
     stack_costume_reason,
     is_blog_host_url,
+    is_deck_host_url,
     is_launch_host_url,
     is_news_host_url,
     is_ranking_host_url,
@@ -58,6 +59,7 @@ from influenzer.playbook import (
     LEAD_MAGNET_REASON,
     FOMO_REASON,
     MEME_REASON,
+    DECK_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
@@ -103,6 +105,7 @@ from influenzer.playbook import (
     looks_like_lead_magnet,
     looks_like_fomo,
     looks_like_meme,
+    looks_like_deck,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -1076,6 +1079,71 @@ class PlaybookCopyTests(unittest.TestCase):
                 if text == "join the waitlist":
                     continue
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_deck_is_slides_not_an_artifact(self) -> None:
+        decks = (
+            "pitch deck for the local tick",
+            "investor deck of the launch",
+            "slide deck without a demo",
+            "PDF of the slides",
+            "pdf slajdów",
+            "slajdy bez produktu",
+            "Notion one-pager",
+            "notion page for the launch",
+            "our pitch for investors",
+            "pitch for VCs",
+            "the deck",
+            "google slides of the launch",
+            "speakerdeck of the local tick",
+            "slideshare of the launch",
+            "deck nie jest artefaktem",
+        )
+        for text in decks:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_deck(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    DECK_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "on deck for the next ship",
+            "screenshot of the local tick demo",
+            "deck chair on the patio",
+            "join the waitlist",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_deck(text))
+                if text == "join the waitlist":
+                    continue
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_deck_host_is_notion_slideshare_or_google_slides_not_a_repo(self) -> None:
+        decks = (
+            "https://www.notion.so/someone/local-tick-one-pager",
+            "https://someone.notion.site/local-tick",
+            "https://speakerdeck.com/someone/local-tick",
+            "https://www.slideshare.net/someone/local-tick",
+            "https://pitch.com/v/local-tick",
+            "https://docs.google.com/presentation/d/abc123/edit",
+        )
+        for url in decks:
+            with self.subTest(url=url):
+                self.assertTrue(is_deck_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+                self.assertFalse(is_store_host_url(url))
+                self.assertFalse(is_blog_host_url(url))
+                self.assertFalse(is_launch_host_url(url))
+                self.assertFalse(is_ranking_host_url(url))
+        self.assertFalse(is_deck_host_url(SHIP_REPO))
+        self.assertFalse(is_deck_host_url(SHIP_PR))
+        self.assertFalse(is_deck_host_url("https://example.com/notion"))
+        self.assertFalse(is_deck_host_url("https://notnotion.so/local-tick"))
+        self.assertFalse(is_deck_host_url("https://notion.so.evil.com/local-tick"))
+        self.assertFalse(is_deck_host_url("https://docs.google.com/document/d/abc123/edit"))
 
     def test_logo_reveal_is_look_not_a_product(self) -> None:
         looks = (
@@ -3223,6 +3291,28 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_deck_is_killed(self) -> None:
+        decks = (
+            "pitch deck for the local tick",
+            "PDF of the slides",
+            "Notion one-pager",
+            "slajdy bez produktu",
+            "our pitch for investors",
+        )
+        for text in decks:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, DECK_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_logo_reveal_ship_claim_is_killed(self) -> None:
         looks = (
             "rebrand of the local tick",
@@ -4358,6 +4448,68 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertIn(SHIP_REPO, decision.draft.body)
         self.assertNotIn("producthunt.com", decision.draft.body)
+
+    def test_notion_slideshare_or_google_slides_as_only_url_is_not_an_artifact(self) -> None:
+        decks = (
+            "https://www.notion.so/someone/local-tick-one-pager",
+            "https://someone.notion.site/local-tick",
+            "https://speakerdeck.com/someone/local-tick",
+            "https://www.slideshare.net/someone/local-tick",
+            "https://pitch.com/v/local-tick",
+            "https://docs.google.com/presentation/d/abc123/edit",
+        )
+        for url in decks:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="see the slides", artifact_url=url),
+                        Fact(text="strangers can click the page today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, DECK_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_deck_next_to_repo_is_still_killed_when_copy_is_a_pitch(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="pitch deck for the local tick", artifact_url=SHIP_REPO),
+                Fact(
+                    text="slides as evidence",
+                    artifact_url="https://speakerdeck.com/someone/local-tick",
+                ),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, DECK_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_deck_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="slides as evidence",
+                    artifact_url="https://speakerdeck.com/someone/local-tick",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("speakerdeck.com", decision.draft.body)
 
     def test_hn_front_star_chart_or_badge_as_only_url_is_not_an_artifact(self) -> None:
         charts = (
