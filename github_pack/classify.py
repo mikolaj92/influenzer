@@ -380,6 +380,13 @@ _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
 )
+# A compare page or one commit describes a change, not a product a stranger
+# can try. Keep README blob URLs usable as the README source, but never accept
+# these diff views as the artifact URL.
+_GITHUB_DIFF_PATH_RE = re.compile(
+    r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:compare|commit)(?:/|$)",
+    re.I,
+)
 _MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 _TRYABLE_ARTIFACT_HOSTS = frozenset({"github.com"})
 _UTM_QUERY_RE = re.compile(r"(?i)(?:^|[&])(?:utm_[a-z]+|fbclid|gclid|mc_cid|mc_eid)=")
@@ -556,6 +563,8 @@ def is_trusted_artifact_url(url: str | None) -> bool:
         return False
     host = _normalized_host(parsed.hostname)
     if not host or not any(host == name or host.endswith("." + name) for name in _TRYABLE_ARTIFACT_HOSTS):
+        return False
+    if _GITHUB_DIFF_PATH_RE.match(parsed.path):
         return False
     if _UTM_QUERY_RE.search(parsed.query) or _CLICK_HERE_RE.search(raw):
         return False
