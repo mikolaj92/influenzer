@@ -48,6 +48,7 @@ from github_pack.classify import (
     looks_like_linktree,
     looks_like_logo_reveal,
     looks_like_apology,
+    looks_like_sunset,
     readme_tryable_url,
 )
 
@@ -69,6 +70,7 @@ README_WITHOUT_DEMO_REASON = "readme_without_demo"
 README_WITHOUT_QUICKSTART_REASON = "readme_without_quickstart"
 REVERTED_NOT_A_SHIP_REASON = "reverted_not_a_ship"
 APOLOGY_WITHOUT_SHIP_REASON = "apology_without_ship"
+SUNSET_NOT_A_SHIP_REASON = "sunset_not_a_ship"
 SOLICIT_GESTURE_REASON = "solicit_gesture"
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _COPYABLE_START_RE = re.compile(
@@ -325,8 +327,13 @@ def facts_from_survey(repo_slug: str, survey: dict[str, Any]) -> list[dict[str, 
         number = item.get("number")
         title = str(item.get("title") or "").strip()
         url = str(item.get("url") or "").strip()
+        body = str(item.get("body") or "").strip()
         label = f"Merged PR #{number}: {title}" if number is not None else title
-        add(kind="pull", text=label, artifact_url=url)
+        add(
+            kind="pull",
+            text="\n".join(part for part in (label, body[:240]) if part),
+            artifact_url=url,
+        )
 
     release_tags = {str(item.get("tagName") or "") for item in survey["releases"]}
     for item in survey["tags"]:
@@ -400,6 +407,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
         return _silence("cloud_drive_not_a_site", repo=slug)
     if looks_like_logo_reveal(blob):
         return _silence("logo_reveal_not_a_ship", repo=slug)
+    if looks_like_sunset(blob):
+        return _silence(SUNSET_NOT_A_SHIP_REASON, repo=slug)
     if looks_like_apology(blob) and not _apology_has_new_artifact(facts):
         return _silence(APOLOGY_WITHOUT_SHIP_REASON, repo=slug)
     if paid_disclosure_reason(blob):

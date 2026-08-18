@@ -18,6 +18,7 @@ from github_pack.pack import (
     README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
     APOLOGY_WITHOUT_SHIP_REASON,
+    SUNSET_NOT_A_SHIP_REASON,
     SOLICIT_GESTURE_REASON,
     looks_like_same_window_revert,
     looks_like_solicit_gesture,
@@ -450,6 +451,72 @@ class PackSilenceTests(unittest.TestCase):
         )
         self.assertEqual(apology_plus_release["status"], "ok")
         self.assertTrue(apology_plus_release["claims_ship"])
+
+    def test_sunset_release_is_silence_even_with_a_tryable_readme(self) -> None:
+        announcements = (
+            "EOL",
+            "We're shutting down",
+            "Shutting down",
+            "Sunsetting the product on September 1",
+            "Discontinuing our API",
+            "Wyłączamy produkt",
+            "Usługa zostanie wygaszona",
+        )
+        for idx, text in enumerate(announcements):
+            with self.subTest(text=text):
+                out = pack_survey(
+                    {
+                        "status": "ok",
+                        "ok": True,
+                        "repo": REPO,
+                        "now": NOW,
+                        "survey": {
+                            "meta": {"description": text},
+                            "prs": [],
+                            "releases": [
+                                {
+                                    "tagName": f"v0.9.{idx}",
+                                    "name": f"Released EOL notice. {text}",
+                                }
+                            ],
+                            "tags": [],
+                            "readme_text": VISIBLE_DEMO,
+                            "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                        },
+                    }
+                )
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], SUNSET_NOT_A_SHIP_REASON)
+                self.assertIsNone(out["brief_id"])
+                self.assertNotIn("facts", out)
+
+    def test_sunset_in_a_ship_pr_body_is_silence(self) -> None:
+        out = pack_survey(
+            {
+                "status": "ok",
+                "ok": True,
+                "repo": REPO,
+                "now": NOW,
+                "survey": {
+                    "meta": {"description": "Local operator for product teams"},
+                    "prs": [
+                        {
+                            "number": 12,
+                            "title": "Released final migration helper",
+                            "body": "We're shutting down the service on September 1.",
+                            "url": SHIP_PR,
+                        }
+                    ],
+                    "releases": [],
+                    "tags": [],
+                    "readme_text": VISIBLE_DEMO,
+                    "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                },
+            }
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], SUNSET_NOT_A_SHIP_REASON)
+        self.assertNotIn("facts", out)
 
     def test_waitlist_release_is_silence(self) -> None:
         out = self._pack(
