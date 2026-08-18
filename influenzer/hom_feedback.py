@@ -13,6 +13,7 @@ Does not comment, label, close, or push. Look is GitHub GET only.
 Does not git clone. Does not make a worktree. Mini is not a checkout cache.
 Does not run the project. Launching on watch is silence.
 Tryable is a README+URL heuristic. Code in look is untrusted.
+A maintenance placeholder is silence even when it reports HTTP 200.
 Survey/feedback only through gh api. Reply and code are not this path.
 Look stops after N pages. Whole-repo history in one look is silence.
 Inbound does not expand the watch. A foreign repo link in an issue stays
@@ -48,7 +49,13 @@ from typing import Any
 
 from github_feedback import collect_feedback
 from github_feedback import feedback as github_feedback_mod
-from github_feedback.feedback import WHOLE_THREAD, sanitize_inbound_facts, whole_thread_reason
+from github_feedback.feedback import (
+    MAINTENANCE_NOT_TRYABLE,
+    WHOLE_THREAD,
+    looks_like_maintenance_page,
+    sanitize_inbound_facts,
+    whole_thread_reason,
+)
 from github_survey import GhRunner, invalid_repo_reason
 from github_survey.survey import look_bytes_over_limit, look_declared_gh, state_bytes_over_limit
 
@@ -150,6 +157,8 @@ def admit_feedback(
     if whole_thread_reason(packed):
         return host_silence(WHOLE_THREAD, project_id=project_id, repo_slug=slug)
     fact_blob = "\n".join(str(item.get("text") or "") for item in facts_raw if isinstance(item, dict))
+    if looks_like_maintenance_page(fact_blob):
+        return host_silence(MAINTENANCE_NOT_TRYABLE, project_id=project_id, repo_slug=slug)
     if looks_like_fork(fact_blob):
         return host_silence("fork_not_a_site", project_id=project_id, repo_slug=slug)
     if looks_like_empty_repo(fact_blob):

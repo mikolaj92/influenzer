@@ -14,7 +14,11 @@ from github_survey.survey import look_argv_leaves_declared_repo
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from github_feedback.feedback import MAX_STORED_FACT_CHARS, WHOLE_THREAD
+from github_feedback.feedback import (
+    MAINTENANCE_NOT_TRYABLE,
+    MAX_STORED_FACT_CHARS,
+    WHOLE_THREAD,
+)
 from github_survey.survey import MAX_GH_LOOK_BYTES
 from github_survey import classify_gh_argv
 from influenzer.hom_feedback import SOURCE, admit_feedback, collect_and_admit, main as feedback_main
@@ -448,6 +452,32 @@ class HomFeedbackComposeTests(unittest.TestCase):
         self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
 
+    def test_maintenance_pack_is_silence_and_writes_no_brief(self) -> None:
+        packed = {
+            "status": "ok",
+            "ok": True,
+            "repo": REPO,
+            "brief_id": "fb-maintenance",
+            "source": SOURCE,
+            "story_kind": "hard_issue",
+            "claims_ship": True,
+            "tryable": True,
+            "facts": [
+                {
+                    "kind": "issue_comment",
+                    "text": "@alice: The artifact returns HTTP 200 but this is a maintenance page",
+                    "artifact_url": ISSUE_COMMENT,
+                }
+            ],
+        }
+        out = admit_feedback(self.repo, packed, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], MAINTENANCE_NOT_TRYABLE)
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse((self.home / "runtime.db").exists())
+
     def test_whole_thread_pack_is_silence_and_writes_no_brief(self) -> None:
         packed = {
             "status": "ok",
@@ -633,6 +663,7 @@ class HomFeedbackBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not run the project", blob)
         self.assertIn("Launching on watch is silence", blob)
         self.assertIn("Tryable is a README+URL heuristic", blob)
+        self.assertIn("maintenance placeholder is silence even when it reports HTTP 200", blob)
         self.assertNotIn("pack_survey", blob)
         self.assertNotIn("survey_public_repo", blob)
         self.assertNotIn("dress_brief", blob)

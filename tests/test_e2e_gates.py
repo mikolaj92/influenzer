@@ -51,7 +51,12 @@ from influenzer.domain import (
     PublishPlan,
     PlanStatus,
 )
-from github_feedback.feedback import collect_feedback, whole_thread_reason
+from github_feedback.feedback import (
+    MAINTENANCE_NOT_TRYABLE,
+    collect_feedback,
+    looks_like_maintenance_page,
+    whole_thread_reason,
+)
 from influenzer.brief_admit import open_story_reason
 from influenzer.hom_feedback import SOURCE as FEEDBACK_SOURCE, admit_feedback
 from influenzer.playbook import (
@@ -1030,6 +1035,50 @@ class OrderedLiveGateTests(unittest.TestCase):
                 self.assertEqual(
                     artifact_tryable_reason(evidence=text), ARTIFACT_5XX_NOT_TRYABLE
                 )
+
+    def test_maintenance_page_is_silence_even_at_http_200(self) -> None:
+        evidence = (
+            "We'll be back",
+            "planned downtime",
+            "the artifact is under scheduled maintenance",
+            "maintenance page",
+            "maintenance",
+        )
+        allowed = (
+            "maintenance mode support is part of the product",
+            "planned maintenance completed successfully",
+            "scheduled downtime was cancelled",
+            "the maintenance page was removed from the demo",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_maintenance_page(text))
+        for idx, text in enumerate(evidence):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_maintenance_page(text))
+                packed = {
+                    "status": "ok",
+                    "ok": True,
+                    "repo": "mikolaj92/demo",
+                    "brief_id": f"fb-maintenance-{idx}",
+                    "facts": [
+                        {
+                            "kind": "issue_comment",
+                            "text": f"@alice: HTTP 200 from the demo, but {text}",
+                            "artifact_url": f"https://github.com/mikolaj92/demo/issues/{idx + 1}",
+                        }
+                    ],
+                }
+                out = admit_feedback(
+                    self.repo,
+                    packed,
+                    project_id="app-1",
+                    now="2026-08-17T06:00:00Z",
+                )
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], MAINTENANCE_NOT_TRYABLE)
+                self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
 
     def test_captcha_bot_wall_is_silence_not_tryable(self) -> None:
         challenges = (
