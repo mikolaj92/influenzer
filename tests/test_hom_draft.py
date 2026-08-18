@@ -1174,6 +1174,71 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("drake", decision.draft.body.lower())
         self.assertNotIn("wojak", decision.draft.body.lower())
 
+    def test_deck_is_undressable_even_when_score_says_draft(self) -> None:
+        decks = (
+            "pitch deck for the local tick",
+            "PDF of the slides",
+            "Notion one-pager",
+            "slajdy bez produktu",
+            "our pitch for investors",
+        )
+        for text in decks:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("pitch deck", dumped.lower())
+                self.assertNotIn("pdf of the slides", dumped.lower())
+                self.assertNotIn("notion one-pager", dumped.lower())
+                self.assertNotIn("slajdy", dumped.lower())
+                self.assertNotIn("our pitch", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
+
+    def test_product_copy_without_deck_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="on deck for the next ship"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("on deck", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("pitch deck", decision.draft.body.lower())
+        self.assertNotIn("one-pager", decision.draft.body.lower())
+
     def test_logo_reveal_is_undressable_even_when_score_says_draft(self) -> None:
         looks = (
             "rebrand of the local tick",

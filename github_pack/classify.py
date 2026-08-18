@@ -235,6 +235,27 @@ _MEME_RE = re.compile(
     r"|\bmem(?:y|ów|ow|ami|em|ie|ach|om)\b"
     r")"
 )
+_DECK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bpitch\s+decks?\b"
+    r"|\binvestor\s+(?:decks?|pitches?)\b"
+    r"|\bslide\s+decks?\b"
+    r"|\bslide\s+pdfs?\b"
+    r"|\bpdf\s+(?:of\s+)?(?:the\s+)?slides?\b"
+    r"|\bpdf\s+slajd"
+    r"|\bslajd(?:y|ów|ami|ach|om|em)?\b"
+    r"|\bone[- ]pagers?\b"
+    r"|\bnotion\s+(?:one[- ]pager|page|doc)\b"
+    r"|\bpitch(?:es)?\s+(?:pdf|slides?|deck)\b"
+    r"|\b(?:our|the|this)\s+pitch\b"
+    r"|\bpitch\s+(?:for|to)\s+(?:investors?|vcs?|angels?)\b"
+    r"|\b(?:our|the|this)\s+decks?\b"
+    r"|\bspeakerdecks?\b"
+    r"|\bslideshare\b"
+    r"|\bgoogle\s+slides\b"
+    r"|\bdeck\s+nie\s+jest\s+artefakt"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -323,6 +344,13 @@ def looks_like_meme(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_MEME_RE.search(text))
+
+
+def looks_like_deck(text: str) -> bool:
+    """True for a pitch / PDF slides / Notion one-pager. A deck is not an artifact."""
+    if not text or not text.strip():
+        return False
+    return bool(_DECK_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

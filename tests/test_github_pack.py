@@ -555,6 +555,28 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "meme")
 
+    def test_pitch_deck_release_is_silence(self) -> None:
+        out = self._pack(
+            ship_script(
+                releases=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "tagName": "v0.0.0-deck",
+                                "name": "Pitch deck for the local tick",
+                                "isDraft": False,
+                                "isPrerelease": False,
+                                "publishedAt": "2026-08-12T18:00:00Z",
+                            }
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "deck_not_an_artifact")
+
     def test_rebrand_release_is_silence(self) -> None:
         out = self._pack(
             ship_script(

@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -583,6 +583,24 @@ NEWS_HOSTS: frozenset[str] = frozenset(
         "polsatnews.pl",
         "notesfrompoland.com",
     }
+)
+# A deck is not a tryable artifact. Pitch / PDF slides / Notion one-pager
+# as the only URL is silence. The website is the repo, not a slide pile.
+# A deck next to a repo can stay as evidence. Neighbor of #40 (no tryable)
+# and #122 (blog URL): here it is slides, not a blog.
+DECK_HOSTS: frozenset[str] = frozenset(
+    {
+        "notion.so",
+        "notion.site",
+        "speakerdeck.com",
+        "slideshare.net",
+        "slideshare.com",
+        "pitch.com",
+    }
+)
+_GOOGLE_SLIDES_RE = re.compile(
+    r"^https://docs\.google\.com/presentation(?:/.*)?$",
+    re.I,
 )
 # A ranking dump is not a tryable artifact. HN front / star-history /
 # shields / stargazers as the only URL is silence. The website is the repo,
@@ -1263,6 +1281,32 @@ MEME_RE = re.compile(
     r"|\btablic[aąęy]\s+z\s+mem"
     r"|\b(?:sciana|ściana)\s+mem"
     r"|\bmem(?:y|ów|ow|ami|em|ie|ach|om)\b"
+    r")"
+)
+# A deck is not an artifact. Pitch / PDF slides / Notion one-pager
+# without a clickable product is silence. Neighbor of Show HN without
+# tryable (#40) and blog-as-Show (#122). Here it is slides, not a blog.
+# A screenshot of the demo and "on deck" stay. Costume is not a pitch.
+DECK_REASON = "deck_not_an_artifact"
+DECK_RE = re.compile(
+    r"(?i)(?:"
+    r"\bpitch\s+decks?\b"
+    r"|\binvestor\s+(?:decks?|pitches?)\b"
+    r"|\bslide\s+decks?\b"
+    r"|\bslide\s+pdfs?\b"
+    r"|\bpdf\s+(?:of\s+)?(?:the\s+)?slides?\b"
+    r"|\bpdf\s+slajd"
+    r"|\bslajd(?:y|ów|ami|ach|om|em)?\b"
+    r"|\bone[- ]pagers?\b"
+    r"|\bnotion\s+(?:one[- ]pager|page|doc)\b"
+    r"|\bpitch(?:es)?\s+(?:pdf|slides?|deck)\b"
+    r"|\b(?:our|the|this)\s+pitch\b"
+    r"|\bpitch\s+(?:for|to)\s+(?:investors?|vcs?|angels?)\b"
+    r"|\b(?:our|the|this)\s+decks?\b"
+    r"|\bspeakerdecks?\b"
+    r"|\bslideshare\b"
+    r"|\bgoogle\s+slides\b"
+    r"|\bdeck\s+nie\s+jest\s+artefakt"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -2168,6 +2212,25 @@ def news_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
     if any(is_ship_artifact_url(url) for url in cleaned):
         return False
     return all(is_news_host_url(url) for url in cleaned)
+
+
+def is_deck_host_url(url: str | None) -> bool:
+    """True for Notion / Speaker Deck / Slideshare / Pitch / Google Slides. A deck is not a tryable demo."""
+    if _host_in(url, DECK_HOSTS):
+        return True
+    if not url:
+        return False
+    return bool(_GOOGLE_SLIDES_RE.fullmatch(url.strip().rstrip("/")))
+
+
+def deck_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
+    """True when every artifact URL is a deck and none is a repo."""
+    cleaned = [url.strip() for url in urls if url and url.strip()]
+    if not cleaned:
+        return False
+    if any(is_ship_artifact_url(url) for url in cleaned):
+        return False
+    return all(is_deck_host_url(url) for url in cleaned)
 
 
 def is_ranking_host_url(url: str | None) -> bool:
@@ -3149,6 +3212,14 @@ def looks_like_meme(text: str) -> bool:
     return bool(MEME_RE.search(cleaned))
 
 
+def looks_like_deck(text: str) -> bool:
+    """True for a pitch / PDF slides / Notion one-pager. A deck is not an artifact."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(DECK_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3689,7 +3760,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a deck, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3735,6 +3806,11 @@ def unquotable_reason(
             return MEME_REASON
     if extra and looks_like_meme(extra):
         return MEME_REASON
+    for _kind, text, _url in packed:
+        if looks_like_deck(text):
+            return DECK_REASON
+    if extra and looks_like_deck(extra):
+        return DECK_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -4044,6 +4120,9 @@ __all__ = [
     "FOMO_RE",
     "MEME_REASON",
     "MEME_RE",
+    "DECK_REASON",
+    "DECK_RE",
+    "DECK_HOSTS",
     "LOGO_REVEAL_NOT_A_SHIP",
     "LOGO_REVEAL_RE",
     "PENDING_CI_RE",
@@ -4097,7 +4176,9 @@ __all__ = [
     "has_tavern_intent_split",
     "has_tavern_seed",
     "has_workshop_life",
+    "deck_urls_only",
     "is_blog_host_url",
+    "is_deck_host_url",
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
     "is_merge_log_texts",
@@ -4200,6 +4281,7 @@ __all__ = [
     "looks_like_lead_magnet",
     "looks_like_fomo",
     "looks_like_meme",
+    "looks_like_deck",
     "looks_like_logo_reveal",
     "looks_like_pending_ci",
     "looks_like_failed_ci",
