@@ -146,6 +146,7 @@ def tick(
             account_id=plan.platform_account_id,
             content_hash=plan.content_hash,
             content_kind="post",
+            body=plan.body,
             action="publish",
             live_intent=True,
             scheduler=True,

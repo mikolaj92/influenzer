@@ -10,6 +10,13 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Mapping
 
+from commercial_disclosure import (
+    PAID_UNDISCLOSED_REASON,
+    has_disclosure_label,
+    looks_like_paid_promotion,
+    paid_disclosure_reason,
+)
+
 
 class DomainError(ValueError):
     pass
@@ -334,9 +341,13 @@ class Campaign:
         if self.kind is CampaignKind.PAID:
             if self.budget_amount is None or self.budget_currency is None:
                 raise DomainError("paid campaign requires budget_amount and budget_currency")
-            if not self.disclosures:
-                raise DomainError("paid campaign requires disclosures")
+            if not has_disclosure_label(self.disclosures):
+                raise DomainError("paid campaign requires a disclosure label")
 
+
+# Re-export the dependency-free commercial-disclosure gate from the domain
+# boundary for host callers. Collection packages import it directly so they
+# remain independent of Influenzer.
 
 ACTIVE_ATTEMPT = frozenset({AttemptStatus.PENDING, AttemptStatus.RUNNING, AttemptStatus.UNKNOWN})
 

@@ -109,6 +109,14 @@ class PackSilenceTests(unittest.TestCase):
             surveyed = survey_public_repo(REPO, gh=fake, now=NOW)
         return pack_survey(surveyed)
 
+    def test_undisclosed_paid_release_is_silence(self) -> None:
+        script = ship_script()
+        script["repo"] = GhCall(0, repo_json(description="Paid partnership for the local operator"))
+        out = self._pack(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "paid_undisclosed")
+        self.assertIsNone(out["brief_id"])
+
     def test_silence_on_commit_noise(self) -> None:
         out = self._pack(noise_script())
         self.assertEqual(out["status"], "noop")

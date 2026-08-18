@@ -107,6 +107,44 @@ class PolicyEvaluationTests(unittest.TestCase):
         self.assertEqual(self.decide(posts_today=2).reason, "daily_rate_exceeded")
         self.assertEqual(self.decide(disclosures=()).reason, "disclosure_required")
 
+    def test_paid_copy_requires_an_audience_facing_label_even_when_policy_is_optional(self):
+        optional = PolicyVersion(
+            project_id=self.policy.project_id,
+            policy_version_id="policy-optional",
+            account_ids=self.policy.account_ids,
+            actions=self.policy.actions,
+            content_kinds=self.policy.content_kinds,
+            max_posts_per_day=self.policy.max_posts_per_day,
+            require_disclosures=False,
+        ).with_hash()
+        optional_grant = PolicyActivationGrant(
+            project_id=self.grant.project_id,
+            grant_id="grant-optional",
+            policy_version_id=optional.policy_version_id,
+            policy_hash=optional.policy_hash,
+            platform_account_id=self.grant.platform_account_id,
+            actions=self.grant.actions,
+            actor=self.grant.actor,
+            created_at=self.grant.created_at,
+            expires_at=self.grant.expires_at,
+        )
+        self.assertEqual(
+            self.decide(
+                policy=optional,
+                grant=optional_grant,
+                disclosures=("internal note",),
+                body="Affiliate link to the local tick",
+            ).reason,
+            "paid_undisclosed",
+        )
+        self.assertTrue(
+            self.decide(
+                policy=optional,
+                grant=optional_grant,
+                body="#affiliate Affiliate link to the local tick",
+            ).allowed
+        )
+
     def test_typed_account_and_content_must_belong_to_bindings(self):
         account = PlatformAccount(
             project_id="project-b",

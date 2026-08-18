@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from .domain import ContentRevision, PlatformAccount, PolicyActivationGrant, PolicyVersion
+from .domain import (
+    ContentRevision,
+    PAID_UNDISCLOSED_REASON,
+    PlatformAccount,
+    PolicyActivationGrant,
+    PolicyVersion,
+    paid_disclosure_reason,
+)
 
 
 @dataclass(frozen=True)
@@ -74,6 +81,7 @@ def evaluate_policy(
     account_id: str | None = None,
     content_hash: str | None = None,
     content_kind: str | None = None,
+    body: str | None = None,
     action: str = "publish",
     disclosures: Sequence[str] | str | None = (),
     live_intent: bool = False,
@@ -100,6 +108,7 @@ def evaluate_policy(
     account_id = _value(request, "account_id", account_id)
     content_hash = _value(request, "content_hash", content_hash)
     content_kind = _value(request, "content_kind", content_kind)
+    body = _value(request, "body", body)
     action = _value(request, "action", action)
     disclosures = _value(request, "disclosures", disclosures)
     live_intent = _value(request, "live_intent", live_intent)
@@ -115,6 +124,8 @@ def evaluate_policy(
         return _deny("invalid_policy_input")
     if not all(isinstance(v, str) and v for v in (project_id, account_id, content_hash, content_kind, action)):
         return _deny("missing_binding")
+    if body is not None and not isinstance(body, str):
+        return _deny("invalid_content")
     if not all(isinstance(v, bool) for v in (live_intent, scheduler, scheduler_live_enabled)):
         return _deny("invalid_live_intent")
     if not isinstance(posts_today, int) or isinstance(posts_today, bool) or posts_today < 0:
@@ -197,6 +208,9 @@ def evaluate_policy(
         return _deny("daily_rate_exceeded")
     if policy.require_disclosures and not _has_disclosure(disclosures):
         return _deny("disclosure_required")
+    copy = content.body if content is not None else body
+    if paid_disclosure_reason(copy):
+        return _deny(PAID_UNDISCLOSED_REASON)
 
     # A scheduler's CLI invocation may contain --live, but it is never enough.
     if scheduler:

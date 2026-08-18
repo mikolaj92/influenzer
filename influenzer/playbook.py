@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from urllib.parse import parse_qs, urlparse
 
+from influenzer.domain import PAID_UNDISCLOSED_REASON, paid_disclosure_reason
+
 
 CANON_URL = "https://github.com/mikolaj92/influenzer-playbook"
 
@@ -4004,6 +4006,11 @@ def unquotable_reason(
             return CLOUD_DRIVE_REASON
     if extra and looks_like_cloud_drive(extra):
         return CLOUD_DRIVE_REASON
+    for _kind, text, _url in packed:
+        if paid_disclosure_reason(text):
+            return PAID_UNDISCLOSED_REASON
+    if extra and paid_disclosure_reason(extra):
+        return PAID_UNDISCLOSED_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON

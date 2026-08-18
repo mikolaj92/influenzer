@@ -23,6 +23,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from commercial_disclosure import PAID_UNDISCLOSED_REASON, paid_disclosure_reason
+
 from github_pack.classify import (
     facts_are_merge_log,
     headline_prs,
@@ -385,6 +387,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
         return _silence("cloud_drive_not_a_site", repo=slug)
     if looks_like_logo_reveal(blob):
         return _silence("logo_reveal_not_a_ship", repo=slug)
+    if paid_disclosure_reason(blob):
+        return _silence(PAID_UNDISCLOSED_REASON, repo=slug)
     meta = survey.get("meta") if isinstance(survey.get("meta"), dict) else {}
     if looks_like_solicit_gesture(
         "\n".join(

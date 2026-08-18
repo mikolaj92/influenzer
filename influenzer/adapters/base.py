@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+from influenzer.domain import PAID_UNDISCLOSED_REASON, paid_disclosure_reason
 from influenzer.envelope import fail, planned, result
 
 
@@ -40,6 +41,8 @@ def dry_run_publish(request: AdapterRequest, *, planned_id: str | None = None) -
 
 
 def run_adapter(handler: Handler, request: AdapterRequest) -> AdapterResult:
+    if paid_disclosure_reason(request.body):
+        return fail(PAID_UNDISCLOSED_REASON, failure_class="terminal")
     if request.dry_run:
         # Harness guarantees no secret material is required for dry-run.
         safe = AdapterRequest(

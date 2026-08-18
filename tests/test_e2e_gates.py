@@ -28,6 +28,10 @@ from influenzer.host import (
 )
 from influenzer.domain import (
     AccountStatus,
+    PAID_UNDISCLOSED_REASON,
+    has_disclosure_label,
+    looks_like_paid_promotion,
+    paid_disclosure_reason,
     AttemptStatus,
     PARKED_DOMAIN_REASON,
     looks_like_parked_domain,
@@ -290,6 +294,48 @@ class OrderedLiveGateTests(unittest.TestCase):
                 "SELECT status FROM publication_attempts WHERE plan_id=?", (f"p{idx}",)
             ).fetchone()["status"]
             self.assertEqual(attempt_status, AttemptStatus.SUCCEEDED.value, platform)
+
+    def test_live_scheduler_rejects_undisclosed_paid_plan_before_adapter(self) -> None:
+        due = [self._seed(project_id="app-1", platform="x", plan_id="paid-plan")]
+        plan = due[0].plan
+        paid = PublishPlan(
+            project_id=plan.project_id,
+            plan_id=plan.plan_id,
+            content_revision_id=plan.content_revision_id,
+            content_hash=plan.content_hash,
+            platform_account_id=plan.platform_account_id,
+            platform=plan.platform,
+            body="Paid promotion for the local tick",
+            status=plan.status,
+            scheduled_at=plan.scheduled_at,
+            created_at=plan.created_at,
+            operation_key=plan.operation_key,
+        )
+        self.repo.conn.execute(
+            "UPDATE publish_plans SET body=? WHERE plan_id=?",
+            (paid.body, paid.plan_id),
+        )
+        called = {"value": False}
+
+        def fake(_req: AdapterRequest) -> dict:
+            called["value"] = True
+            return {"status": "ok", "ok": True, "mutated": True}
+
+        out = tick(
+            self.repo,
+            Config(home=self.home, scheduler_live_enabled=True),
+            due=[DueWork(plan=paid, account=due[0].account, policy=due[0].policy, grant=due[0].grant)],
+            now="2026-01-02T00:00:00Z",
+            handlers={"x": fake},
+        )
+        self.assertFalse(called["value"])
+        self.assertEqual(out["outcomes"][0]["reason"], PAID_UNDISCLOSED_REASON)
+        self.assertEqual(
+            self.repo.conn.execute(
+                "SELECT status FROM publish_plans WHERE plan_id=?", (paid.plan_id,)
+            ).fetchone()["status"],
+            PlanStatus.SCHEDULED.value,
+        )
 
     def test_builder_project_can_publish_independently(self) -> None:
         due = [self._seed(project_id="builder-1", platform="bluesky", plan_id="builder-post")]
@@ -994,6 +1040,64 @@ class OrderedLiveGateTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertTrue(looks_like_parked_domain(text))
                 self.assertEqual(parked_domain_reason(text), PARKED_DOMAIN_REASON)
+
+    def test_undisclosed_paid_partner_or_affiliate_is_silence_in_every_arena(self) -> None:
+        undisclosed = (
+            "Paid promotion for the local tick",
+            "Our partner paid for this launch",
+            "Affiliate link for the local tick",
+            "materiał sponsorowany dla lokalnego ticka",
+            "link afiliacyjny do lokalnego ticka",
+        )
+        disclosed = (
+            "#ad Paid promotion for the local tick",
+            "#sponsored Our partner paid for this launch",
+            "#affiliate Affiliate link for the local tick",
+            "[reklama] materiał sponsorowany dla lokalnego ticka",
+            "link afiliacyjny do lokalnego ticka #reklama",
+        )
+        self.assertFalse(looks_like_paid_promotion("Local tick scores briefs"))
+        self.assertFalse(has_disclosure_label("partnership roadmap"))
+        for idx, text in enumerate(undisclosed):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_paid_promotion(text))
+                self.assertEqual(paid_disclosure_reason(text), PAID_UNDISCLOSED_REASON)
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    PAID_UNDISCLOSED_REASON,
+                )
+                for arena in ArenaId:
+                    brief = Brief.create(
+                        project_id="app-1",
+                        brief_id=f"b-undisclosed-{idx}-{arena.value}",
+                        facts=(
+                            Fact(text=text, artifact_url=SHIP_PR),
+                            Fact(text="strangers can click and run the demo today"),
+                        ),
+                        story_kind="major",
+                        claims_ship=True,
+                        tryable=True,
+                        preferred_arena=arena,
+                    )
+                    with self.subTest(arena=arena.value):
+                        score = score_brief(brief)
+                        self.assertEqual(score.verdict, Verdict.KILL)
+                        self.assertEqual(score.reason, PAID_UNDISCLOSED_REASON)
+                        self.assertIsNone(score.arena)
+                        leaked = Score(
+                            brief_id=brief.brief_id,
+                            verdict=Verdict.DRAFT,
+                            reason="one_angle",
+                            arena=arena,
+                            angle="what shipped and why a stranger should try it",
+                            wave_checklist=ARENAS[arena].wave,
+                            canon_url=ARENAS[arena].canon_url,
+                        )
+                        self.assertIsNone(compose_draft(brief, leaked))
+        for text in disclosed:
+            with self.subTest(text=text):
+                self.assertTrue(has_disclosure_label(text))
+                self.assertIsNone(paid_disclosure_reason(text))
 
     def test_linktree_is_silence_not_an_artifact(self) -> None:
         boards = (

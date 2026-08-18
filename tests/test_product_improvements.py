@@ -123,7 +123,7 @@ class InfluenzerInitDemoTests(unittest.TestCase):
                 "--budget-currency",
                 "USD",
                 "--disclosure",
-                "ad",
+                "#ad",
             ]
         )
         self.assertEqual(good, 0)

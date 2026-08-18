@@ -47,6 +47,7 @@ from github_survey.survey import (
     state_bytes_over_limit,
 )
 from github_pack.pack import sanitize_inbound_facts, strip_inbound_instructions
+from commercial_disclosure import PAID_UNDISCLOSED_REASON, paid_disclosure_reason
 
 SOURCE = "github-feedback"
 LAUNCH_WINDOW_DAYS = 2
@@ -356,6 +357,8 @@ def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
     facts = sanitize_inbound_facts(facts)
     if not facts:
         return _silence("comment_noise", repo=repo_slug)
+    if paid_disclosure_reason("\n".join(str(fact.get("text") or "") for fact in facts)):
+        return _silence(PAID_UNDISCLOSED_REASON, repo=repo_slug)
     packed = {
         "status": "ok",
         "ok": True,

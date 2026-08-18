@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from influenzer.domain import DomainError, content_hash, require_slug, utc_now
+from influenzer.domain import DomainError, PAID_UNDISCLOSED_REASON, content_hash, paid_disclosure_reason, require_slug, utc_now
 from influenzer.playbook import (
     ANGLES,
     ARENAS,
@@ -649,6 +649,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
     if not brief.facts:
         return _kill(brief, "empty_brief")
     blob = _facts_blob(brief)
+    if paid_disclosure_reason(blob):
+        return _kill(brief, PAID_UNDISCLOSED_REASON)
     unsourced = unquotable_reason(_fact_triples(brief))
     if unsourced:
         return _kill(brief, unsourced)
