@@ -1,22 +1,28 @@
 {
   "paths": [
-    "influenzer/playbook.py",
+    "github_pack/classify.py",
+    "github_pack/pack.py",
+    "influenzer/brief_admit.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
-    "tests/test_hom_operator.py",
+    "influenzer/playbook.py",
+    "skills/influenzer-hn/SKILL.md",
+    "tests/test_brief_admit.py",
+    "tests/test_e2e_gates.py",
+    "tests/test_github_pack.py",
     "tests/test_hom_draft.py",
-    "tests/test_e2e_gates.py"
+    "tests/test_hom_operator.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["tls", "cert", "tryable", "gate"],
+  "matched_tokens": ["influenzer", "gate", "drive", "dropbox", "wetransfer"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
     "Repo tree entries considered: 137.",
-    "Refined after inspection: same fail-closed shape as #92 dead link."
+    "Issue 155: cloud drive is not a website. Fail closed at score, dress, pack, admit."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__154-martwy-tls-nie-jest-tryable-da0e7dfb",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__155-dysk-w-chmurze-nie-jest-witryn-b28d4b87",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

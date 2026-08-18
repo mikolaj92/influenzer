@@ -1,41 +1,37 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=154 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=155 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #154 — Martwy TLS nie jest tryable
+Issue: #155 — Dysk w chmurze nie jest witryną
 
 ## Goal
 
-A recorded cert error, mixed content, or HTTPS the browser rejects is not
-tryable. Silence on Show HN and ship claims. Do not click the warning.
-This is recorded TLS evidence, not a 404 (#92) and not the https scheme (#77).
+Drive / Dropbox / WeTransfer as an artifact is silence. A file share is not a product.
+
+Fail closed at score, dress, pack, and admit — same shape as #151 (deck) and #153 (linktree). Neighbor of #76 (trusted host).
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — fail-closed `DEAD_TLS_RE` / `looks_like_dead_tls`
-- `influenzer/hom.py` — ship/social kill, otherwise changelog
-- `influenzer/hom_draft.py` — undress even if a score says draft
-- `tests/test_hom_operator.py`
-- `tests/test_hom_draft.py`
-- `tests/test_e2e_gates.py`
+- `influenzer/playbook.py` — detector, hosts, reason, unquotable
+- `influenzer/hom.py` — score kill + URL-only gate
+- `influenzer/hom_draft.py` — dress silence
+- `influenzer/brief_admit.py` — admit silence
+- `github_pack/classify.py` / `github_pack/pack.py` — pack silence
+- `skills/influenzer-hn/SKILL.md` — seminar wave
+- tests: `test_e2e_gates.py`, `test_hom_operator.py`, `test_hom_draft.py`, `test_brief_admit.py`, `test_github_pack.py`
 
 ## Test plan
 
-- `python -m pytest tests/test_hom_operator.py::PlaybookCopyTests::test_dead_tls_is_not_tryable tests/test_hom_operator.py::ScoreBriefTests::test_dead_tls_ship_claim_is_killed tests/test_hom_operator.py::ScoreBriefTests::test_dead_tls_without_ship_claim_is_changelog_only tests/test_hom_operator.py::ScoreBriefTests::test_product_copy_without_dead_tls_can_still_draft tests/test_hom_draft.py::HomDraftCostumeTests::test_dead_tls_is_undressable_even_when_score_says_draft tests/test_hom_draft.py::HomDraftCostumeTests::test_product_copy_without_dead_tls_can_still_dress tests/test_e2e_gates.py::OrderedLiveGateTests::test_dead_tls_is_silence_not_tryable -q`
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Live TLS handshake or browser probe of artifact URLs (HOM stays rule-only)
-- Dead 404/410 links (#92) and https-only scheme (#77)
-- Login wall 401/403 (#126) and listed release-asset 404 (#171)
-- github_survey / github_pack collectors
+- Do not treat a repo next to a drive as silence unless the copy is the file share
+- Do not confuse Google Slides (deck) with Drive / Docs (file)
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
-- Same shape as dead-link / login-wall: text evidence in the brief, not a
-  network check. Bare `certificate error` / `mixed content` / `martwy TLS`
-  is this gate. A working handshake stays.
-- Do not call “click through the warning”.
-- Collector boundary: no unbounded collection.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
+- Reason: `cloud_drive_not_a_site`.

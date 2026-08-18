@@ -107,6 +107,7 @@ from influenzer.playbook import (
     looks_like_fomo,
     looks_like_meme,
     looks_like_dead_tls,
+    looks_like_cloud_drive,
     looks_like_deck,
     looks_like_linktree,
     looks_like_logo_reveal,
@@ -120,6 +121,7 @@ from influenzer.playbook import (
     LEAD_MAGNET_REASON,
     FOMO_REASON,
     MEME_REASON,
+    CLOUD_DRIVE_REASON,
     DEAD_TLS_REASON,
     DECK_REASON,
     LINKTREE_REASON,
@@ -975,6 +977,55 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, LINKTREE_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_cloud_drive_is_silence_not_a_site(self) -> None:
+        drives = (
+            "Google Drive folder for the local tick",
+            "Dropbox of the launch",
+            "WeTransfer of the zip",
+            "dysk w chmurze zamiast produktu",
+            "cloud drive instead of a website",
+        )
+        self.assertFalse(looks_like_cloud_drive(""))
+        self.assertFalse(looks_like_cloud_drive("   "))
+        self.assertFalse(looks_like_cloud_drive("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_cloud_drive("SSD drive in the laptop"))
+        self.assertFalse(looks_like_cloud_drive("screenshot of the local tick demo"))
+        self.assertFalse(looks_like_cloud_drive("join the waitlist"))
+        for idx, text in enumerate(drives):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_cloud_drive(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    CLOUD_DRIVE_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-drive-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, CLOUD_DRIVE_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(

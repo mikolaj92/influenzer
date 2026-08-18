@@ -129,7 +129,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="workshop",
         game="README conversion + star velocity in a window",
         wave=(
-            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. A Monday without a ship or real public feedback is silence, not a recap. Weekly update without history stays in the changelog. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch. Press-release tone is changelog, not a workshop launch.",
+            "Repo is the website. README one screen: one-liner → GIF → working quickstart. English only. No shouty CAPS title, no emoji. A Polish one-liner is silence. A fork is not a website. An empty repo or a repo without a README is not a website. A private repo is not a website. A Google Drive, Dropbox, or WeTransfer file is not a website. Workshop is a public README. An archived or disabled repo is dead. Do not launch a museum. Watch only on our repo. Owner must be the same GitHub as the maintainer. A foreign owner is silence, not a ship. Helping them is cisza here or contribute, not our launch. A default nginx / Apache / Caddy page is not a product. A week of only dependabot / renovate / github-actions bumps is not a story. A Monday without a ship or real public feedback is silence, not a recap. Weekly update without history stays in the changelog. Pending or yellow CI is not a ship. Red or failed CI on the default branch is a false launch. Press-release tone is changelog, not a workshop launch.",
             "Broken install is a false launch. Do not buy stars.",
             "Launch is one 24–48h stack, not a week of drip. Angle from the canonical source, not a copy.",
             "Sit on the repo during the spike (issues, Discussions). Issues disabled is not a camp.",
@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no linktree, no Carrd, no bio site, no list of links, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no dead TLS, no cert error, no mixed content, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no linktree, no Carrd, no bio site, no list of links, no Drive, no Dropbox, no WeTransfer, no cloud drive, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no dead TLS, no cert error, no mixed content, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -624,6 +624,35 @@ LINKTREE_HOSTS: frozenset[str] = frozenset(
         "linkin.bio",
         "about.me",
     }
+)
+# A cloud drive is not a tryable artifact. Drive / Dropbox / WeTransfer
+# as the only URL is silence. The website is the repo, not a file share.
+# A drive next to a repo can stay as evidence. Neighbor of #76 (trusted
+# host) and #151 (deck): here it is a file, not slides.
+CLOUD_DRIVE_HOSTS: frozenset[str] = frozenset(
+    {
+        "drive.google.com",
+        "dropbox.com",
+        "dl.dropboxusercontent.com",
+        "wetransfer.com",
+        "we.tl",
+        "transfernow.net",
+        "fromsmash.com",
+        "sendspace.com",
+        "mediafire.com",
+        "mega.nz",
+        "mega.io",
+        "box.com",
+        "app.box.com",
+        "1drv.ms",
+        "onedrive.live.com",
+        "onedrive.com",
+        "sharepoint.com",
+    }
+)
+_GOOGLE_DRIVE_RE = re.compile(
+    r"^https://(?:drive|docs)\.google\.com/(?:file|uc|open|drive|document|spreadsheets)(?:/.*)?$",
+    re.I,
 )
 # A ranking dump is not a tryable artifact. HN front / star-history /
 # shields / stargazers as the only URL is silence. The website is the repo,
@@ -1384,6 +1413,26 @@ LINKTREE_RE = re.compile(
     r"|\btablic[aąęy]\s+link"
     r"|\bbeacons\.ai\b"
     r"|\blinktree\s+nie\s+jest\s+artefakt"
+    r")"
+)
+# A cloud drive is not an artifact. Drive / Dropbox / WeTransfer instead
+# of a product is silence. Neighbor of trusted host (#76) and deck (#151).
+# Here it is a file, not slides. "SSD drive" and a product site stay.
+CLOUD_DRIVE_REASON = "cloud_drive_not_a_site"
+CLOUD_DRIVE_RE = re.compile(
+    r"(?i)(?:"
+    r"\bgoogle\s+drives?\b"
+    r"|\bdrives?\.google\b"
+    r"|\bdropbox(?:es)?\b"
+    r"|\bwetransfers?\b"
+    r"|\bwe\.tl\b"
+    r"|\bcloud\s+drives?\b"
+    r"|\bonedrives?\b"
+    r"|\b1drv\.ms\b"
+    r"|\bdysk(?:u|iem|owi|ach|i)?\s+w\s+chmur"
+    r"|\bdysk(?:u|iem|owi)?\s+google\b"
+    r"|\bchmurow\w*\s+dysk"
+    r"|\bdysk\s+w\s+chmurze\s+nie\s+jest\s+witryn"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -2323,6 +2372,25 @@ def linktree_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
     if any(is_ship_artifact_url(url) for url in cleaned):
         return False
     return all(is_linktree_host_url(url) for url in cleaned)
+
+
+def is_cloud_drive_host_url(url: str | None) -> bool:
+    """True for Drive / Dropbox / WeTransfer. A file share is not a tryable demo."""
+    if _host_in(url, CLOUD_DRIVE_HOSTS):
+        return True
+    if not url:
+        return False
+    return bool(_GOOGLE_DRIVE_RE.fullmatch(url.strip().rstrip("/")))
+
+
+def cloud_drive_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
+    """True when every artifact URL is a cloud drive and none is a repo."""
+    cleaned = [url.strip() for url in urls if url and url.strip()]
+    if not cleaned:
+        return False
+    if any(is_ship_artifact_url(url) for url in cleaned):
+        return False
+    return all(is_cloud_drive_host_url(url) for url in cleaned)
 
 
 def is_ranking_host_url(url: str | None) -> bool:
@@ -3327,6 +3395,14 @@ def looks_like_linktree(text: str) -> bool:
     return bool(LINKTREE_RE.search(cleaned))
 
 
+def looks_like_cloud_drive(text: str) -> bool:
+    """True for Drive / Dropbox / WeTransfer. A file share is not a website."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(CLOUD_DRIVE_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3867,7 +3943,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a deck, a linktree, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a deck, a linktree, a cloud drive, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3923,6 +3999,11 @@ def unquotable_reason(
             return LINKTREE_REASON
     if extra and looks_like_linktree(extra):
         return LINKTREE_REASON
+    for _kind, text, _url in packed:
+        if looks_like_cloud_drive(text):
+            return CLOUD_DRIVE_REASON
+    if extra and looks_like_cloud_drive(extra):
+        return CLOUD_DRIVE_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -4240,6 +4321,9 @@ __all__ = [
     "LINKTREE_REASON",
     "LINKTREE_RE",
     "LINKTREE_HOSTS",
+    "CLOUD_DRIVE_REASON",
+    "CLOUD_DRIVE_RE",
+    "CLOUD_DRIVE_HOSTS",
     "LOGO_REVEAL_NOT_A_SHIP",
     "LOGO_REVEAL_RE",
     "PENDING_CI_RE",
@@ -4293,9 +4377,11 @@ __all__ = [
     "has_tavern_intent_split",
     "has_tavern_seed",
     "has_workshop_life",
+    "cloud_drive_urls_only",
     "deck_urls_only",
     "linktree_urls_only",
     "is_blog_host_url",
+    "is_cloud_drive_host_url",
     "is_deck_host_url",
     "is_linktree_host_url",
     "is_feedback_excerpt_fact",
@@ -4401,6 +4487,7 @@ __all__ = [
     "looks_like_lead_magnet",
     "looks_like_fomo",
     "looks_like_meme",
+    "looks_like_cloud_drive",
     "looks_like_deck",
     "looks_like_linktree",
     "looks_like_logo_reveal",
