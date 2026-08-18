@@ -1,23 +1,17 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=151 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=152 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #151 — Deck nie jest artefaktem
+Issue: #152 — Localhost i staging nie są tryable
 
 ## Goal
 
-Deck nie jest artefaktem. Pitch, PDF slajdów, Notion one-pager bez klikalnego produktu = cisza.
+Localhost i staging nie są tryable. Adres pętli, host .local, preview deploy bez publicznego hosta = cisza.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — detector, hosts, wave copy
-- `influenzer/hom.py` — score fail-closed
-- `influenzer/hom_draft.py` — refuse leaked deck drafts
-- `influenzer/brief_admit.py` — admit silence
-- `github_pack/classify.py` / `github_pack/pack.py` — pack silence
-- `skills/influenzer-hn/SKILL.md` — seminar copy
-- tests: `test_hom_operator.py`, `test_hom_draft.py`, `test_e2e_gates.py`, `test_brief_admit.py`, `test_github_pack.py`
+- (infer from repo inspection)
 
 ## Test plan
 
@@ -25,11 +19,11 @@ Deck nie jest artefaktem. Pitch, PDF slajdów, Notion one-pager bez klikalnego p
 
 ## Non-goals
 
-- Do not treat a deck next to a real GitHub ship as a tryable demo.
-- Do not confuse court "pitch in line one" with a pitch deck.
+- (none stated)
 
 ## Notes
 
-- Same fail-closed shape as #150 (meme) plus host-only silence like #122/#134.
-- Neighbor of #40 (Show HN without tryable) and #122 (blog URL): here it is slides, not a blog.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
+- No explicit file paths in issue; infer from repo inspection.
