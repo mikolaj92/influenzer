@@ -23,6 +23,7 @@ from influenzer.domain import paid_disclosure_reason, utc_now
 from influenzer.host import (
     looks_like_age_gate,
     looks_like_captcha_challenge,
+    looks_like_cookie_wall,
     looks_like_geo_block,
 )
 from influenzer.hom import (
@@ -358,6 +359,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_login_gate(bits.blob)
         or looks_like_captcha_challenge(bits.blob)
         or looks_like_age_gate(bits.blob)
+        or looks_like_cookie_wall(bits.blob)
         or looks_like_geo_block(bits.blob)
         or looks_like_shortener(bits.blob)
         or looks_like_utm_farm(bits.blob)

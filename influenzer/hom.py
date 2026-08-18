@@ -16,9 +16,11 @@ from influenzer.domain import DomainError, PAID_UNDISCLOSED_REASON, content_hash
 from influenzer.host import (
     AGE_GATE_NOT_TRYABLE,
     CAPTCHA_NOT_TRYABLE,
+    COOKIE_WALL_NOT_TRYABLE,
     GEO_BLOCK_NOT_TRYABLE,
     looks_like_age_gate,
     looks_like_captcha_challenge,
+    looks_like_cookie_wall,
     looks_like_geo_block,
 )
 from influenzer.playbook import (
@@ -705,6 +707,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, AGE_GATE_NOT_TRYABLE)
         return _changelog(brief, AGE_GATE_NOT_TRYABLE)
+    if looks_like_cookie_wall(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, COOKIE_WALL_NOT_TRYABLE)
+        return _changelog(brief, COOKIE_WALL_NOT_TRYABLE)
     if looks_like_geo_block(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, GEO_BLOCK_NOT_TRYABLE)
