@@ -3,9 +3,9 @@
     "influenzer/playbook.py",
     "influenzer/hom.py",
     "influenzer/hom_draft.py",
+    "influenzer/brief_admit.py",
     "github_pack/classify.py",
     "github_pack/pack.py",
-    "influenzer/brief_admit.py",
     "tests/test_e2e_gates.py",
     "tests/test_hom_operator.py",
     "tests/test_hom_draft.py",
@@ -14,13 +14,13 @@
   ],
   "source": "deterministic",
   "seed_paths": [],
-  "matched_tokens": ["logo", "rebrand", "ship", "gate"],
+  "matched_tokens": ["fomo", "gate", "silence"],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Refined after inspection: logo reveal / rebrand / palette / moodboard fail-closed like event (#138) and roadmap (#129)."
+    "Artificial FOMO (only N spots / countdown / last chance) is silence, not an angle.",
+    "Fail closed at score, dress, pack, and admit."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__148-ods-ona-logo-nie-jest-shipem-2c4ab2c6",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__149-sztuczny-fomo-nie-jest-k-tem-4663ec55",
   "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

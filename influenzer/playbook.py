@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -1218,6 +1218,31 @@ LOGO_REVEAL_RE = re.compile(
     r"|\bnowe\s+logo\b"
     r"|\bnow[aą]\s+palet"
     r"|\bnowy\s+branding\b"
+    r")"
+)
+# Artificial FOMO is not an angle. Only N spots / countdown /
+# last chance is silence, not a product. Neighbor of bait (#114,
+# a gesture) and waitlist (#46, a list). Here it is pressure.
+FOMO_REASON = "fomo"
+FOMO_RE = re.compile(
+    r"(?i)(?:"
+    r"\bfomo\b"
+    r"|\blast\s+chances?\b"
+    r"|\blast\s+calls?\b"
+    r"|\bcount[- ]?downs?\b"
+    r"|\bonly\s+(?:n|\d+)\s+(?:spots?|seats?|places?|slots?|tickets?)\b"
+    r"|\bonly\s+(?:a\s+)?few\s+(?:spots?|seats?|places?|slots?)\b"
+    r"|\blast\s+(?:n|\d+)\s+(?:spots?|seats?|places?|slots?)\b"
+    r"|\blimited\s+(?:spots?|seats?|places?|slots?|tickets?)\b"
+    r"|\b(?:spots?|seats?|places?|slots?)\s+(?:left|remaining)\b"
+    r"|\blimited[- ]time\b"
+    r"|\bending\s+soon\b"
+    r"|\bdon['’]?t\s+miss\s+out\b"
+    r"|\bwhile\s+supplies\s+last\b"
+    r"|\bostatni[aea]\s+szans"
+    r"|\btylko\s+(?:n|\d+)\s+miejsc"
+    r"|\bostatni[ae]\s+miejsc"
+    r"|\bodliczani"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -3088,6 +3113,14 @@ def looks_like_logo_reveal(text: str) -> bool:
     return bool(LOGO_REVEAL_RE.search(cleaned))
 
 
+def looks_like_fomo(text: str) -> bool:
+    """True for only-N-spots / countdown / last chance. Pressure is not a product."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(FOMO_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3628,7 +3661,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3664,6 +3697,11 @@ def unquotable_reason(
             return LEAD_MAGNET_REASON
     if extra and looks_like_lead_magnet(extra):
         return LEAD_MAGNET_REASON
+    for _kind, text, _url in packed:
+        if looks_like_fomo(text):
+            return FOMO_REASON
+    if extra and looks_like_fomo(extra):
+        return FOMO_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -3969,6 +4007,8 @@ __all__ = [
     "FOUNDER_JOURNAL_RE",
     "LEAD_MAGNET_REASON",
     "LEAD_MAGNET_RE",
+    "FOMO_REASON",
+    "FOMO_RE",
     "LOGO_REVEAL_NOT_A_SHIP",
     "LOGO_REVEAL_RE",
     "PENDING_CI_RE",
@@ -4123,6 +4163,7 @@ __all__ = [
     "looks_like_fog",
     "looks_like_founder_journal",
     "looks_like_lead_magnet",
+    "looks_like_fomo",
     "looks_like_logo_reveal",
     "looks_like_pending_ci",
     "looks_like_failed_ci",

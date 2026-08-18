@@ -1,35 +1,40 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=148 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=149 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #148 — Odsłona logo nie jest shipem
+Issue: #149 — Sztuczny FOMO nie jest kątem
 
 ## Goal
 
-Odsłona logo nie jest shipem. Rebrand, paleta, moodboard = cisza. To nie produkt.
+Sztuczny FOMO nie jest kątem. „Only N spots”, countdown, last chance = cisza. To nie produkt.
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — `LOGO_REVEAL_RE` / `looks_like_logo_reveal` / `LOGO_REVEAL_NOT_A_SHIP`
-- `influenzer/hom.py` — score kill/changelog
-- `influenzer/hom_draft.py` — undress rebrand copy
-- `github_pack/classify.py` + `github_pack/pack.py` — inbound rebrand silence
-- `influenzer/brief_admit.py` — admit fail-closed
-- tests for score, dress, pack, admit, e2e
+- `influenzer/playbook.py`
+- `influenzer/hom.py`
+- `influenzer/hom_draft.py`
+- `influenzer/brief_admit.py`
+- `github_pack/classify.py`
+- `github_pack/pack.py`
+- `tests/test_e2e_gates.py`
+- `tests/test_hom_operator.py`
+- `tests/test_hom_draft.py`
+- `tests/test_brief_admit.py`
+- `tests/test_github_pack.py`
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
-- `pytest` on logo-reveal cases in `test_e2e_gates`, `test_hom_operator`, `test_hom_draft`, `test_brief_admit`, `test_github_pack`
+- Run the smallest useful tests for files touched: playbook detector, score, dress, pack, admit
 
 ## Non-goals
 
-- Do not treat a README logo, a Shorts logo intro, or an outro-logo as a rebrand.
+- Do not treat waitlist, click-bait, or a contest as this gate
+- Do not start a collection job
 
 ## Notes
 
 - Trust intentional issue; this plan is evidence for later review, not a human gate.
 - Coding agent may refine details but should stay on the stated goal and non-goals.
 - Collector boundary: if implementation introduces unbounded collection, ship only a bounded collector patch that starts durably in the background after merge. The coding agent and mill must not populate data or wait for collection to finish.
-- Pair of founder journal (#146, lifestyle) and roadmap (#129, a calendar). Here it is the look, not a tryable drop.
+- No explicit file paths in issue; infer from repo inspection.

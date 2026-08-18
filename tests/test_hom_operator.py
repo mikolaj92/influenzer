@@ -56,6 +56,7 @@ from influenzer.playbook import (
     FOG_REASON,
     FOUNDER_JOURNAL_REASON,
     LEAD_MAGNET_REASON,
+    FOMO_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
@@ -99,6 +100,7 @@ from influenzer.playbook import (
     looks_like_fog,
     looks_like_founder_journal,
     looks_like_lead_magnet,
+    looks_like_fomo,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -977,6 +979,52 @@ class PlaybookCopyTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(looks_like_lead_magnet(text))
                 if text == "join the waitlist":
+                    continue
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_fomo_is_pressure_not_a_product(self) -> None:
+        pressure = (
+            "fomo for the local tick",
+            "last chance to try the local tick",
+            "last call for the local tick",
+            "countdown to the launch",
+            "count-down to the launch",
+            "only 5 spots for the local tick",
+            "only n spots left",
+            "only a few seats left",
+            "last 3 places",
+            "limited spots this week",
+            "spots left for the local tick",
+            "seats remaining",
+            "limited-time launch",
+            "ending soon",
+            "don't miss out",
+            "dont miss out",
+            "while supplies last",
+            "ostatnia szansa",
+            "tylko 3 miejsca",
+            "ostatnie miejsca",
+            "odliczanie do launchu",
+        )
+        for text in pressure:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_fomo(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    FOMO_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "join the waitlist",
+            "like if this local tick helped",
+            "parking spots near the office",
+            "spot check the local tick",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_fomo(text))
+                if text in {"join the waitlist", "like if this local tick helped"}:
                     continue
                 self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
 
@@ -3079,6 +3127,28 @@ class ScoreBriefTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, LEAD_MAGNET_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_fomo_is_killed(self) -> None:
+        pressure = (
+            "only 5 spots for the local tick",
+            "countdown to the launch",
+            "last chance to try the local tick",
+            "tylko 3 miejsca",
+            "ostatnia szansa",
+        )
+        for text in pressure:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, FOMO_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
