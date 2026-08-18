@@ -25,6 +25,7 @@ BATTERY_LAPTOP_REASON = (
 PRIVATE_HOST_NOT_TRYABLE = "private_host_not_tryable"
 ARTIFACT_5XX_NOT_TRYABLE = "artifact_5xx_not_tryable"
 CAPTCHA_NOT_TRYABLE = "captcha_not_tryable"
+GEO_BLOCK_NOT_TRYABLE = "geo_block_not_tryable"
 
 # A server error is not a public, working artifact. Require a status context so
 # an unrelated number such as an audience count does not silence a real demo.
@@ -79,6 +80,49 @@ _CAPTCHA_CHALLENGE_RE = re.compile(
     r"|\bbramk[aąeęi]\s+anty[- ]?botow\w*\b"
     r"|\b(?:captcha|challenge|bot\s+wall|weryfikacja\s+cz[lł]owieka)\s+na\s+"
     r"(?:artefakcie|demo|stronie)\b"
+    r")"
+)
+
+# A geo-block is a region gate, not a demo. Show HN is global.
+# Keep generic product copy such as "available in 40 countries" or
+# "geo-block support" usable; require a 451 / country wall / region denial.
+_GEO_BLOCK_RE = re.compile(
+    r"(?ix)(?:"
+    r"^\s*(?:an?\s+)?(?:geo[- ]?block(?:ed|ing)?|geoblock(?:ed|ing)?|"
+    r"country\s+wall|geo[- ]restrict(?:ed|ion)?|region[- ]lock(?:ed|ing)?)\s*[.!]?\s*$"
+    r"|^\s*451\s*[.!]?\s*$"
+    r"|^\s*(?:not|n['’]t|isn['’]t)\s+available\s+in\s+(?:your|this)\s+"
+    r"(?:region|country)\s*[.!]?\s*$"
+    r"|\b(?:geo[- ]?block|geoblock|country\s+wall|geo[- ]restrict(?:ion)?|"
+    r"region[- ]lock)\s+(?:challenge|wall|gate|check|page|required|protected|blocks?|blocked)\b"
+    r"|\b(?:geo[- ]?blocked|geoblocked|geo[- ]restricted|region[- ]locked)\s+"
+    r"(?:artifact|demo|site|url|page)\b"
+    r"|\b(?:behind|blocked\s+by|stopped\s+by)\s+(?:an?\s+)?"
+    r"(?:geo[- ]?block|geoblock|country\s+wall|geo[- ]restriction|region[- ]lock)\b"
+    r"|\b(?:country\s+wall|geo[- ]?block|geoblock|geo[- ]restriction|region[- ]lock)\s+"
+    r"(?:on|at)\s+(?:the\s+)?(?:artifact|demo|site|url|page)\b"
+    r"|\b(?:artifact|demo|site|url|page)\b[^\n]{0,36}\b(?:is\s+)?"
+    r"(?:geo[- ]?blocked|geoblocked|geo[- ]restricted|region[- ]locked)\b"
+    r"|\b(?:not|n['’]t|isn['’]t)\s+available\s+in\s+(?:your|this|the)\s+"
+    r"(?:region|country|territory|jurisdiction)\b"
+    r"|\bunavailable\s+in\s+(?:your|this|the)\s+(?:region|country|territory|jurisdiction)\b"
+    r"|\b(?:not|n['’]t|isn['’]t)\s+(?:available|accessible)\s+from\s+"
+    r"(?:your|this|the)\s+(?:region|country)\b"
+    r"|\bthis\s+(?:content|service|site|demo|product|page|artifact)\s+"
+    r"(?:is\s+)?(?:not|n['’]t|isn['’]t)\s+available\s+in\s+(?:your|this)\s+"
+    r"(?:region|country)\b"
+    r"|\b(?:http(?:/\d+(?:\.\d+)?)?|status(?:[ _-]code)?|response(?:[ _-]status)?|"
+    r"error|code|kod|b[łl][aą]d)\b[^\d]{0,12}\b451\b"
+    r"|\b(?:head|get)(?:\s*/\s*get)?\s+(?:returned\s+)?451\b"
+    r"|\b451\s+unavailable(?:\s+for\s+legal\s+reasons)?\b"
+    r"|\bunavailable\s+for\s+legal\s+reasons\b"
+    r"|\b(?:artifact|demo|site|url|server|look|probe)\b[^\d]{0,36}"
+    r"\b(?:returns?|returned|got|received|zwraca|dosta[łl])\b[^\d]{0,12}\b451\b"
+    r"|\bniedost[eę]pn[aey]\s+w\s+(?:twoim|tym)\s+(?:regionie|kraju)\b"
+    r"|\bnie\s+jest\s+dost[eę]pn[aey]\s+w\s+(?:twoim|tym)\s+(?:regionie|kraju)\b"
+    r"|\bgeo[- ]?blokad[aąeęy]\b"
+    r"|\bblokad[aąeęy]\s+geo\b"
+    r"|\b[sś]cian[aąeę]\s+krajow\w*\b"
     r")"
 )
 
@@ -217,6 +261,20 @@ def is_artifact_5xx_status(status: int | str | None) -> bool:
         return False
 
 
+def is_geo_block_status(status: int | str | None) -> bool:
+    """True when an artifact response is HTTP 451 Unavailable For Legal Reasons."""
+    if isinstance(status, bool):
+        return False
+    if isinstance(status, int):
+        return status == 451
+    if not isinstance(status, str):
+        return False
+    try:
+        return int(status.strip()) == 451
+    except ValueError:
+        return False
+
+
 def looks_like_artifact_5xx(evidence: str | None) -> bool:
     """True for reported HTTP 5xx evidence; a stranger cannot use it now."""
     return bool(evidence and _ARTIFACT_5XX_RE.search(evidence))
@@ -227,12 +285,19 @@ def looks_like_captcha_challenge(evidence: str | None) -> bool:
     return bool(evidence and _CAPTCHA_CHALLENGE_RE.search(evidence))
 
 
+def looks_like_geo_block(evidence: str | None) -> bool:
+    """True for a 451 / country wall / not-available-in-your-region gate."""
+    return bool(evidence and _GEO_BLOCK_RE.search(evidence))
+
+
 def artifact_tryable_reason(
     *, status: int | str | None = None, evidence: str | None = None
 ) -> str | None:
     """Return the fail-closed reason when an artifact cannot be offered."""
     if is_artifact_5xx_status(status) or looks_like_artifact_5xx(evidence):
         return ARTIFACT_5XX_NOT_TRYABLE
+    if is_geo_block_status(status) or looks_like_geo_block(evidence):
+        return GEO_BLOCK_NOT_TRYABLE
     if looks_like_captcha_challenge(evidence):
         return CAPTCHA_NOT_TRYABLE
     return None

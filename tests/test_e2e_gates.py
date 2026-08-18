@@ -22,11 +22,14 @@ from influenzer.hom import Brief, Fact, Score, _gate_violation, compose_draft, s
 from influenzer.host import (
     ARTIFACT_5XX_NOT_TRYABLE,
     CAPTCHA_NOT_TRYABLE,
+    GEO_BLOCK_NOT_TRYABLE,
     artifact_tryable_reason,
     is_artifact_5xx_status,
+    is_geo_block_status,
     is_tryable_artifact,
     looks_like_artifact_5xx,
     looks_like_captcha_challenge,
+    looks_like_geo_block,
 )
 from influenzer.domain import (
     AccountStatus,
@@ -1098,6 +1101,91 @@ class OrderedLiveGateTests(unittest.TestCase):
         score = score_brief(quiet)
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertEqual(score.reason, CAPTCHA_NOT_TRYABLE)
+        self.assertIsNone(compose_draft(quiet, score))
+
+    def test_geo_block_is_silence_not_tryable(self) -> None:
+        blocked = (
+            "451 Unavailable For Legal Reasons",
+            "HTTP 451 at the demo",
+            "the artifact returns 451",
+            "country wall on the site",
+            "not available in your region",
+            "unavailable in your country",
+            "this content is not available in your region",
+            "geo-blocked demo",
+            "blocked by a geo-block",
+            "niedostępny w twoim regionie",
+            "ściana krajowa na artefakcie",
+            "geo-blokada na stronie",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "available in 40 countries",
+            "geo-block support is part of the product",
+            "we ship region-aware pricing",
+            "451 stars on the repo",
+            "HTTP 200 on the demo",
+        )
+        for status in (451, "451"):
+            with self.subTest(status=status):
+                self.assertTrue(is_geo_block_status(status))
+                self.assertFalse(is_tryable_artifact(status=status))
+                self.assertEqual(
+                    artifact_tryable_reason(status=status), GEO_BLOCK_NOT_TRYABLE
+                )
+        for status in (None, False, 450, 452, "451 Unavailable For Legal Reasons"):
+            with self.subTest(status=status):
+                self.assertFalse(is_geo_block_status(status))
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_geo_block(text))
+                self.assertTrue(is_tryable_artifact(evidence=text))
+        for idx, text in enumerate(blocked):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_geo_block(text))
+                self.assertFalse(is_tryable_artifact(evidence=text))
+                self.assertEqual(
+                    artifact_tryable_reason(evidence=text), GEO_BLOCK_NOT_TRYABLE
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-geo-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, GEO_BLOCK_NOT_TRYABLE)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-geo-changelog",
+            facts=(Fact(text="not available in your region", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, GEO_BLOCK_NOT_TRYABLE)
         self.assertIsNone(compose_draft(quiet, score))
 
     def test_parked_domain_is_silence_not_a_website(self) -> None:
