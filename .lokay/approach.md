@@ -1,31 +1,25 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=158 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=159 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #158 — Nieoznaczona reklama to cisza
+Issue: #159 — Tag a friend to cisza
 
 ## Goal
 
-Nieoznaczona reklama to cisza. Paid, partner, affiliate bez etykiety w kącie = kill. Disclose albo nic.
+„Tag a friend” to cisza. Send this to, quote this, chain = bait, nie produkt.
 
 ## Files likely touched
 
-- `commercial_disclosure/__init__.py` (shared fail-closed gate)
-- `influenzer/domain.py`, `influenzer/playbook.py`, `influenzer/hom.py`, `influenzer/hom_draft.py`
-- `influenzer/policy.py`, `influenzer/scheduler.py`, `influenzer/adapters/base.py`
-- `github_pack/pack.py`, `github_feedback/feedback.py`
-- `skills/influenzer-reddit/SKILL.md`
-- targeted tests under `tests/`
+- (infer from repo inspection)
 
 ## Test plan
 
-- `python3 -m unittest` for e2e gates, policy, adapters, pack, feedback, operator, product, domain
+- Run the smallest useful tests for files touched
 
 ## Non-goals
 
-- Do not invent a live Ads spend path.
-- Do not treat authorship disclosure (`I built`) as a commercial label.
+- (none stated)
 
 ## Notes
 
