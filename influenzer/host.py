@@ -25,6 +25,7 @@ BATTERY_LAPTOP_REASON = (
 PRIVATE_HOST_NOT_TRYABLE = "private_host_not_tryable"
 ARTIFACT_5XX_NOT_TRYABLE = "artifact_5xx_not_tryable"
 CAPTCHA_NOT_TRYABLE = "captcha_not_tryable"
+AGE_GATE_NOT_TRYABLE = "age_gate_not_tryable"
 GEO_BLOCK_NOT_TRYABLE = "geo_block_not_tryable"
 
 # A server error is not a public, working artifact. Require a status context so
@@ -80,6 +81,54 @@ _CAPTCHA_CHALLENGE_RE = re.compile(
     r"|\bbramk[aąeęi]\s+anty[- ]?botow\w*\b"
     r"|\b(?:captcha|challenge|bot\s+wall|weryfikacja\s+cz[lł]owieka)\s+na\s+"
     r"(?:artefakcie|demo|stronie)\b"
+    r")"
+)
+
+# An age declaration is a gate, not a demo. Keep product copy such as
+# "age-gate support" or "Node.js 18+" usable; require access-gate language.
+_AGE_GATE_RE = re.compile(
+    r"(?imx)(?:"
+    r"^\s*(?:an?\s+)?(?:age[- ]?(?:gate|wall|check|verification)|"
+    r"age\s+(?:verification|declaration|confirmation)|18\+(?:\s+only)?|"
+    r"adults?[- ]?only|adults?\s+only)\s*[.!?]?\s*$"
+    r"|\b(?:age[- ]?(?:gate|wall|check|verification)|"
+    r"age\s+(?:verification|declaration|confirmation))\s+(?:on|at)\s+"
+    r"(?:the\s+)?(?:artifact|demo|site|url|page)\b"
+    r"|\b(?:artifact|demo|site|url|page)\b[^\n]{0,36}\b"
+    r"(?:has|shows?|showed|presents?|presented|serves?|served)\s+"
+    r"(?:an?\s+|the\s+)?(?:age[- ]?(?:gate|wall|check)|age\s+verification|"
+    r"18\+(?:\s+only)?|adults?[- ]?only|adults?\s+only)\b"
+    r"|\b(?:behind|blocked\s+by|stopped\s+by)\s+(?:an?\s+)?"
+    r"(?:age[- ]?(?:gate|wall|check)|age\s+verification)\b"
+    r"|\bage[- ]?gated\s+(?:artifact|demo|site|url|page)\b"
+    r"|\b(?:18\+(?:\s+only)?|adults?[- ]?only|adults?\s+only)\s+"
+    r"(?:on|at)\s+(?:the\s+)?(?:artifact|demo|site|url|page)\b"
+    r"|\b(?:artifact|demo|site|url|page)\b[^\n]{0,24}\b"
+    r"(?:is|shows?|returns?|serves?)\s+(?:an?\s+|the\s+)?(?:"
+    r"18\+(?:\s+only)?(?!\w)|adults?[- ]?only\b|adults?\s+only\b)"
+    r"|\bare\s+you\s+(?:(?:at\s+least|over)\s+)?18"
+    r"(?:\+|\s+years?\s+old|\s+or\s+older)?\b"
+    r"|\bare\s+you\s+(?:of\s+legal\s+age|an?\s+adult)\b"
+    r"|\b(?:confirm|verify|declare|certify|acknowledge)\s+(?:that\s+)?"
+    r"you(?:['’]re|\s+are)\s+(?:(?:at\s+least|over)\s+)?18"
+    r"(?:\+|\s+years?\s+old|\s+or\s+older)?\b"
+    r"|\b(?:confirm|verify|declare|certify|acknowledge)\s+(?:that\s+)?"
+    r"you(?:['’]re|\s+are)\s+(?:of\s+legal\s+age|an?\s+adult)\b"
+    r"|\b(?:confirm|verify)\s+(?:your\s+)?age\s+(?:to|before)\s+"
+    r"(?:continue|view|access|see|try|run|use|enter)\b"
+    r"|\b(?:enter|provide)\s+(?:your\s+)?(?:date\s+of\s+birth|birth\s+date|birthday)\s+"
+    r"(?:to|before)\s+(?:continue|view|access|see|try|run|use|enter)\b"
+    r"|\byou\s+(?:must|need\s+to)\s+be\s+(?:(?:at\s+least|over)\s+)?18"
+    r"(?:\+|\s+years?\s+old|\s+or\s+older)?\s+"
+    r"(?:to|before)\s+(?:continue|view|access|see|try|run|use|enter)\b"
+    r"|\bbramk[aąeęi]\s+wieku\b"
+    r"|\b(?:weryfikacj[aeęi]|o[sś]wiadczeni[aeęu]|potwierdzeni[aeęu])\s+wieku\b"
+    r"|\bczy\s+masz\s+(?:uko[nń]czone\s+)?18\s+lat\b"
+    r"|\bpotwierd[zź](?:,?\s+[zż]e)?\s+(?:masz\s+(?:uko[nń]czone\s+)?18\s+lat|"
+    r"jeste[sś]\s+pe[lł]noletni[am]?)\b"
+    r"|\b(?:musisz|trzeba)\s+mie[cć]\s+(?:uko[nń]czone\s+)?18\s+lat\s+"
+    r"(?:aby|[zż]eby)\s+(?:kontynuowa[cć]|wej[sś][cć]|zobaczy[cć]|skorzysta[cć])\b"
+    r"|\btylko\s+dla\s+(?:os[oó]b\s+)?pe[lł]noletnich\b"
     r")"
 )
 
@@ -285,6 +334,11 @@ def looks_like_captcha_challenge(evidence: str | None) -> bool:
     return bool(evidence and _CAPTCHA_CHALLENGE_RE.search(evidence))
 
 
+def looks_like_age_gate(evidence: str | None) -> bool:
+    """True for an age declaration a stranger would have to accept."""
+    return bool(evidence and _AGE_GATE_RE.search(evidence))
+
+
 def looks_like_geo_block(evidence: str | None) -> bool:
     """True for a 451 / country wall / not-available-in-your-region gate."""
     return bool(evidence and _GEO_BLOCK_RE.search(evidence))
@@ -300,6 +354,8 @@ def artifact_tryable_reason(
         return GEO_BLOCK_NOT_TRYABLE
     if looks_like_captcha_challenge(evidence):
         return CAPTCHA_NOT_TRYABLE
+    if looks_like_age_gate(evidence):
+        return AGE_GATE_NOT_TRYABLE
     return None
 
 
