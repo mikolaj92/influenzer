@@ -2931,6 +2931,56 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertIn("follow the README", draft.body)
 
+    def test_tag_forward_quote_or_chain_bait_is_silence_not_an_angle(self) -> None:
+        baits = (
+            "Tag a friend who needs this local tick",
+            "send this to the team that owns the queue",
+            "quote this after you run the demo",
+            "chain this with your launch",
+        )
+        for idx, text in enumerate(baits):
+            with self.subTest(text=text):
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-chain-bait-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        alive = Brief.create(
+            project_id="app-1",
+            brief_id="b-chain-bait-alive",
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="send a patch through the local queue"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(alive)
+        self.assertEqual(score.verdict, Verdict.DRAFT)
+        draft = compose_draft(alive, score)
+        assert draft is not None
+        self.assertIn("send a patch", draft.body)
+
     def test_letter_without_a_gift_is_silence(self) -> None:
         empties = (
             "subscribe to our list",

@@ -193,6 +193,21 @@ def looks_like_solicit_gesture(text: str) -> bool:
     return bool(_SOLICIT_GESTURE_RE.search(cleaned))
 
 
+# Sharing, quoting, and chaining asks manufacture engagement rather than product copy.
+_CHAIN_BAIT_RE = re.compile(
+    r"(?i)(?:"
+    r"\btag\s+(?:a|your)\s+friends?\b|"
+    r"\bsend\s+this\s+to\b|"
+    r"\bquote\s+this\b|"
+    r"\bchain\b"
+    r")"
+)
+
+
+def looks_like_chain_bait(text: str) -> bool:
+    """True for asks to tag, forward, quote, or chain a post."""
+    return bool(text and _CHAIN_BAIT_RE.search(text))
+
 
 @dataclass(frozen=True)
 class CopyBits:
@@ -340,6 +355,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_utm_farm(bits.blob)
         or looks_like_click_here(bits.blob)
         or looks_like_solicit_gesture(bits.blob)
+        or looks_like_chain_bait(bits.blob)
         or looks_like_dead_link(bits.blob)
         or looks_like_dead_tls(bits.blob)
         or looks_like_dead_release_asset(bits.blob)
@@ -807,6 +823,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_foreign_wave((*triples, ("signal", body, None)))
         or looks_like_engagement_bait(body)
         or looks_like_solicit_gesture(body)
+        or looks_like_chain_bait(body)
         or looks_like_contest(body)
         or looks_like_poll(body)
         or looks_like_model_in_frame(body)

@@ -1,30 +1,22 @@
 {
   "paths": [
-    "github_pack/pack.py",
-    "influenzer/adapters/base.py",
-    "influenzer/config.py",
-    "influenzer/content.py",
-    "influenzer/hom.py",
-    "influenzer/host.py",
-    "influenzer/domain.py",
-    "github_feedback/feedback.py",
-    "skills/influenzer-reddit",
+    "influenzer/hom_draft.py",
+    "tests/test_hom_draft.py",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "kill",
-    "Reddit",
+    "draft",
     "influenzer",
     "gate"
   ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Repo tree entries considered: 139."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__158-nieoznaczona-reklama-to-cisza-7c621dfa",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__159-tag-a-friend-to-cisza-b9ddc81a",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }
