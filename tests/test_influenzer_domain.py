@@ -9,9 +9,12 @@ from influenzer.domain import (
     DomainError,
     PlanStatus,
     PlatformAccount,
+    PARKED_DOMAIN_REASON,
     Project,
     PublishPlan,
     assert_same_project,
+    looks_like_parked_domain,
+    parked_domain_reason,
     transition_plan,
 )
 
@@ -74,6 +77,33 @@ class ProjectProfileTests(unittest.TestCase):
         self.assertEqual(cancelled.status, PlanStatus.CANCELLED)
         with self.assertRaises(DomainError):
             transition_plan(plan, PlanStatus.SUCCEEDED)
+
+    def test_parked_domain_is_not_a_website(self) -> None:
+        parked = (
+            "This domain is parked.",
+            "Example.com is for sale.",
+            "Buy this domain today.",
+            "Registrar placeholder page.",
+            "Coming soon from your hosting provider.",
+            "Parking page by the host.",
+            "Zaparkowana domena na sprzedaż.",
+            "Placeholder od rejestratora.",
+        )
+        for text in parked:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_parked_domain(text))
+                self.assertEqual(parked_domain_reason(text), PARKED_DOMAIN_REASON)
+
+        for text in (
+            "Our product is coming soon.",
+            "The host runs the application.",
+            "Parking spaces near the office are full.",
+            "A domain model is immutable.",
+            "Produkt wkrótce dostępny.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_parked_domain(text))
+                self.assertIsNone(parked_domain_reason(text))
 
     def test_content_hash_changes_with_body(self) -> None:
         base = dict(

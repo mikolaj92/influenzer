@@ -29,6 +29,9 @@ from influenzer.host import (
 from influenzer.domain import (
     AccountStatus,
     AttemptStatus,
+    PARKED_DOMAIN_REASON,
+    looks_like_parked_domain,
+    parked_domain_reason,
     ContentStatus,
     PlatformAccount,
     PolicyActivationGrant,
@@ -974,6 +977,23 @@ class OrderedLiveGateTests(unittest.TestCase):
                 self.assertEqual(
                     artifact_tryable_reason(evidence=text), ARTIFACT_5XX_NOT_TRYABLE
                 )
+
+    def test_parked_domain_is_silence_not_a_website(self) -> None:
+        parked = (
+            "This domain is parked.",
+            "example.com is for sale.",
+            "Buy this domain today.",
+            "Registrar placeholder page.",
+            "Coming soon from your hosting provider.",
+            "Zaparkowana domena na sprzedaż.",
+        )
+        self.assertFalse(looks_like_parked_domain(""))
+        self.assertFalse(looks_like_parked_domain("Our product is coming soon."))
+        self.assertFalse(looks_like_parked_domain("Parking spaces near the office are full."))
+        for idx, text in enumerate(parked):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_parked_domain(text))
+                self.assertEqual(parked_domain_reason(text), PARKED_DOMAIN_REASON)
 
     def test_linktree_is_silence_not_an_artifact(self) -> None:
         boards = (

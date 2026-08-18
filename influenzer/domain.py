@@ -340,6 +340,35 @@ class Campaign:
 
 ACTIVE_ATTEMPT = frozenset({AttemptStatus.PENDING, AttemptStatus.RUNNING, AttemptStatus.UNKNOWN})
 
+PARKED_DOMAIN_REASON = "parked_domain_not_a_site"
+_PARKED_DOMAIN_RE = re.compile(
+    r"\b(?:"
+    r"(?:this\s+)?domain(?:\s+name)?\s+(?:is\s+|may\s+be\s+)?(?:parked|for\s+sale|available\s+for\s+sale)"
+    r"|(?:[a-z0-9-]+\.)+[a-z]{2,63}\s+(?:is\s+|may\s+be\s+)?(?:parked|for\s+sale|available\s+for\s+sale)"
+    r"|parked\s+domain(?:\s+page)?"
+    r"|(?:buy|purchase)\s+(?:this\s+)?domain"
+    r"|domain\s+parking"
+    r"|(?:zaparkowana\s+domena|domena\s+(?:jest\s+)?(?:zaparkowana|na\s+sprzedaż)|kup\s+(?:tę\s+)?domenę)"
+    r"|(?:registrar|rejestrator|host(?:ing)?(?:\s+(?:provider|company))?)(?:'s)?\s+(?:placeholder|parking(?:\s+page)?|coming\s+soon(?:\s+page)?)"
+    r"|(?:placeholder|parking(?:\s+page)?|coming\s+soon(?:\s+page)?)\s+(?:from|by|od)\s+(?:your\s+|the\s+)?(?:registrar|rejestratora|host(?:ing)?(?:\s+(?:provider|company))?|hosta)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def looks_like_parked_domain(value: str | None) -> bool:
+    """Whether explicit registrar/host parking copy masquerades as a website.
+
+    An unqualified product "coming soon" belongs to the waitlist gate. This
+    guard only treats it as domain parking when the host or registrar is named.
+    """
+    return isinstance(value, str) and bool(_PARKED_DOMAIN_RE.search(value))
+
+
+def parked_domain_reason(value: str | None) -> str | None:
+    return PARKED_DOMAIN_REASON if looks_like_parked_domain(value) else None
+
+
 FOREIGN_OWNER = "foreign_owner"
 _GITHUB_LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
 
