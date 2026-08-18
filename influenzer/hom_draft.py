@@ -407,6 +407,40 @@ def _merge_log_bits(bits: CopyBits) -> bool:
     return is_merge_log_texts((bits.one_liner, *bits.rest))
 
 
+def _release_fact_has_notes(fact: Fact) -> bool:
+    text = " ".join(fact.text.split()).casefold().strip(" .:;-")
+    if not text or text in {"ship artifact", "release"}:
+        return False
+    url = (fact.artifact_url or "").casefold()
+    if "/releases/tag/" not in url:
+        return True
+    tag = url.split("/releases/tag/", 1)[1].split("?", 1)[0].split("#", 1)[0].strip("/")
+    tag_only = re.fullmatch(
+        r"(?:(?:github\s+)?release(?:d)?|published|tag)(?:\s+tag)?\s*:?\s*(.+)",
+        text,
+    )
+    return text != tag and not (tag_only and tag_only.group(1).strip(" .:;-") == tag)
+
+
+def _empty_github_release(brief: Brief) -> bool:
+    """A release tag needs notes or a downloadable asset to be a ship."""
+    release_facts = tuple(
+        fact
+        for fact in brief.facts
+        if fact.kind.strip().lower() == "release"
+        or "/releases/tag/" in (fact.artifact_url or "").casefold()
+    )
+    if not release_facts:
+        return False
+    has_notes = any(_release_fact_has_notes(fact) for fact in release_facts)
+    has_asset = any(
+        fact.kind.strip().lower() in {"asset", "release_asset"}
+        or "/releases/download/" in (fact.artifact_url or "").casefold()
+        for fact in brief.facts
+    )
+    return not has_notes and not has_asset
+
+
 def _bot_bump_week_bits(bits: CopyBits) -> bool:
     return looks_like_bot_bump_week((bits.one_liner, *bits.rest))
 
@@ -748,6 +782,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     if (
         bits is None
         or _undressable_blob(bits)
+        or _empty_github_release(brief)
         or _superlative_without_proof(brief, bits)
         or looks_like_dunk(bits.blob)
         or looks_like_worse_clone(bits.blob)

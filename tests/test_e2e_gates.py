@@ -4411,7 +4411,7 @@ class OrderedLiveGateTests(unittest.TestCase):
                     "url": "https://github.com/mikolaj92/demo/pull/12",
                 }
             ],
-            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0"}],
+            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0: local scoring"}],
             "tags": [{"name": "v0.1.0"}],
             "readme_text": installable,
             "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
@@ -4473,7 +4473,7 @@ class OrderedLiveGateTests(unittest.TestCase):
                     "url": "https://github.com/mikolaj92/demo/pull/12",
                 }
             ],
-            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0"}],
+            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0: local scoring"}],
             "tags": [{"name": "v0.1.0"}],
             "readme_text": prose,
             "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
@@ -4535,7 +4535,7 @@ class OrderedLiveGateTests(unittest.TestCase):
                     "url": "https://github.com/mikolaj92/demo/pull/13",
                 },
             ],
-            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0"}],
+            "releases": [{"tagName": "v0.1.0", "name": "v0.1.0: local scoring"}],
             "tags": [{"name": "v0.1.0"}],
             "readme_text": "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n",
             "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
@@ -4581,6 +4581,84 @@ class OrderedLiveGateTests(unittest.TestCase):
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
         self.assertNotIn("Costume:", draft.body)
+
+    def test_empty_github_release_cannot_reach_an_operator_draft(self) -> None:
+        release = "https://github.com/mikolaj92/demo/releases/tag/v0.2.0"
+        survey = {
+            "meta": {"description": "Local operator with a working install", "homepageUrl": ""},
+            "prs": [
+                {
+                    "number": 12,
+                    "title": "feat: local operator scores briefs",
+                    "url": "https://github.com/mikolaj92/demo/pull/12",
+                }
+            ],
+            "releases": [
+                {
+                    "tagName": "v0.2.0",
+                    "name": "v0.2.0",
+                    "description": "",
+                    "assets": [],
+                }
+            ],
+            "tags": [{"name": "v0.2.0"}],
+            "readme_text": "# Demo\n\n```bash\nuv run influenzer-tick --once\n```\n\n![demo](docs/demo.gif)\n",
+            "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+        }
+        packed = pack_survey(
+            {
+                "status": "ok",
+                "ok": True,
+                "repo": "mikolaj92/demo",
+                "now": "2026-08-17T06:00:00Z",
+                "survey": survey,
+            }
+        )
+        self.assertEqual(packed["status"], "ok")
+        facts = tuple(
+            Fact(
+                kind=str(item.get("kind") or "signal"),
+                text=str(item.get("text") or ""),
+                artifact_url=item.get("artifact_url"),
+            )
+            for item in packed["facts"]
+        )
+        self.assertEqual(
+            facts[0],
+            Fact(kind="release", text="Released v0.2.0", artifact_url=release),
+        )
+        brief = Brief.create(
+            project_id=self.app.project_id,
+            brief_id=str(packed["brief_id"]),
+            facts=facts,
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.GITHUB,
+            created_at="2026-08-17T06:00:00Z",
+        )
+        leaked = Score(
+            brief_id=brief.brief_id,
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.GITHUB,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.GITHUB].wave,
+            canon_url=ARENAS[ArenaId.GITHUB].canon_url,
+        )
+        self.assertIsNone(compose_draft(brief, leaked))
+
+        self.repo.save_brief(brief)
+        out = tick(
+            self.repo,
+            Config(home=self.home, scheduler_live_enabled=False),
+            due=(),
+            now="2026-08-17T06:00:00Z",
+        )
+        outcome = out["operator"]["outcomes"][0]
+        self.assertIn(outcome["verdict"], {"draft", "changelog_only"})
+        self.assertIsNone(outcome.get("body"))
+        self.assertIsNone(self.repo.get_operator_draft(self.app.project_id, brief.brief_id))
 
     def test_same_release_after_history_is_silence_even_with_a_new_angle(self) -> None:
         release = "https://github.com/mikolaj92/influenzer/releases/tag/v0.2.0"
