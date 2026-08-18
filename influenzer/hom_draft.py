@@ -19,7 +19,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from influenzer.domain import utc_now
+from influenzer.domain import paid_disclosure_reason, utc_now
 from influenzer.hom import (
     Brief,
     Draft,
@@ -744,6 +744,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_world_commentary(bits.blob)
         or looks_like_hire_fundraise(bits.blob)
         or looks_like_source_available_as_oss(bits.blob)
+        or paid_disclosure_reason(bits.blob)
         or looks_like_press_release(bits.blob)
         or (is_social_arena(score.arena) and looks_like_issues_disabled(bits.blob))
         or looks_like_fork(bits.blob)
@@ -829,6 +830,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         or looks_like_world_commentary(body)
         or looks_like_hire_fundraise(body)
         or looks_like_source_available_as_oss(body)
+        or paid_disclosure_reason(body)
         or looks_like_press_release(body)
         or (is_social_arena(score.arena) and looks_like_issues_disabled(body))
         or looks_like_fork(body)

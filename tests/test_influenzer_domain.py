@@ -9,11 +9,15 @@ from influenzer.domain import (
     DomainError,
     PlanStatus,
     PlatformAccount,
+    PAID_UNDISCLOSED_REASON,
     PARKED_DOMAIN_REASON,
     Project,
     PublishPlan,
     assert_same_project,
+    has_disclosure_label,
+    looks_like_paid_promotion,
     looks_like_parked_domain,
+    paid_disclosure_reason,
     parked_domain_reason,
     transition_plan,
 )
@@ -77,6 +81,35 @@ class ProjectProfileTests(unittest.TestCase):
         self.assertEqual(cancelled.status, PlanStatus.CANCELLED)
         with self.assertRaises(DomainError):
             transition_plan(plan, PlanStatus.SUCCEEDED)
+
+    def test_undisclosed_paid_copy_is_silence(self) -> None:
+        commercial = (
+            "Paid promotion for the local tick",
+            "Our partner paid for this launch",
+            "Affiliate link for the local tick",
+            "materiał sponsorowany dla lokalnego ticka",
+            "link afiliacyjny do lokalnego ticka",
+        )
+        for text in commercial:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_paid_promotion(text))
+                self.assertEqual(paid_disclosure_reason(text), PAID_UNDISCLOSED_REASON)
+        for text in (
+            "#ad Paid promotion for the local tick",
+            "#affiliate Affiliate link for the local tick",
+            "[reklama] materiał sponsorowany",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(has_disclosure_label(text))
+                self.assertIsNone(paid_disclosure_reason(text))
+        for text in (
+            "Local tick scores briefs and emits a draft",
+            "partnership roadmap",
+            "we partnered with the community",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_paid_promotion(text))
+                self.assertIsNone(paid_disclosure_reason(text))
 
     def test_parked_domain_is_not_a_website(self) -> None:
         parked = (

@@ -118,6 +118,17 @@ class AdapterContractConformanceTests(unittest.TestCase):
                     self.assertIn("request_digest", out)
                     self.assertEqual(len(provider.calls), 1)
 
+    def test_undisclosed_paid_copy_is_rejected_before_every_adapter(self) -> None:
+        for platform in PLATFORM_CONTRACTS:
+            with self.subTest(platform=platform):
+                out = run_adapter(
+                    get_adapter(platform),
+                    self._req(platform, body="Paid promotion for the local tick"),
+                )
+                self.assertFalse(out["ok"])
+                self.assertFalse(out["mutated"])
+                self.assertEqual(out["reason"], "paid_undisclosed")
+
     def test_secret_material_in_request_is_rejected(self) -> None:
         provider = plat.get_provider("x")
         token = "Bearer " + "sk" + "-" + "this-is-not-allowed-123456"

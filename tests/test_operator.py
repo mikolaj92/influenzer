@@ -105,6 +105,28 @@ class OperatorTests(unittest.TestCase):
         # Creating content never invents a remote publish outcome.
         self.assertNotIn(rev.status.value, {"succeeded", "published_confirmed", "reconciled_succeeded"})
 
+    def test_paid_campaign_requires_a_recognizable_disclosure_label(self) -> None:
+        with self.assertRaisesRegex(ValueError, "disclosure label"):
+            create_campaign(
+                project_id="app-1",
+                campaign_id="camp-unlabeled",
+                name="Launch",
+                kind=CampaignKind.PAID,
+                budget_amount=100.0,
+                budget_currency="USD",
+                disclosures=("internal approval",),
+            )
+        labeled = create_campaign(
+            project_id="app-1",
+            campaign_id="camp-labeled",
+            name="Launch",
+            kind=CampaignKind.PAID,
+            budget_amount=100.0,
+            budget_currency="USD",
+            disclosures=("#ad",),
+        )
+        self.assertEqual(labeled.disclosures, ("#ad",))
+
     def test_paid_campaign_is_plan_only_no_spend(self) -> None:
         campaign = create_campaign(
             project_id="app-1",

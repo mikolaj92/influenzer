@@ -98,6 +98,24 @@ class CollectFeedbackTests(unittest.TestCase):
         with patch("subprocess.run", side_effect=AssertionError("feedback must not call subprocess")):
             return collect_feedback(REPO, gh=fake, now=NOW)
 
+    def test_undisclosed_paid_feedback_is_silence(self) -> None:
+        script = feedback_noise_script()
+        script["issue_comments"] = GhCall(
+            0,
+            json.dumps(
+                [
+                    gh_comment(
+                        html_url=ISSUE_COMMENT,
+                        body="Does this paid partnership break the local tick?",
+                    )
+                ]
+            ),
+        )
+        out = self._collect(script)
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "paid_undisclosed")
+        self.assertIsNone(out["brief_id"])
+
     def test_bot_and_lgtm_are_silence(self) -> None:
         out = self._collect(feedback_noise_script())
         self.assertEqual(out["status"], "noop")

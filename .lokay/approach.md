@@ -1,25 +1,31 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=157 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=158 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #157 — Zaparkowana domena nie jest witryną
+Issue: #158 — Nieoznaczona reklama to cisza
 
 ## Goal
 
-Zaparkowana domena nie jest witryną. Domain for sale, registrar placeholder, „coming soon” od hosta = cisza.
+Nieoznaczona reklama to cisza. Paid, partner, affiliate bez etykiety w kącie = kill. Disclose albo nic.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `commercial_disclosure/__init__.py` (shared fail-closed gate)
+- `influenzer/domain.py`, `influenzer/playbook.py`, `influenzer/hom.py`, `influenzer/hom_draft.py`
+- `influenzer/policy.py`, `influenzer/scheduler.py`, `influenzer/adapters/base.py`
+- `github_pack/pack.py`, `github_feedback/feedback.py`
+- `skills/influenzer-reddit/SKILL.md`
+- targeted tests under `tests/`
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- `python3 -m unittest` for e2e gates, policy, adapters, pack, feedback, operator, product, domain
 
 ## Non-goals
 
-- (none stated)
+- Do not invent a live Ads spend path.
+- Do not treat authorship disclosure (`I built`) as a commercial label.
 
 ## Notes
 
