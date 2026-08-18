@@ -6,7 +6,12 @@ Does not post replies. Does not survey releases/PRs. Does not enable live.
 Does not know Heimdall. Does not know my-auth. Does not scrape X/LinkedIn.
 """
 
-from github_feedback.feedback import collect_feedback, is_feedback_signal, is_noise_comment
+from github_feedback.feedback import (
+    collect_feedback,
+    is_feedback_signal,
+    is_noise_comment,
+    looks_like_maintenance_page,
+)
 from github_pack.pack import (
     looks_like_inbound_instruction,
     sanitize_inbound_facts,
@@ -17,6 +22,7 @@ __all__ = [
     "collect_feedback",
     "is_feedback_signal",
     "is_noise_comment",
+    "looks_like_maintenance_page",
     "looks_like_inbound_instruction",
     "sanitize_inbound_facts",
     "strip_inbound_instructions",

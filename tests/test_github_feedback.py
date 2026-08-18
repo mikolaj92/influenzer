@@ -6,8 +6,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from github_feedback import collect_feedback, is_feedback_signal, is_noise_comment
+from github_feedback import (
+    collect_feedback,
+    is_feedback_signal,
+    is_noise_comment,
+    looks_like_maintenance_page,
+)
 from github_feedback.feedback import (
+    MAINTENANCE_NOT_TRYABLE,
     MAX_FACT_CHARS,
     MAX_STORED_FACT_CHARS,
     WHOLE_THREAD,
@@ -91,6 +97,29 @@ class NoiseGateTests(unittest.TestCase):
         )
         self.assertTrue(is_noise_comment(gh_issue(html_url=ISSUE, title="thanks", body="+1")))
 
+    def test_maintenance_page_detector_is_specific(self) -> None:
+        blocked = (
+            "We'll be back",
+            "Planned downtime",
+            "The demo is under scheduled maintenance",
+            "Maintenance page",
+            "Maintenance",
+        )
+        allowed = (
+            "We shipped maintenance mode settings",
+            "Planned maintenance completed successfully",
+            "The maintenance page was removed from the demo",
+            "Scheduled downtime was cancelled",
+            "No planned downtime for this release",
+            "The maintainers will be back tomorrow",
+        )
+        for text in blocked:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_maintenance_page(text))
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_maintenance_page(text))
+
 
 class CollectFeedbackTests(unittest.TestCase):
     def _collect(self, script: dict[str, GhCall]) -> dict:
@@ -115,6 +144,20 @@ class CollectFeedbackTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "paid_undisclosed")
         self.assertIsNone(out["brief_id"])
+
+    def test_maintenance_page_feedback_is_silence_even_at_http_200(self) -> None:
+        for body in ("The demo returns HTTP 200 but says: We'll be back", "Maintenance"):
+            with self.subTest(body=body):
+                script = feedback_noise_script()
+                script["issue_comments"] = GhCall(
+                    0,
+                    json.dumps([gh_comment(html_url=ISSUE_COMMENT, body=body)]),
+                )
+                out = self._collect(script)
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], MAINTENANCE_NOT_TRYABLE)
+                self.assertIsNone(out["brief_id"])
+                self.assertNotIn("facts", out)
 
     def test_bot_and_lgtm_are_silence(self) -> None:
         out = self._collect(feedback_noise_script())

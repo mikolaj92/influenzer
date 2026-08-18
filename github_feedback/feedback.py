@@ -57,6 +57,25 @@ MAX_FACT_CHARS = 240
 MAX_STORED_FACT_CHARS = MAX_FACT_CHARS + 48
 MIN_BODY_CHARS = 12
 WHOLE_THREAD = "whole_thread"
+MAINTENANCE_NOT_TRYABLE = "maintenance_not_tryable"
+
+_MAINTENANCE_PAGE_RE = re.compile(
+    r"\bwe(?:['’]ll|\s+will)\s+be\s+back\b|"
+    r"\b(?:planned|scheduled)\s+(?:(?:site|service|system)\s+)?(?:downtime|maintenance)\b|"
+    r"\b(?:under|down\s+for)\s+(?:scheduled\s+)?maintenance\b|"
+    r"\b(?:site|website|page|demo|artifact|service)\s+(?:is\s+|is\s+currently\s+)?"
+    r"(?:under|down\s+for)\s+(?:scheduled\s+)?maintenance\b|"
+    r"\bmaintenance\s+(?:page|notice)\b|"
+    r"(?:^|:\s*|\bbut\s+)(?:site\s+|website\s+)?maintenance\s*[!.]?\s*$",
+    re.I,
+)
+_MAINTENANCE_CLEARED_RE = re.compile(
+    r"\b(?:maintenance\s+(?:page|notice)\s+(?:was\s+)?(?:removed|disabled)|"
+    r"(?:removed|disabled)\s+(?:the\s+)?maintenance\s+(?:page|notice)|"
+    r"(?:no|without)(?:\s+more)?\s+(?:planned|scheduled)?\s*(?:downtime|maintenance)|"
+    r"(?:downtime|maintenance)\s+(?:was\s+)?(?:cancelled|canceled|completed|finished|over))\b",
+    re.I,
+)
 
 _COMMENT_URL_RE = re.compile(
     r"^https://github\.com/"
@@ -232,7 +251,15 @@ def is_noise_body(text: str) -> bool:
     return False
 
 
+def looks_like_maintenance_page(text: str) -> bool:
+    """Return whether artifact evidence describes a maintenance placeholder."""
+    evidence = _MAINTENANCE_CLEARED_RE.sub("", text.strip())
+    return bool(_MAINTENANCE_PAGE_RE.search(evidence))
+
+
 def is_feedback_signal(text: str) -> bool:
+    if looks_like_maintenance_page(text):
+        return True
     if is_noise_body(text):
         return False
     return bool(_SIGNAL_RE.search(text))
@@ -271,7 +298,7 @@ def _fact_from_comment(item: dict[str, Any], *, kind: str) -> dict[str, Any] | N
     if not url.startswith("https://github.com/"):
         return None
     body = strip_inbound_instructions(_clip(_item_signal_text(item)))
-    if not body or is_noise_body(body) or not is_feedback_signal(body):
+    if not body or not is_feedback_signal(body):
         return None
     login = _login(item.get("user")) or "someone"
     return {
@@ -357,8 +384,11 @@ def pack_comments(repo_slug: str, collected: dict[str, Any]) -> dict[str, Any]:
     facts = sanitize_inbound_facts(facts)
     if not facts:
         return _silence("comment_noise", repo=repo_slug)
-    if paid_disclosure_reason("\n".join(str(fact.get("text") or "") for fact in facts)):
+    fact_blob = "\n".join(str(fact.get("text") or "") for fact in facts)
+    if paid_disclosure_reason(fact_blob):
         return _silence(PAID_UNDISCLOSED_REASON, repo=repo_slug)
+    if looks_like_maintenance_page(fact_blob):
+        return _silence(MAINTENANCE_NOT_TRYABLE, repo=repo_slug)
     packed = {
         "status": "ok",
         "ok": True,
