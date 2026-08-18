@@ -13,6 +13,7 @@ from github_survey.gh import (
     decode_gh_bytes,
     gh_argv,
     gh_child_env,
+    gh_reason,
     isolated_gh_argv,
     isolated_gh_cwd,
     isolated_gh_env,
@@ -78,6 +79,30 @@ class SurveySilenceTests(unittest.TestCase):
         self.assertEqual(out["reason"], "empty_survey")
         self.assertTrue(out["ok"])
         self.assertNotIn("survey", out)
+
+    def test_secondary_rate_limit_is_empty_look_not_loop_death(self) -> None:
+        out = self._survey(
+            {"repo": GhCall(1, "", "You have exceeded a secondary rate limit. Please wait.")}
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "empty_survey")
+        self.assertTrue(out["ok"])
+        self.assertNotIn("survey", out)
+
+    def test_rate_limit_on_optional_look_is_not_a_partial_survey(self) -> None:
+        for kind in ("tags", "readme"):
+            with self.subTest(kind=kind):
+                limited = GhCall(
+                    1,
+                    '{"body":"provider response is not survey data"}',
+                    "You have exceeded a secondary rate limit. Please wait.",
+                )
+                out = self._survey(ship_script(**{kind: limited}))
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], "empty_survey")
+                self.assertTrue(out["ok"])
+                self.assertNotIn("survey", out)
+                self.assertNotIn("provider response", json.dumps(out))
 
     def test_network_pad_is_empty_look_not_loop_death(self) -> None:
         out = self._survey({"repo": GhCall(1, "", "Get \"https://api.github.com/user\": dial tcp: lookup api.github.com: no such host")})
@@ -204,6 +229,20 @@ class RunGhTests(unittest.TestCase):
             call = run_gh(["repo", "view", REPO])
         self.assertFalse(call.missing)
         self.assertEqual(call.returncode, 124)
+
+    def test_gh_rate_limit_errors_are_classified_without_body_logging(self) -> None:
+        for stderr in (
+            "HTTP 429: API rate limit exceeded",
+            "You have exceeded a secondary rate limit. Please wait.",
+            "HTTP 429: Too Many Requests",
+        ):
+            with self.subTest(stderr=stderr):
+                call = GhCall(1, '{"body":"do not log this"}', stderr)
+                self.assertEqual(gh_reason(call), "gh_rate")
+
+        self.assertEqual(gh_reason(GhCall(1, '{"body":"not a rate limit"}', "gh failed")), "gh_error")
+        self.assertEqual(gh_reason(GhCall(1, '{"body":"HTTP 429"}', "gh failed")), "gh_error")
+        self.assertEqual(gh_reason(GhCall(0, '{"body":"HTTP 429"}', "")), "gh_error")
 
     def test_run_gh_decode_error_is_empty_not_a_crash(self) -> None:
         with patch(

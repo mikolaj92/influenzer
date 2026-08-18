@@ -1,4 +1,4 @@
-"""Injectable ``gh`` subprocess. Missing binary, auth, bad JSON, or non-UTF8 is silence, not a crash.
+"""Injectable ``gh`` subprocess. Missing binary, auth, bad JSON, non-UTF8, or rate limits are silence, not a crash.
 
 The child cwd is an empty temporary directory, never HOME and never the host
 checkout. A cwd outside that empty temp is silence, not a spawn.
@@ -36,6 +36,11 @@ _FIELDS_RE = re.compile(r"^[A-Za-z0-9_]+(?:,[A-Za-z0-9_]+)*$")
 _SINCE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _SLUG_PATH = r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
 _GH_ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_RATE_LIMIT_RE = re.compile(
+    r"\b429\b|\b(?:api|secondary)\s+rate\s+limit\b|"
+    r"\brate\s+limit\s+(?:has\s+been\s+)?exceeded\b|\btoo\s+many\s+requests\b",
+    re.IGNORECASE,
+)
 GH_CHILD_ENV_ALLOWLIST = frozenset(
     {
         "PATH",
@@ -449,7 +454,11 @@ def loads_json(blob: str | bytes | bytearray | None) -> Any | None:
 def gh_reason(call: GhCall) -> str:
     if call.missing or call.returncode == 127:
         return "gh_missing"
-    err = f"{call.stderr} {call.stdout}".lower()
+    # gh writes provider failures to stderr. Do not inspect or echo the
+    # response body while classifying a failed look.
+    err = decode_gh_bytes(call.stderr).lower()
+    if call.returncode != 0 and _RATE_LIMIT_RE.search(err):
+        return "gh_rate"
     if call.returncode in {4, 1} and any(
         token in err for token in ("auth", "401", "403", "http 401", "http 403", "gh auth login")
     ):
