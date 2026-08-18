@@ -175,6 +175,23 @@ _LEAD_MAGNET_RE = re.compile(
     r"|\bbramk[aąę]\s+mail"
     r")"
 )
+_APOLOGY_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwe\s+hear\s+you\b"
+    r"|\bwe(?:['’]?ve|\s+have)\s+heard\s+you\b"
+    r"|\bcrisis\s+(?:post|statement|message|update|response)\b"
+    r"|\b(?:public|official)\s+apolog(?:y|ies)\b"
+    r"|(?:^|\n)\s*(?:sorry|an?\s+apology|apologies)\s*[.!]?\s*(?=$|\n)"
+    r"|\bsorry\s*(?:[.!]\s+|[—:-]\s+)(?=\S)"
+    r"|\bwe\s+(?:apologi[sz]e|are\s+sorry)\b"
+    r"|\bwe(?:['’]?re|\s+are)\s+sorry\b"
+    r"|\b(?:we(?:['’]?re|\s+are)\s+)?sorry\s+(?:for|about|that|to)\b"
+    r"|\bour\s+apologies\b"
+    r"|\bprzepraszam(?:y)?\b"
+    r"|\bprzeprosiny\b"
+    r"|\bkryzysow(?:y|a|e)\s+(?:post|wpis|komunikat|o[sś]wiadczenie)\b"
+    r")"
+)
 _LOGO_REVEAL_RE = re.compile(
     r"(?i)(?:"
     r"\bre-?brands?(?:ing)?\b"
@@ -359,6 +376,13 @@ def looks_like_lead_magnet(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_LEAD_MAGNET_RE.search(text))
+
+
+def looks_like_apology(text: str) -> bool:
+    """True for apology / crisis-response copy. It needs a separate new artifact."""
+    if not text or not text.strip():
+        return False
+    return bool(_APOLOGY_RE.search(text))
 
 
 def looks_like_logo_reveal(text: str) -> bool:

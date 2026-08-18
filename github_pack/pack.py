@@ -46,6 +46,7 @@ from github_pack.classify import (
     looks_like_deck,
     looks_like_linktree,
     looks_like_logo_reveal,
+    looks_like_apology,
     readme_tryable_url,
 )
 
@@ -66,6 +67,7 @@ _BADGE_OR_LOGO_RE = re.compile(
 README_WITHOUT_DEMO_REASON = "readme_without_demo"
 README_WITHOUT_QUICKSTART_REASON = "readme_without_quickstart"
 REVERTED_NOT_A_SHIP_REASON = "reverted_not_a_ship"
+APOLOGY_WITHOUT_SHIP_REASON = "apology_without_ship"
 SOLICIT_GESTURE_REASON = "solicit_gesture"
 _INLINE_CODE_RE = re.compile(r"`([^`]+)`")
 _COPYABLE_START_RE = re.compile(
@@ -274,6 +276,16 @@ def looks_like_same_window_revert(prs: Any) -> bool:
     return False
 
 
+def _apology_has_new_artifact(facts: list[dict[str, Any]]) -> bool:
+    """An apology needs a separate release/merge artifact; its own issue is not a ship."""
+    return any(
+        str(fact.get("kind") or "").strip().lower() in {"release", "pull"}
+        and not looks_like_apology(str(fact.get("text") or ""))
+        and is_ship_artifact(str(fact.get("artifact_url") or "") or None)
+        for fact in facts
+    )
+
+
 def sanitize_inbound_facts(facts: list[Any]) -> list[dict[str, Any]]:
     """Keep excerpt shape. Drop an order. Empty after strip is not a fact."""
     cleaned: list[dict[str, Any]] = []
@@ -387,6 +399,8 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
         return _silence("cloud_drive_not_a_site", repo=slug)
     if looks_like_logo_reveal(blob):
         return _silence("logo_reveal_not_a_ship", repo=slug)
+    if looks_like_apology(blob) and not _apology_has_new_artifact(facts):
+        return _silence(APOLOGY_WITHOUT_SHIP_REASON, repo=slug)
     if paid_disclosure_reason(blob):
         return _silence(PAID_UNDISCLOSED_REASON, repo=slug)
     meta = survey.get("meta") if isinstance(survey.get("meta"), dict) else {}

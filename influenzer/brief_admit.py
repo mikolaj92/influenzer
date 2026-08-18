@@ -37,6 +37,7 @@ from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping, is_ship_artifact
 from influenzer.playbook import (
     EVENT_NOT_A_SHIP,
+    APOLOGY_WITHOUT_SHIP_REASON,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
@@ -51,10 +52,12 @@ from influenzer.playbook import (
     LIVING_STACK_REASON,
     SECRET_REASON,
     StoryKind,
+    apology_has_new_ship,
     is_social_arena,
     looks_like_archived_repo,
     looks_like_empty_repo,
     looks_like_event,
+    looks_like_apology,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -197,6 +200,17 @@ def admit_pack(
         return host_silence(SECRET_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_event(fact_blob):
         return host_silence(EVENT_NOT_A_SHIP, project_id=project_id, repo_slug=slug)
+    fact_triples = tuple(
+        (
+            str(item.get("kind") or "signal"),
+            str(item.get("text") or ""),
+            str(item.get("artifact_url")) if item.get("artifact_url") else None,
+        )
+        for item in facts_raw
+        if isinstance(item, dict)
+    )
+    if looks_like_apology(fact_blob) and not apology_has_new_ship(fact_triples):
+        return host_silence(APOLOGY_WITHOUT_SHIP_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_calendar_filler(fact_blob):
         return host_silence(CALENDAR_FILLER_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_counter_thanks(fact_blob):

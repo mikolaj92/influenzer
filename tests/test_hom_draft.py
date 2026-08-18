@@ -768,6 +768,61 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("chatgpt", decision.draft.body.lower())
         self.assertNotIn("as an ai", decision.draft.body.lower())
 
+    def test_apology_without_new_ship_is_undressable_even_when_score_says_draft(self) -> None:
+        apologies = (
+            "We hear you",
+            "Sorry",
+            "Sorry. The queue failed during deploy",
+            "crisis post about the outage",
+            "we apologize for the broken queue",
+            "sorry about the failed launch",
+            "przepraszamy za awarię",
+        )
+        for text in apologies:
+            with self.subTest(text=text):
+                brief = _ship_brief(facts=(Fact(text=text, artifact_url=SHIP_PR),))
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                self.assertNotIn(text, json.dumps(payload))
+
+    def test_apology_with_shipped_fix_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="We hear you"),
+                Fact(kind="release", text="Released queue recovery", artifact_url=SHIP_RELEASE),
+                Fact(text="bounded retries keep the queue moving"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_RELEASE, decision.draft.body)
+
     def test_calendar_filler_is_undressable_even_when_score_says_draft(self) -> None:
         greetings = (
             "happy Friday",

@@ -1,35 +1,37 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=165 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=166 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #165 — Ściana ciasteczek nie jest tryable
+Issue: #166 — Przeprosiny bez shipu to cisza
 
 ## Goal
 
-Treat a cookie-consent wall / blocking GDPR overlay as not tryable. Ship claims
-and social arenas go silent; a non-ship brief is changelog-only. A guest does
-not click through the overlay to reveal the product.
+Przeprosiny bez shipu to cisza. „We hear you”, crisis post, sorry bez nowego artefaktu = nie kąt. Changelog albo nic.
 
 ## Files likely touched
 
-- `influenzer/host.py` — focused detector + `artifact_tryable_reason`
-- `influenzer/hom.py` — score kill / changelog
-- `influenzer/hom_draft.py` — fail closed if a leaked score says draft
-- `influenzer/playbook.py` — HN wave
-- `skills/influenzer-hn/SKILL.md` — seminar guidance
-- `tests/test_e2e_gates.py` — gate cases and passive-notice/product-copy negatives
+- `github_pack/classify.py` — pack-side apology detector
+- `github_pack/pack.py` — survey silence unless a separate release/merge exists
+- `influenzer/playbook.py` — shared detector and shipped-fix check
+- `influenzer/hom.py` — social kill / changelog-only score
+- `influenzer/hom_draft.py` — independent leaked-draft guard
+- `influenzer/brief_admit.py` — fail closed for apology-only packs
+- `tests/test_e2e_gates.py`
+- `tests/test_github_pack.py`
+- `tests/test_hom_draft.py`
+- `tests/test_brief_admit.py`
 
 ## Test plan
 
-- Run the cookie-wall e2e test, then the full e2e gate module
+- Run targeted apology tests across pack, score, draft, and admission
+- Compile changed Python modules and run `git diff --check`
 
 ## Non-goals
 
-- Clicking, accepting, or bypassing cookie consent
-- Live HTTP/browser probing
-- Treating a passive cookie notice or generic cookie/GDPR product copy as a wall
-- Changing login-wall, CAPTCHA, age-gate, geo-block, or maintenance behavior
+- Generating apology copy or probing external artifacts
+- Silencing an apology paired with a separately shipped fix
+- Changing unrelated waitlist, event, or maintenance gates
 
 ## Notes
 

@@ -9,6 +9,7 @@ from github_pack.pack import (
     README_WITHOUT_DEMO_REASON,
     README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
+    APOLOGY_WITHOUT_SHIP_REASON,
     SOLICIT_GESTURE_REASON,
     looks_like_solicit_gesture,
     pack_survey,
@@ -65,6 +66,7 @@ from influenzer.playbook import (
     ARENAS,
     ArenaId,
     AGORA_NO_NEW_THOUGHT_REASON,
+    APOLOGY_WITHOUT_SHIP_REASON as HOM_APOLOGY_WITHOUT_SHIP_REASON,
     BLUESKY_PACK_WITHOUT_FEED_REASON,
     BLUESKY_VIBE_WITHOUT_ARTIFACT_REASON,
     CINEMA_ANNOUNCES_END_REASON,
@@ -127,6 +129,7 @@ from influenzer.playbook import (
     looks_like_tavern_invite,
     looks_like_press_release,
     looks_like_event,
+    looks_like_apology,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -577,6 +580,80 @@ class OrderedLiveGateTests(unittest.TestCase):
         draft = compose_draft(alive, score)
         assert draft is not None
         self.assertTrue(draft.body.startswith("Show HN:"))
+
+    def test_apology_without_new_ship_is_changelog_or_silence(self) -> None:
+        apologies = (
+            "We hear you",
+            "Sorry",
+            "Sorry. The queue failed during deploy",
+            "crisis post about the outage",
+            "we apologize for the broken queue",
+            "sorry about the failed launch",
+            "przepraszamy za awarię",
+        )
+        self.assertEqual(APOLOGY_WITHOUT_SHIP_REASON, HOM_APOLOGY_WITHOUT_SHIP_REASON)
+        self.assertFalse(looks_like_apology("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_apology("sorry state is cleared after retry"))
+        for idx, text in enumerate(apologies):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_apology(text))
+                social = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-apology-{idx}",
+                    facts=(Fact(text=text, artifact_url=SHIP_PR),),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(social)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, APOLOGY_WITHOUT_SHIP_REASON)
+                self.assertIsNone(compose_draft(social, score))
+                leaked = Score(
+                    brief_id=social.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(social, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-apology-changelog",
+            facts=(Fact(text="We hear you"),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        quiet_score = score_brief(quiet)
+        self.assertEqual(quiet_score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(quiet_score.reason, APOLOGY_WITHOUT_SHIP_REASON)
+        self.assertIsNone(compose_draft(quiet, quiet_score))
+
+        shipped = Brief.create(
+            project_id="app-1",
+            brief_id="b-apology-shipped-fix",
+            facts=(
+                Fact(text="We hear you"),
+                Fact(
+                    kind="release",
+                    text="Released queue recovery with bounded retries",
+                    artifact_url="https://github.com/mikolaj92/influenzer/releases/tag/v0.2.0",
+                ),
+                Fact(text="strangers can click and run the fixed queue today"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+        )
+        shipped_score = score_brief(shipped)
+        self.assertEqual(shipped_score.verdict, Verdict.DRAFT)
+        self.assertIsNotNone(compose_draft(shipped, shipped_score))
 
     def test_calendar_filler_is_silence_not_an_angle(self) -> None:
         greetings = (

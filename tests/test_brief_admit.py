@@ -12,7 +12,7 @@ from influenzer.config import Config, load_config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
 from github_pack.pack import README_WITHOUT_QUICKSTART_REASON
-from influenzer.playbook import ArenaId, CALENDAR_FILLER_REASON, CLOUD_DRIVE_REASON, COUNTER_THANKS_REASON, DECK_REASON, EVENT_NOT_A_SHIP, FOG_REASON, FOMO_REASON, FOUNDER_JOURNAL_REASON, LEAD_MAGNET_REASON, LINKTREE_REASON, LOGO_REVEAL_NOT_A_SHIP, LIVING_STACK_REASON, MEME_REASON, SECRET_REASON, StoryKind
+from influenzer.playbook import APOLOGY_WITHOUT_SHIP_REASON, ArenaId, CALENDAR_FILLER_REASON, CLOUD_DRIVE_REASON, COUNTER_THANKS_REASON, DECK_REASON, EVENT_NOT_A_SHIP, FOG_REASON, FOMO_REASON, FOUNDER_JOURNAL_REASON, LEAD_MAGNET_REASON, LINKTREE_REASON, LOGO_REVEAL_NOT_A_SHIP, LIVING_STACK_REASON, MEME_REASON, SECRET_REASON, StoryKind
 from influenzer.scheduler import tick
 from influenzer.storage import StateRepository
 from github_survey import GhCall
@@ -507,6 +507,55 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertFalse(out["published"])
         self.assertIsNone(out["brief_id"])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+    def test_apology_pack_is_silence_without_a_separate_ship(self) -> None:
+        out = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-1-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "pull",
+                        "text": "Released public apology for the outage",
+                        "artifact_url": SHIP_PR,
+                    },
+                    {"kind": "signal", "text": "We hear you"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], APOLOGY_WITHOUT_SHIP_REASON)
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["published"])
+        self.assertIsNone(out["brief_id"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
+        shipped = admit_pack(
+            self.repo,
+            {
+                "status": "ok",
+                "repo": REPO,
+                "brief_id": "scan-v0-2-0",
+                "tryable": True,
+                "facts": [
+                    {
+                        "kind": "release",
+                        "text": "Released queue recovery",
+                        "artifact_url": "https://github.com/mikolaj92/demo/releases/tag/v0.2.0",
+                    },
+                    {"kind": "signal", "text": "We hear you"},
+                ],
+            },
+            project_id="app-1",
+            now=NOW,
+        )
+        self.assertEqual(shipped["status"], "ok")
+        self.assertEqual(shipped["brief_id"], "scan-v0-2-0")
 
     def test_calendar_filler_pack_is_silence_not_a_ship(self) -> None:
         out = admit_pack(
