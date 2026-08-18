@@ -20,6 +20,7 @@ from influenzer.config import Config
 from influenzer.content import create_revision, persist_revision
 from influenzer.hom import Brief, Fact, Score, _gate_violation, compose_draft, score_brief
 from influenzer.host import (
+    AGE_GATE_NOT_TRYABLE,
     ARTIFACT_5XX_NOT_TRYABLE,
     CAPTCHA_NOT_TRYABLE,
     GEO_BLOCK_NOT_TRYABLE,
@@ -27,6 +28,7 @@ from influenzer.host import (
     is_artifact_5xx_status,
     is_geo_block_status,
     is_tryable_artifact,
+    looks_like_age_gate,
     looks_like_artifact_5xx,
     looks_like_captcha_challenge,
     looks_like_geo_block,
@@ -1101,6 +1103,89 @@ class OrderedLiveGateTests(unittest.TestCase):
         score = score_brief(quiet)
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertEqual(score.reason, CAPTCHA_NOT_TRYABLE)
+        self.assertIsNone(compose_draft(quiet, score))
+
+    def test_age_gate_is_silence_not_tryable(self) -> None:
+        gated = (
+            "age gate",
+            "18+",
+            "age gate on the artifact",
+            "the demo shows age verification",
+            "age-gated site",
+            "18+ on the artifact",
+            "the site shows 18+",
+            "the demo is adults only",
+            "Are you 18?",
+            "Are you 18 years old?",
+            "Are you of legal age?",
+            "Confirm that you are 18 or older",
+            "Verify your age to continue",
+            "Enter your date of birth to access the demo",
+            "You must be 18 or older to enter",
+            "bramka wieku na artefakcie",
+            "czy masz ukończone 18 lat?",
+            "potwierdź, że jesteś pełnoletni",
+            "tylko dla osób pełnoletnich",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "age-gate support is part of the product",
+            "we removed the age gate from the demo",
+            "Node.js 18+ is supported",
+            "the project is 18 years old",
+            "adult education tools run locally",
+            "date-of-birth validation uses ISO 8601",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_age_gate(text))
+                self.assertTrue(is_tryable_artifact(evidence=text))
+        for idx, text in enumerate(gated):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_age_gate(text))
+                self.assertFalse(is_tryable_artifact(evidence=text))
+                self.assertEqual(
+                    artifact_tryable_reason(evidence=text), AGE_GATE_NOT_TRYABLE
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-age-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, AGE_GATE_NOT_TRYABLE)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-age-changelog",
+            facts=(Fact(text="Are you 18?", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, AGE_GATE_NOT_TRYABLE)
         self.assertIsNone(compose_draft(quiet, score))
 
     def test_geo_block_is_silence_not_tryable(self) -> None:

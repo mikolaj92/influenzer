@@ -5,25 +5,27 @@
     "influenzer/config.py",
     "influenzer/content.py",
     "influenzer/hom.py",
+    "influenzer/hom_draft.py",
     "influenzer/host.py",
+    "influenzer/playbook.py",
     "influenzer/domain.py",
     "github_feedback/feedback.py",
-    "skills/influenzer-hn",
+    "skills/influenzer-hn/SKILL.md",
     "tests/test_e2e_gates.py"
   ],
   "source": "deterministic",
   "seed_paths": [],
   "matched_tokens": [
-    "HN",
-    "influenzer",
-    "gate"
+    "gate",
+    "influenzer"
   ],
   "notes": [
     "Agentless-style localization: deterministic paths only (no embeddings).",
     "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 139."
+    "Repo tree entries considered: 139.",
+    "Inspection refined the implementation scope to host detection, HoM scoring/dressing, HN guidance, and e2e gate tests."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__162-geo-block-nie-jest-tryable-cf117db3",
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__163-bramka-wieku-nie-jest-tryable-35902e93",
   "wrote": false,
   "localize_rel": ".lokay/localize.json"
 }
