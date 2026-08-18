@@ -256,6 +256,26 @@ _DECK_RE = re.compile(
     r"|\bdeck\s+nie\s+jest\s+artefakt"
     r")"
 )
+_LINKTREE_RE = re.compile(
+    r"(?i)(?:"
+    r"\blinktrees?\b"
+    r"|\blinktr\.ee\b"
+    r"|\bcarrds?\b"
+    r"|\bbio\s+sites?\b"
+    r"|\bbiosites?\b"
+    r"|\blista\s+link"
+    r"|\blink\s+lists?\b"
+    r"|\blists?\s+of\s+links?\b"
+    r"|\blink\s+boards?\b"
+    r"|\ball\s+my\s+links?\b"
+    r"|\bmy\s+links?\s+page\b"
+    r"|\blinks?\s+page\b"
+    r"|\bstron[aąeęy]\s+z\s+link"
+    r"|\btablic[aąęy]\s+link"
+    r"|\bbeacons\.ai\b"
+    r"|\blinktree\s+nie\s+jest\s+artefakt"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -351,6 +371,13 @@ def looks_like_deck(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_DECK_RE.search(text))
+
+
+def looks_like_linktree(text: str) -> bool:
+    """True for Linktree / Carrd / bio site / a list of links. A board is not an artifact."""
+    if not text or not text.strip():
+        return False
+    return bool(_LINKTREE_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:

@@ -107,6 +107,7 @@ from influenzer.playbook import (
     looks_like_fomo,
     looks_like_meme,
     looks_like_deck,
+    looks_like_linktree,
     looks_like_logo_reveal,
     looks_like_waitlist,
     looks_like_worse_clone,
@@ -119,6 +120,7 @@ from influenzer.playbook import (
     FOMO_REASON,
     MEME_REASON,
     DECK_REASON,
+    LINKTREE_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     reddit_reason,
     seminar_reason,
@@ -877,6 +879,55 @@ class OrderedLiveGateTests(unittest.TestCase):
                 score = score_brief(brief)
                 self.assertEqual(score.verdict, Verdict.KILL)
                 self.assertEqual(score.reason, DECK_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+    def test_linktree_is_silence_not_an_artifact(self) -> None:
+        boards = (
+            "linktree for the local tick",
+            "Carrd bio site",
+            "lista linków zamiast produktu",
+            "all my links",
+            "strona z linkami",
+        )
+        self.assertFalse(looks_like_linktree(""))
+        self.assertFalse(looks_like_linktree("   "))
+        self.assertFalse(looks_like_linktree("Local tick scores briefs and emits a draft"))
+        self.assertFalse(looks_like_linktree("link in the README"))
+        self.assertFalse(looks_like_linktree("screenshot of the local tick demo"))
+        self.assertFalse(looks_like_linktree("join the waitlist"))
+        for idx, text in enumerate(boards):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_linktree(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    LINKTREE_REASON,
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-linktree-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LINKTREE_REASON)
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
                 leaked = Score(

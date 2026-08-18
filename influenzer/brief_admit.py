@@ -45,6 +45,7 @@ from influenzer.playbook import (
     FOMO_REASON,
     MEME_REASON,
     DECK_REASON,
+    LINKTREE_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     LIVING_STACK_REASON,
     SECRET_REASON,
@@ -61,6 +62,7 @@ from influenzer.playbook import (
     looks_like_fomo,
     looks_like_meme,
     looks_like_deck,
+    looks_like_linktree,
     looks_like_logo_reveal,
     looks_like_failed_ci,
     looks_like_fork,
@@ -209,6 +211,8 @@ def admit_pack(
         return host_silence(MEME_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_deck(fact_blob):
         return host_silence(DECK_REASON, project_id=project_id, repo_slug=slug)
+    if looks_like_linktree(fact_blob):
+        return host_silence(LINKTREE_REASON, project_id=project_id, repo_slug=slug)
     if looks_like_logo_reveal(fact_blob):
         return host_silence(LOGO_REVEAL_NOT_A_SHIP, project_id=project_id, repo_slug=slug)
     try:
