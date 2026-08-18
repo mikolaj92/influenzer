@@ -387,6 +387,11 @@ _GITHUB_DIFF_PATH_RE = re.compile(
     r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:compare|commit)(?:/|$)",
     re.I,
 )
+# Actions runs, jobs, and checks are CI plumbing, not a product artifact.
+_GITHUB_ACTIONS_PATH_RE = re.compile(
+    r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:actions|runs)(?:/|$)",
+    re.I,
+)
 _MERGED_PR_FACT_RE = re.compile(r"(?i)^merged\s+pr\s+#\d+")
 _TRYABLE_ARTIFACT_HOSTS = frozenset({"github.com"})
 _UTM_QUERY_RE = re.compile(r"(?i)(?:^|[&])(?:utm_[a-z]+|fbclid|gclid|mc_cid|mc_eid)=")
@@ -564,7 +569,7 @@ def is_trusted_artifact_url(url: str | None) -> bool:
     host = _normalized_host(parsed.hostname)
     if not host or not any(host == name or host.endswith("." + name) for name in _TRYABLE_ARTIFACT_HOSTS):
         return False
-    if _GITHUB_DIFF_PATH_RE.match(parsed.path):
+    if _GITHUB_DIFF_PATH_RE.match(parsed.path) or _GITHUB_ACTIONS_PATH_RE.match(parsed.path):
         return False
     if _UTM_QUERY_RE.search(parsed.query) or _CLICK_HERE_RE.search(raw):
         return False

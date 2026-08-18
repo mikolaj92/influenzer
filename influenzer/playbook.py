@@ -503,6 +503,11 @@ _GITHUB_DIFF_PATH_RE = re.compile(
     r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:compare|commit)(?:/|$)",
     re.I,
 )
+# Actions runs, jobs, and checks are CI plumbing, not a product artifact.
+_GITHUB_ACTIONS_PATH_RE = re.compile(
+    r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:actions|runs)(?:/|$)",
+    re.I,
+)
 # A film is not click-and-run. YouTube/Vimeo/Loom as the only URL is silence
 # on seminar. A film next to a repo can stay as evidence. Cinema is separate.
 VIDEO_HOSTS: frozenset[str] = frozenset(
@@ -1592,7 +1597,8 @@ _SHIP_URL_IN_TEXT_RE = re.compile(
     r"https://github\.com/"
     r"(?!(?:gist|orgs|settings|users)/)"
     r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
-    r"(?!/(?:compare|commit)(?:/|$))"
+    r"(?![A-Za-z0-9_.-])"
+    r"(?!/(?:compare|commit|actions|runs)(?:/|$))"
     r"(?:/(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+)))?",
     re.I,
 )
@@ -2344,9 +2350,9 @@ def is_tryable_artifact_url(url: str | None) -> bool:
         return False
     if _host_allowed(parsed.hostname, SHORTENER_HOSTS):
         return False
-    if (
-        _host_allowed(parsed.hostname, TRYABLE_ARTIFACT_HOSTS)
-        and _GITHUB_DIFF_PATH_RE.match(parsed.path)
+    if _host_allowed(parsed.hostname, TRYABLE_ARTIFACT_HOSTS) and (
+        _GITHUB_DIFF_PATH_RE.match(parsed.path)
+        or _GITHUB_ACTIONS_PATH_RE.match(parsed.path)
     ):
         return False
     if _has_utm_farm_query(parsed.query) or CLICK_HERE_RE.search(raw):

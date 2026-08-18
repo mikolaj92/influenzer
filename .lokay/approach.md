@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=176 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=179 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #176 — Limit gh to cisza, nie wyjątek
+Issue: #179 — Log z Actions nie jest artefaktem
 
 ## Goal
 
-Limit gh to cisza, nie wyjątek. 429, secondary rate limit = ten look milczy, pętla żyje. Nie puchniemy logów body.
+Log z Actions nie jest artefaktem. URL runs/job/checks = cisza. To rura, nie produkt.
 
 ## Files likely touched
 
