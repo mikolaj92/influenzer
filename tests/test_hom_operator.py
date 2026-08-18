@@ -352,6 +352,8 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertTrue(is_tryable_artifact_url("https://www.github.com/mikolaj92/influenzer"))
         self.assertFalse(is_tryable_artifact_url("https://github.com/mikolaj92/influenzer/compare/main...feature"))
         self.assertFalse(is_tryable_artifact_url("https://github.com/mikolaj92/influenzer/commit/abc"))
+        self.assertFalse(is_tryable_artifact_url("https://github.com/mikolaj92/influenzer/actions/runs/123/job/456/checks"))
+        self.assertFalse(is_tryable_artifact_url("https://github.com/mikolaj92/influenzer/runs/job/checks"))
         almost = (
             "http://github.com/mikolaj92/influenzer",
             "http://github.com/mikolaj92/influenzer/pull/12",
@@ -4525,6 +4527,8 @@ class ScoreBriefTests(unittest.TestCase):
             "https://bsky.app/profile/did:plc:demo/post/1",
             "https://github.com/mikolaj92/influenzer/commit/abc",
             "https://github.com/mikolaj92/influenzer/compare/main...feature",
+            "https://github.com/mikolaj92/influenzer/actions/runs/123/job/456/checks",
+            "https://github.com/mikolaj92/influenzer/runs/job/checks",
         )
         for url in almost:
             with self.subTest(url=url):
