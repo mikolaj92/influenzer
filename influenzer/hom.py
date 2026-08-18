@@ -18,10 +18,12 @@ from influenzer.host import (
     CAPTCHA_NOT_TRYABLE,
     COOKIE_WALL_NOT_TRYABLE,
     GEO_BLOCK_NOT_TRYABLE,
+    PAYMENT_GATE_NOT_TRYABLE,
     looks_like_age_gate,
     looks_like_captcha_challenge,
     looks_like_cookie_wall,
     looks_like_geo_block,
+    looks_like_payment_gate,
 )
 from influenzer.playbook import (
     ANGLES,
@@ -702,6 +704,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "prerelease_not_a_ship")
         return _changelog(brief, "prerelease_not_a_ship")
+    if looks_like_payment_gate(blob):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, PAYMENT_GATE_NOT_TRYABLE)
+        return _changelog(brief, PAYMENT_GATE_NOT_TRYABLE)
     if looks_like_login_gate(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "login_gate_not_tryable")

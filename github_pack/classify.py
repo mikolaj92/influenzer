@@ -149,6 +149,40 @@ _FOUNDER_JOURNAL_RE = re.compile(
     r"|\brutyna\s+porann"
     r")"
 )
+_PAYMENT_GATE_RE = re.compile(
+    r"(?i)(?:"
+    r"^\s*(?:(?:payment|billing|subscription|credit[- ]?card|card)[ -]+"
+    r"(?:wall|gate|required)|paywall)\s*[.!]?\s*$"
+    r"|\b(?:subscribe|pay)\s+to\s+(?:continue|view|access|try|use|unlock)\b"
+    r"|\b(?:subscription|payment|billing|credit[- ]?card|debit[- ]?card|"
+    r"card|payment\s+method)\s+(?:is\s+|are\s+)?required\b"
+    r"|\b(?:artifact|demo|site|page|product|trial|access)\b.{0,36}\b"
+    r"(?:requires?|demands?)\s+(?:an?\s+)?(?:paid\s+)?"
+    r"(?:subscription|payment|credit[- ]?card|debit[- ]?card|card|payment\s+method)\b"
+    r"|\b(?:enter|add|provide|submit)\s+(?:your\s+|a\s+)?"
+    r"(?:credit[- ]?card|debit[- ]?card|card\s+(?:details?|number)|payment\s+method)\s+"
+    r"(?:to|before)\s+(?:continue|view|access|try|use|unlock|start)\b"
+    r"|\b(?:free\s+)?trial\s+(?:requires?|needs?)\s+(?:an?\s+)?"
+    r"(?:credit[- ]?card|debit[- ]?card|card|payment\s+method)\b"
+    r"|\b(?:credit[- ]?card|debit[- ]?card|card|payment)\s+before\s+"
+    r"(?:the\s+)?(?:artifact|demo|product|trial|access)\b"
+    r"|\b(?:behind|blocked\s+by)\s+(?:an?\s+|the\s+)?"
+    r"(?:paywall|payment\s+(?:wall|gate)|subscription\s+(?:wall|gate)|checkout)\b"
+    r"|\bkart(?:a|ę|y)\s+(?:przed\s+produktem|jest\s+wymagana|wymagana)\b"
+    r"|\bwymaga\s+(?:podania\s+)?(?:karty|p[łl]atno[sś]ci|subskrypcji)\b"
+    r"|\bsubskrybuj\s*[,;:]?\s+(?:aby|[zż]eby)\s+"
+    r"(?:kontynuowa[cć]|wej[sś][cć]|zobaczy[cć]|wypr[oó]bowa[cć]|skorzysta[cć])\b"
+    r")"
+)
+_PAYMENT_GATE_CLEARED_RE = re.compile(
+    r"(?i)(?:"
+    r"\bno\s+(?:credit[- ]?|debit[- ]?)?card\s+(?:is\s+)?required\b"
+    r"|\bno\s+(?:payment|paid\s+subscription)\s+(?:is\s+)?required\b"
+    r"|\b(?:credit[- ]?card|debit[- ]?card|card|payment|subscription)\s+"
+    r"(?:is\s+)?(?:not\s+required|optional)\b"
+    r"|\b(?:bez\s+karty|nie\s+wymaga\s+(?:karty|p[łl]atno[sś]ci|subskrypcji))\b"
+    r")"
+)
 _LEAD_MAGNET_RE = re.compile(
     r"(?i)(?:"
     r"\blead[- ]magnets?\b"
@@ -369,6 +403,14 @@ def looks_like_founder_journal(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_FOUNDER_JOURNAL_RE.search(text))
+
+
+def looks_like_payment_gate(text: str) -> bool:
+    """True when a card, payment, or paid subscription precedes the product."""
+    if not text or not text.strip():
+        return False
+    active_text = _PAYMENT_GATE_CLEARED_RE.sub("", text)
+    return bool(_PAYMENT_GATE_RE.search(active_text))
 
 
 def looks_like_lead_magnet(text: str) -> bool:

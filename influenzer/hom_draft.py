@@ -25,6 +25,7 @@ from influenzer.host import (
     looks_like_captcha_challenge,
     looks_like_cookie_wall,
     looks_like_geo_block,
+    looks_like_payment_gate,
 )
 from influenzer.hom import (
     Brief,
@@ -362,6 +363,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_captcha_challenge(bits.blob)
         or looks_like_age_gate(bits.blob)
         or looks_like_cookie_wall(bits.blob)
+        or looks_like_payment_gate(bits.blob)
         or looks_like_geo_block(bits.blob)
         or looks_like_shortener(bits.blob)
         or looks_like_utm_farm(bits.blob)

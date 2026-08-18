@@ -26,6 +26,7 @@ from influenzer.host import (
     CAPTCHA_NOT_TRYABLE,
     COOKIE_WALL_NOT_TRYABLE,
     GEO_BLOCK_NOT_TRYABLE,
+    PAYMENT_GATE_NOT_TRYABLE,
     artifact_tryable_reason,
     is_artifact_5xx_status,
     is_geo_block_status,
@@ -35,6 +36,7 @@ from influenzer.host import (
     looks_like_captcha_challenge,
     looks_like_cookie_wall,
     looks_like_geo_block,
+    looks_like_payment_gate,
 )
 from influenzer.domain import (
     AccountStatus,
@@ -1395,6 +1397,82 @@ class OrderedLiveGateTests(unittest.TestCase):
         score = score_brief(quiet)
         self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
         self.assertEqual(score.reason, COOKIE_WALL_NOT_TRYABLE)
+        self.assertIsNone(compose_draft(quiet, score))
+
+    def test_payment_gate_is_silence_not_tryable(self) -> None:
+        gated = (
+            "Subscribe to continue",
+            "Pay to access the product",
+            "credit card required",
+            "the demo requires a payment method",
+            "Enter your card details to start the trial",
+            "free trial requires a credit card",
+            "card before the product",
+            "the artifact is behind a paywall",
+            "karta przed produktem",
+            "demo wymaga podania karty",
+            "subskrybuj, aby kontynuować",
+        )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "subscription billing is part of the product",
+            "payment method validation runs locally",
+            "credit card form supports autofill",
+            "no credit card required to try the demo",
+            "card is optional after the trial",
+            "we removed the payment gate",
+            "bez karty można uruchomić demo",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_payment_gate(text))
+                self.assertTrue(is_tryable_artifact(evidence=text))
+        for idx, text in enumerate(gated):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_payment_gate(text))
+                self.assertFalse(is_tryable_artifact(evidence=text))
+                self.assertEqual(
+                    artifact_tryable_reason(evidence=text), PAYMENT_GATE_NOT_TRYABLE
+                )
+                brief = Brief.create(
+                    project_id="app-1",
+                    brief_id=f"b-payment-{idx}",
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    ),
+                    story_kind="major",
+                    claims_ship=True,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, PAYMENT_GATE_NOT_TRYABLE)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+                leaked = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(compose_draft(brief, leaked))
+
+        quiet = Brief.create(
+            project_id="app-1",
+            brief_id="b-payment-changelog",
+            facts=(Fact(text="Subscribe to continue", artifact_url=SHIP_PR),),
+            story_kind="major",
+            claims_ship=False,
+            tryable=False,
+        )
+        score = score_brief(quiet)
+        self.assertEqual(score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(score.reason, PAYMENT_GATE_NOT_TRYABLE)
         self.assertIsNone(compose_draft(quiet, score))
 
     def test_geo_block_is_silence_not_tryable(self) -> None:

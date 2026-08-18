@@ -1,37 +1,34 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=166 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=167 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #166 — Przeprosiny bez shipu to cisza
+Issue: #167 — Karta zanim produkt nie jest tryable
 
 ## Goal
 
-Przeprosiny bez shipu to cisza. „We hear you”, crisis post, sorry bez nowego artefaktu = nie kąt. Changelog albo nic.
+A card, payment, or paid subscription before the product is not tryable.
+“Subscribe to continue” on the artifact is silence; Show HN must not ask a
+stranger for a wallet before they can try the product.
 
 ## Files likely touched
 
-- `github_pack/classify.py` — pack-side apology detector
-- `github_pack/pack.py` — survey silence unless a separate release/merge exists
-- `influenzer/playbook.py` — shared detector and shipped-fix check
-- `influenzer/hom.py` — social kill / changelog-only score
-- `influenzer/hom_draft.py` — independent leaked-draft guard
-- `influenzer/brief_admit.py` — fail closed for apology-only packs
-- `tests/test_e2e_gates.py`
-- `tests/test_github_pack.py`
-- `tests/test_hom_draft.py`
-- `tests/test_brief_admit.py`
+- `influenzer/host.py` — payment-gate evidence detector and tryable reason
+- `influenzer/hom.py` / `influenzer/hom_draft.py` — score and dress fail closed
+- `github_pack/classify.py` / `github_pack/pack.py` — README/release pack fails closed
+- `skills/influenzer-hn/SKILL.md` / `influenzer/playbook.py` — document the HN gate
+- `tests/test_e2e_gates.py` / `tests/test_github_pack.py` — focused regressions
 
 ## Test plan
 
-- Run targeted apology tests across pack, score, draft, and admission
-- Compile changed Python modules and run `git diff --check`
+- Run the payment-gate tests in `tests/test_e2e_gates.py` and `tests/test_github_pack.py`
+- Run the complete touched test modules when practical
 
 ## Non-goals
 
-- Generating apology copy or probing external artifacts
-- Silencing an apology paired with a separately shipped fix
-- Changing unrelated waitlist, event, or maintenance gates
+- No live artifact probing or payment-provider integration
+- Do not reject products that merely implement billing/card features
+- Do not reject an explicitly card-free trial
 
 ## Notes
 
