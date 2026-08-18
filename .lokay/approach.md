@@ -1,13 +1,13 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=156 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=157 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #156 — Artefakt 5xx nie jest tryable
+Issue: #157 — Zaparkowana domena nie jest witryną
 
 ## Goal
 
-Artefakt 5xx nie jest tryable. 500/502/503 w looku = cisza. Nie wołamy Show HN na padnięty host.
+Zaparkowana domena nie jest witryną. Domain for sale, registrar placeholder, „coming soon” od hosta = cisza.
 
 ## Files likely touched
 
