@@ -104,6 +104,7 @@ from influenzer.playbook import (
     looks_like_launch_pitch,
     looks_like_superlative,
     looks_like_dead_link,
+    looks_like_dead_tls,
     looks_like_dead_release_asset,
     looks_like_issues_disabled,
     looks_like_fork,
@@ -337,6 +338,7 @@ def _undressable_blob(bits: CopyBits) -> bool:
         or looks_like_click_here(bits.blob)
         or looks_like_solicit_gesture(bits.blob)
         or looks_like_dead_link(bits.blob)
+        or looks_like_dead_tls(bits.blob)
         or looks_like_dead_release_asset(bits.blob)
         or looks_like_roadmap(bits.blob)
         or looks_like_event(bits.blob)

@@ -1,41 +1,41 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=153 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=154 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #153 — Linktree nie jest artefaktem
+Issue: #154 — Martwy TLS nie jest tryable
 
 ## Goal
 
-Linktree / Carrd / bio site / a list of links instead of a product is
-silence. An artifact is a product, not a link board.
+A recorded cert error, mixed content, or HTTPS the browser rejects is not
+tryable. Silence on Show HN and ship claims. Do not click the warning.
+This is recorded TLS evidence, not a 404 (#92) and not the https scheme (#77).
 
 ## Files likely touched
 
-- `influenzer/playbook.py` — detector, hosts, reason
-- `influenzer/hom.py` — score + HN gate
-- `influenzer/hom_draft.py` — refuse to dress a leaked draft
-- `influenzer/brief_admit.py` — admit silence
-- `github_pack/classify.py` / `github_pack/pack.py` — pack silence
-- `skills/influenzer-hn/SKILL.md` — seminar copy
-- tests next to the deck gate (`#151`)
+- `influenzer/playbook.py` — fail-closed `DEAD_TLS_RE` / `looks_like_dead_tls`
+- `influenzer/hom.py` — ship/social kill, otherwise changelog
+- `influenzer/hom_draft.py` — undress even if a score says draft
+- `tests/test_hom_operator.py`
+- `tests/test_hom_draft.py`
+- `tests/test_e2e_gates.py`
 
 ## Test plan
 
-- Detector: Linktree / Carrd / bio site / lista linków kill; README
-  link and product copy stay
-- Host-only URL (linktr.ee, carrd.co, bio.site) is not tryable
-- Pack / admit / score / dress fail closed
-- A link page next to a repo can stay as evidence when copy is product
+- `python -m pytest tests/test_hom_operator.py::PlaybookCopyTests::test_dead_tls_is_not_tryable tests/test_hom_operator.py::ScoreBriefTests::test_dead_tls_ship_claim_is_killed tests/test_hom_operator.py::ScoreBriefTests::test_dead_tls_without_ship_claim_is_changelog_only tests/test_hom_operator.py::ScoreBriefTests::test_product_copy_without_dead_tls_can_still_draft tests/test_hom_draft.py::HomDraftCostumeTests::test_dead_tls_is_undressable_even_when_score_says_draft tests/test_hom_draft.py::HomDraftCostumeTests::test_product_copy_without_dead_tls_can_still_dress tests/test_e2e_gates.py::OrderedLiveGateTests::test_dead_tls_is_silence_not_tryable -q`
 
 ## Non-goals
 
-- Do not steal `#139` (CTA / link in bio on a looping cut)
-- Do not change trusted-host allowlist (`#76`) beyond refusing known
-  link-board hosts as the artifact
+- Live TLS handshake or browser probe of artifact URLs (HOM stays rule-only)
+- Dead 404/410 links (#92) and https-only scheme (#77)
+- Login wall 401/403 (#126) and listed release-asset 404 (#171)
+- github_survey / github_pack collectors
 
 ## Notes
 
-- Same fail-closed shape as `#151` (deck is not an artifact).
-- Neighbor of `#139` (CTA in DM / link in bio) and `#76` (trusted host):
-  here it is a list page, not a CTA.
+- Trust intentional issue; this plan is evidence for later review, not a human gate.
+- Same shape as dead-link / login-wall: text evidence in the brief, not a
+  network check. Bare `certificate error` / `mixed content` / `martwy TLS`
+  is this gate. A working handshake stays.
+- Do not call “click through the warning”.
+- Collector boundary: no unbounded collection.
