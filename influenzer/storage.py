@@ -20,12 +20,16 @@ from .domain import (
 )
 from .domain import content_hash
 from .hom import (
+    HNUrlKey,
+    SAME_HN_URL_REASON,
     Brief,
     Draft,
     ReleaseKey,
     Score,
     angle_body_hash,
     brief_to_mapping,
+    hn_draft_url_key,
+    hn_submission_url_key,
     parse_facts_json,
     release_story_keys,
 )
@@ -868,6 +872,14 @@ class StateRepository:
             ).fetchone()
             if existing is not None:
                 return "already_told"
+            wanted_hn_url = hn_submission_url_key(brief.facts)
+            if wanted_hn_url:
+                for row in c.execute(
+                    "SELECT * FROM operator_drafts WHERE arena=?",
+                    (ArenaId.HN.value,),
+                ):
+                    if hn_draft_url_key(self._draft_from_row(row)) == wanted_hn_url:
+                        return SAME_HN_URL_REASON
             wanted = {fact.artifact_url for fact in brief.facts if fact.artifact_url}
             if wanted:
                 for row in c.execute("SELECT facts_json FROM briefs"):
@@ -1012,6 +1024,15 @@ class StateRepository:
             return None
         last = max(drafts, key=lambda draft: (draft.created_at, draft.draft_id))
         return angle_body_hash(last.body)
+
+    def hn_submission_url_keys(self) -> frozenset[HNUrlKey]:
+        """URLs previously dressed for HN, across projects and including held history."""
+        found = {
+            key
+            for draft in self.list_operator_drafts(include_held=True)
+            if (key := hn_draft_url_key(draft)) is not None
+        }
+        return frozenset(found)
 
     def release_story_keys(
         self,

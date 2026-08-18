@@ -21,12 +21,14 @@ from influenzer.adapters.base import AdapterRequest
 from influenzer.config import Config
 from influenzer.content import create_revision, persist_revision
 from influenzer.hom import (
+    SAME_HN_URL_REASON,
     SAME_RELEASE_REASON,
     Brief,
     Fact,
     Score,
     _gate_violation,
     compose_draft,
+    hn_url_key,
     score_brief,
 )
 from influenzer.host import (
@@ -4659,6 +4661,102 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertIn(outcome["verdict"], {"draft", "changelog_only"})
         self.assertIsNone(outcome.get("body"))
         self.assertIsNone(self.repo.get_operator_draft(self.app.project_id, brief.brief_id))
+
+    def test_same_url_already_drafted_for_hn_is_silence_after_the_camp(self) -> None:
+        self.assertEqual(
+            hn_url_key(
+                "https://www.github.com/Mikolaj92/Influenzer/pull/12/#discussion"
+            ),
+            hn_url_key(SHIP_PR),
+        )
+        self.assertNotEqual(
+            hn_url_key("https://example.com/demo"),
+            hn_url_key("https://example.com/demo/"),
+        )
+        first = Brief.create(
+            project_id=self.app.project_id,
+            brief_id="hn-url-first",
+            facts=(
+                Fact(
+                    text="I built a local tick that scores briefs",
+                    artifact_url=SHIP_PR,
+                ),
+                Fact(text="I struggled with a queue that never scored a brief"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            created_at="2026-08-10T06:00:00Z",
+        )
+        self.repo.save_brief(first)
+        first_out = tick(
+            self.repo,
+            Config(home=self.home, scheduler_live_enabled=False),
+            due=(),
+            now="2026-08-10T06:00:00Z",
+        )
+        self.assertEqual(first_out["operator"]["outcomes"][0]["arena"], "hn")
+        first_draft = self.repo.get_operator_draft(self.app.project_id, first.brief_id)
+        assert first_draft is not None
+        self.repo.record_draft_verdict(first_draft, "hold")
+        self.assertEqual(self.repo.hn_submission_url_keys(), {hn_url_key(SHIP_PR)})
+
+        admission_probe = Brief.create(
+            project_id=self.builder.project_id,
+            brief_id="hn-url-admission-probe",
+            facts=(
+                Fact(text="I rebuilt the same URL for another Show", artifact_url=SHIP_PR),
+                Fact(text="A new title and backstory do not make a new URL"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            created_at="2026-08-17T05:00:00Z",
+        )
+        self.assertEqual(
+            self.repo.admit_brief(admission_probe),
+            SAME_HN_URL_REASON,
+        )
+        self.assertIsNone(
+            self.repo.get_brief(self.builder.project_id, admission_probe.brief_id)
+        )
+
+        second = Brief.create(
+            project_id=self.builder.project_id,
+            brief_id="hn-url-second",
+            facts=(
+                Fact(
+                    text="I rebuilt the operator around a bounded local queue",
+                    artifact_url=SHIP_PR,
+                ),
+                Fact(text="The implementation and backstory are new"),
+            ),
+            story_kind="major",
+            claims_ship=True,
+            tryable=True,
+            preferred_arena=ArenaId.HN,
+            created_at="2026-08-17T06:00:00Z",
+        )
+        self.repo.save_brief(second)
+        out = tick(
+            self.repo,
+            Config(home=self.home, scheduler_live_enabled=False),
+            due=(),
+            now="2026-08-17T06:00:00Z",
+        )
+        outcome = out["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "kill")
+        self.assertEqual(outcome["reason"], SAME_HN_URL_REASON)
+        self.assertIsNone(outcome.get("body"))
+        self.assertIsNone(
+            self.repo.get_operator_draft(self.builder.project_id, second.brief_id)
+        )
+        self.assertEqual(
+            self.repo.get_operator_score(self.builder.project_id, second.brief_id).reason,
+            SAME_HN_URL_REASON,
+        )
 
     def test_same_release_after_history_is_silence_even_with_a_new_angle(self) -> None:
         release = "https://github.com/mikolaj92/influenzer/releases/tag/v0.2.0"

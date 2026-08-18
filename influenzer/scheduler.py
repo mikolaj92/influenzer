@@ -27,6 +27,7 @@ from influenzer.hom import (
     apply_brief,
     decision_to_dict,
     drop_repeat_angle,
+    drop_repeat_hn_url,
     drop_repeat_release,
 )
 from influenzer.playbook import CANON_URL
@@ -57,16 +58,19 @@ def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
     for brief in repo.list_pending_briefs():
         # Exclude the pending brief itself: only an earlier admitted story can
         # silence this release. History is machine-wide, like the story lock.
-        decision = drop_repeat_release(
-            drop_repeat_angle(
-                apply_brief(
-                    brief,
-                    now=now,
-                    stack_arena=repo.living_stack_arena(brief.project_id, now),
+        decision = drop_repeat_hn_url(
+            drop_repeat_release(
+                drop_repeat_angle(
+                    apply_brief(
+                        brief,
+                        now=now,
+                        stack_arena=repo.living_stack_arena(brief.project_id, now),
+                    ),
+                    repo.last_angle_body_hash(brief.project_id),
                 ),
-                repo.last_angle_body_hash(brief.project_id),
+                repo.release_story_keys(exclude=(brief.project_id, brief.brief_id)),
             ),
-            repo.release_story_keys(exclude=(brief.project_id, brief.brief_id)),
+            repo.hn_submission_url_keys(),
         )
         revision = None
         if decision.draft is not None:

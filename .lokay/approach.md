@@ -1,25 +1,33 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=170 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=172 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #170 — Pusty GitHub Release nie jest shipem
+Issue: #172 — Ten sam URL już był na HN = cisza
 
 ## Goal
 
-Sam tag bez assetów i bez notki to nie ship. Pusty GitHub Release = cisza. Nie ma co kliknąć.
+Ten sam URL już był na HN = cisza. Nie resubmitujemy. Seminarium nie znosi powtórki linku.
 
 ## Files likely touched
 
-- (infer from repo inspection)
+- `influenzer/hom.py` — canonical HN URL identity and fail-closed repeat gate
+- `influenzer/storage.py` — machine-wide history of URLs previously dressed for HN
+- `influenzer/scheduler.py` — drop a repeated HN URL before persisting a draft
+- `influenzer/brief_admit.py` — scan admission stays silent when HN already used the URL
+- `influenzer/playbook.py`, `skills/influenzer-hn/SKILL.md` — encode the no-resubmit rule
+- `tests/test_e2e_gates.py` — old HN URL stays silent after the 48h camp expires
 
 ## Test plan
 
-- Run the smallest useful tests for files touched
+- Targeted HN URL key and tick tests
+- Full `tests.test_e2e_gates` plus focused operator/admit suites
 
 ## Non-goals
 
-- (none stated)
+- No HN network collector or submission-history scrape
+- Do not infer that every GitHub brief was posted to HN; history comes from stored HN drafts
+- Do not change the existing 48h in-thread camp or same-release/body gates
 
 ## Notes
 
