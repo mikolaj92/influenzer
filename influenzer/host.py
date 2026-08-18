@@ -27,6 +27,7 @@ ARTIFACT_5XX_NOT_TRYABLE = "artifact_5xx_not_tryable"
 CAPTCHA_NOT_TRYABLE = "captcha_not_tryable"
 AGE_GATE_NOT_TRYABLE = "age_gate_not_tryable"
 COOKIE_WALL_NOT_TRYABLE = "cookie_wall_not_tryable"
+PAYMENT_GATE_NOT_TRYABLE = "payment_gate_not_tryable"
 GEO_BLOCK_NOT_TRYABLE = "geo_block_not_tryable"
 
 # A server error is not a public, working artifact. Require a status context so
@@ -189,6 +190,61 @@ _COOKIE_WALL_CLEARED_RE = re.compile(
     r"(?:overlay|modal|banner|notice|prompt)\s+"
     r"(?:no\s+longer|does\s+not|doesn['’]t)\s+"
     r"(?:blocks?|covers?|hides?|obscures?)\b"
+    r")"
+)
+
+# A card or paid subscription before the product is a checkout, not a demo.
+# Keep billing/payment product features usable; require an access-gate shape.
+_PAYMENT_GATE_RE = re.compile(
+    r"(?imx)(?:"
+    r"^\s*(?:an?\s+)?(?:(?:payment|billing|subscription|credit[- ]?card|card)[ -]+"
+    r"(?:wall|gate|required)|paywall)\s*[.!]?\s*$"
+    r"|^\s*(?:subscribe|payment|pay|credit[- ]?card)\s+to\s+continue\s*[.!]?\s*$"
+    r"|\b(?:subscribe|pay)\s+to\s+"
+    r"(?:continue|view|access|see|try|run|use|enter|unlock)\b"
+    r"|\b(?:subscription|payment|billing|credit[- ]?card|debit[- ]?card|"
+    r"card|payment\s+method)\s+(?:is\s+|are\s+)?required\b"
+    r"|\b(?:artifact|demo|site|page|product|trial|access)\b[^\n]{0,36}\b"
+    r"(?:requires?|demands?)\s+(?:an?\s+)?(?:paid\s+)?"
+    r"(?:subscription|payment|credit[- ]?card|debit[- ]?card|card|payment\s+method)\b"
+    r"|\b(?:requires?|must)\s+(?:you\s+to\s+)?(?:subscribe|pay)\s+"
+    r"(?:to|before)\s+(?:continue|view|access|see|try|run|use|enter|unlock)\b"
+    r"|\b(?:enter|add|provide|submit)\s+(?:your\s+|a\s+)?"
+    r"(?:credit[- ]?card|debit[- ]?card|card\s+(?:details?|number)|"
+    r"payment\s+method|payment\s+details?|billing\s+details?)\s+"
+    r"(?:to|before)\s+(?:continue|view|access|see|try|run|use|enter|unlock|start)\b"
+    r"|\b(?:free\s+)?trial\s+(?:requires?|needs?)\s+(?:an?\s+)?"
+    r"(?:credit[- ]?card|debit[- ]?card|card|payment\s+method)\b"
+    r"|\bno\s+trial\s+without\s+(?:an?\s+)?(?:credit[- ]?card|card|payment)\b"
+    r"|\b(?:credit[- ]?card|debit[- ]?card|card|payment)\s+before\s+"
+    r"(?:the\s+)?(?:artifact|demo|product|trial|access)\b"
+    r"|\b(?:behind|blocked\s+by)\s+(?:an?\s+|the\s+)?"
+    r"(?:paywall|payment\s+(?:wall|gate)|subscription\s+(?:wall|gate)|checkout)\b"
+    r"|\bcheckout\s+(?:is\s+)?required\s+(?:to|before)\s+"
+    r"(?:continue|view|access|see|try|run|use|enter|unlock)\b"
+    r"|\bkart(?:a|ę|y)\s+(?:przed\s+produktem|jest\s+wymagana|wymagana)\b"
+    r"|\bwymaga\s+(?:podania\s+)?(?:karty|p[łl]atno[sś]ci|subskrypcji)\b"
+    r"|\b(?:podaj|dodaj|wpisz)\s+(?:dane\s+)?kart(?:y|ę)\s*[,;:]?\s+"
+    r"(?:aby|[zż]eby|przed)\s+(?:kontynuowa[cć]|wej[sś][cć]|zobaczy[cć]|"
+    r"wypr[oó]bowa[cć]|uruchomi[cć]|skorzysta[cć]|odblokowa[cć])\b"
+    r"|\bsubskrybuj\s*[,;:]?\s+(?:aby|[zż]eby)\s+"
+    r"(?:kontynuowa[cć]|wej[sś][cć]|zobaczy[cć]|wypr[oó]bowa[cć]|skorzysta[cć])\b"
+    r"|\b(?:p[łl]atno[sś][cć]|subskrypcj[aeę])\s+(?:jest\s+)?wymagan[ae]\b"
+    r"|\bp[łl]atno[sś][cć]\s+przed\s+(?:dost[eę]pem|produktem|demo)\b"
+    r")"
+)
+_PAYMENT_GATE_CLEARED_RE = re.compile(
+    r"(?ix)(?:"
+    r"\bno\s+(?:credit[- ]?|debit[- ]?)?card\s+(?:is\s+)?required\b"
+    r"|\bno\s+(?:payment|paid\s+subscription)\s+(?:is\s+)?required\b"
+    r"|\b(?:credit[- ]?card|debit[- ]?card|card|payment|subscription)\s+"
+    r"(?:is\s+)?(?:not\s+required|optional)\b"
+    r"|\b(?:does\s+not|doesn['’]t|no\s+longer)\s+require\s+"
+    r"(?:an?\s+)?(?:credit[- ]?card|debit[- ]?card|card|payment|subscription)\b"
+    r"|\b(?:removed|disabled|eliminated)\s+(?:the\s+)?"
+    r"(?:paywall|payment\s+(?:wall|gate)|subscription\s+(?:wall|gate)|card\s+gate)\b"
+    r"|\bkart(?:a|y)\s+(?:nie\s+jest\s+wymagana|opcjonalna)\b"
+    r"|\b(?:bez\s+karty|nie\s+wymaga\s+(?:karty|p[łl]atno[sś]ci|subskrypcji))\b"
     r")"
 )
 
@@ -407,6 +463,14 @@ def looks_like_cookie_wall(evidence: str | None) -> bool:
     return bool(_COOKIE_WALL_RE.search(active_evidence))
 
 
+def looks_like_payment_gate(evidence: str | None) -> bool:
+    """True when a card, payment, or paid subscription precedes the product."""
+    if not evidence:
+        return False
+    active_evidence = _PAYMENT_GATE_CLEARED_RE.sub("", evidence)
+    return bool(_PAYMENT_GATE_RE.search(active_evidence))
+
+
 def looks_like_geo_block(evidence: str | None) -> bool:
     """True for a 451 / country wall / not-available-in-your-region gate."""
     return bool(evidence and _GEO_BLOCK_RE.search(evidence))
@@ -426,6 +490,8 @@ def artifact_tryable_reason(
         return AGE_GATE_NOT_TRYABLE
     if looks_like_cookie_wall(evidence):
         return COOKIE_WALL_NOT_TRYABLE
+    if looks_like_payment_gate(evidence):
+        return PAYMENT_GATE_NOT_TRYABLE
     return None
 
 

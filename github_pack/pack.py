@@ -42,6 +42,7 @@ from github_pack.classify import (
     looks_like_lead_magnet,
     looks_like_fomo,
     looks_like_meme,
+    looks_like_payment_gate,
     looks_like_cloud_drive,
     looks_like_deck,
     looks_like_linktree,
@@ -404,15 +405,16 @@ def pack_survey(payload: dict[str, Any]) -> dict[str, Any]:
     if paid_disclosure_reason(blob):
         return _silence(PAID_UNDISCLOSED_REASON, repo=slug)
     meta = survey.get("meta") if isinstance(survey.get("meta"), dict) else {}
-    if looks_like_solicit_gesture(
-        "\n".join(
-            (
-                blob,
-                str(survey.get("readme_text") or ""),
-                str(meta.get("description") or ""),
-            )
+    artifact_evidence = "\n".join(
+        (
+            blob,
+            str(survey.get("readme_text") or ""),
+            str(meta.get("description") or ""),
         )
-    ):
+    )
+    if looks_like_payment_gate(artifact_evidence):
+        return _silence("payment_gate_not_tryable", repo=slug)
+    if looks_like_solicit_gesture(artifact_evidence):
         return _silence(SOLICIT_GESTURE_REASON, repo=slug)
     if looks_like_same_window_revert(survey.get("prs") or []):
         return _silence(REVERTED_NOT_A_SHIP_REASON, repo=slug)

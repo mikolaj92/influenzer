@@ -10,6 +10,7 @@ from github_pack.classify import (
     is_trusted_artifact_url,
     is_tryable,
     looks_like_merged_pr_fact,
+    looks_like_payment_gate,
     readme_tryable_url,
 )
 from github_pack.pack import (
@@ -117,6 +118,35 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "paid_undisclosed")
         self.assertIsNone(out["brief_id"])
+
+    def test_payment_gated_readme_is_silence(self) -> None:
+        gated = (
+            "Subscribe to continue",
+            "credit card required",
+            "free trial requires a credit card",
+            "karta przed produktem",
+        )
+        for text in gated:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_payment_gate(text))
+                readme = f"{VISIBLE_DEMO}\n{text}\n"
+                out = self._pack(ship_script(readme=GhCall(0, b64_readme(readme))))
+                self.assertEqual(out["status"], "noop")
+                self.assertEqual(out["reason"], "payment_gate_not_tryable")
+                self.assertIsNone(out["brief_id"])
+
+        self.assertFalse(looks_like_payment_gate("subscription billing is part of the product"))
+        self.assertFalse(looks_like_payment_gate("no credit card required to try the demo"))
+        out = self._pack(
+            ship_script(
+                readme=GhCall(
+                    0,
+                    b64_readme(f"{VISIBLE_DEMO}\nNo credit card required to try the demo.\n"),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "ok")
+        self.assertTrue(out["tryable"])
 
     def test_silence_on_commit_noise(self) -> None:
         out = self._pack(noise_script())
