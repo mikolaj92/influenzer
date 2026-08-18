@@ -16,6 +16,7 @@ from github_pack.pack import (
     README_WITHOUT_DEMO_REASON,
     README_WITHOUT_QUICKSTART_REASON,
     REVERTED_NOT_A_SHIP_REASON,
+    APOLOGY_WITHOUT_SHIP_REASON,
     SOLICIT_GESTURE_REASON,
     looks_like_same_window_revert,
     looks_like_solicit_gesture,
@@ -364,6 +365,61 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(readme_ask["status"], "noop")
         self.assertEqual(readme_ask["reason"], SOLICIT_GESTURE_REASON)
         self.assertNotIn("facts", readme_ask)
+
+    def test_apology_needs_a_separate_new_artifact(self) -> None:
+        only_sorry = pack_survey(
+            {
+                "status": "ok",
+                "ok": True,
+                "repo": REPO,
+                "now": NOW,
+                "survey": {
+                    "meta": {"description": "We hear you"},
+                    "prs": [
+                        {
+                            "number": 12,
+                            "title": "Released public apology for the outage",
+                            "url": SHIP_PR,
+                        }
+                    ],
+                    "releases": [],
+                    "tags": [],
+                    "readme_text": VISIBLE_DEMO,
+                    "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                },
+            }
+        )
+        self.assertEqual(only_sorry["status"], "noop")
+        self.assertEqual(only_sorry["reason"], APOLOGY_WITHOUT_SHIP_REASON)
+        self.assertIsNone(only_sorry["brief_id"])
+        self.assertNotIn("facts", only_sorry)
+
+        apology_plus_release = pack_survey(
+            {
+                "status": "ok",
+                "ok": True,
+                "repo": REPO,
+                "now": NOW,
+                "survey": {
+                    "meta": {"description": "We hear you"},
+                    "prs": [
+                        {
+                            "number": 12,
+                            "title": "Released public apology for the outage",
+                            "url": SHIP_PR,
+                        }
+                    ],
+                    "releases": [
+                        {"tagName": "v0.2.0", "name": "Queue recovery with bounded retries"}
+                    ],
+                    "tags": [{"name": "v0.2.0"}],
+                    "readme_text": VISIBLE_DEMO,
+                    "readme_url": "https://github.com/mikolaj92/demo/blob/main/README.md",
+                },
+            }
+        )
+        self.assertEqual(apology_plus_release["status"], "ok")
+        self.assertTrue(apology_plus_release["claims_ship"])
 
     def test_waitlist_release_is_silence(self) -> None:
         out = self._pack(

@@ -1144,6 +1144,27 @@ EVENT_RE = re.compile(
     r"(?:poniedzia[lł]ek|wtorek|[sś]rod[eę]|czwartek|pi[aą]tek)\b"
     r")"
 )
+# An apology is not a ship. "We hear you" / crisis-response / sorry copy
+# needs a separate new artifact; otherwise it is silence or changelog only.
+# The apology's own issue/comment URL is evidence of the crisis, not the fix.
+APOLOGY_WITHOUT_SHIP_REASON = "apology_without_ship"
+APOLOGY_RE = re.compile(
+    r"(?i)(?:"
+    r"\bwe\s+hear\s+you\b"
+    r"|\bwe(?:['’]?ve|\s+have)\s+heard\s+you\b"
+    r"|\bcrisis\s+(?:post|statement|message|update|response)\b"
+    r"|\b(?:public|official)\s+apolog(?:y|ies)\b"
+    r"|(?:^|\n)\s*(?:sorry|an?\s+apology|apologies)\s*[.!]?\s*(?=$|\n)"
+    r"|\bsorry\s*(?:[.!]\s+|[—:-]\s+)(?=\S)"
+    r"|\bwe\s+(?:apologi[sz]e|are\s+sorry)\b"
+    r"|\bwe(?:['’]?re|\s+are)\s+sorry\b"
+    r"|\b(?:we(?:['’]?re|\s+are)\s+)?sorry\s+(?:for|about|that|to)\b"
+    r"|\bour\s+apologies\b"
+    r"|\bprzepraszam(?:y)?\b"
+    r"|\bprzeprosiny\b"
+    r"|\bkryzysow(?:y|a|e)\s+(?:post|wpis|komunikat|o[sś]wiadczenie)\b"
+    r")"
+)
 # A calendar does not write for us. Holiday / repo birthday / happy Friday
 # is silence, not a product. Neighbor of event (#138, meetup) and world
 # commentary (#131, news of the day). This is the date as a greeting, not
@@ -3317,6 +3338,26 @@ def looks_like_event(text: str) -> bool:
     return bool(EVENT_RE.search(text))
 
 
+def looks_like_apology(text: str) -> bool:
+    """True for apology / crisis-response copy. Sorry alone is not a ship."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(APOLOGY_RE.search(cleaned))
+
+
+def apology_has_new_ship(
+    facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
+) -> bool:
+    """True when a non-apology release/merge points at a separate shipped artifact."""
+    return any(
+        kind.strip().lower() in {"release", "pull"}
+        and is_ship_artifact_url(url)
+        and not looks_like_apology(text)
+        for kind, text, url in facts
+    )
+
+
 def looks_like_calendar_filler(text: str) -> bool:
     """True for a holiday, repo birthday, or happy Friday. A calendar does not write."""
     if not text or not text.strip():
@@ -4308,6 +4349,8 @@ __all__ = [
     "ROADMAP_RE",
     "EVENT_NOT_A_SHIP",
     "EVENT_RE",
+    "APOLOGY_WITHOUT_SHIP_REASON",
+    "APOLOGY_RE",
     "CALENDAR_FILLER_REASON",
     "CALENDAR_FILLER_RE",
     "COUNTER_THANKS_REASON",
@@ -4356,6 +4399,7 @@ __all__ = [
     "X_REPLY_LIMIT",
     "arena_gate",
     "arena_play",
+    "apology_has_new_ship",
     "choose_arena",
     "agora_reason",
     "cafe_artifact_reason",
@@ -4487,6 +4531,7 @@ __all__ = [
     "looks_like_server_splash",
     "looks_like_roadmap",
     "looks_like_event",
+    "looks_like_apology",
     "looks_like_calendar_filler",
     "looks_like_counter_thanks",
     "looks_like_fog",

@@ -35,6 +35,7 @@ from influenzer.playbook import (
     Verdict,
     arena_gate,
     arena_play,
+    apology_has_new_ship,
     choose_arena,
     agora_reason,
     has_parent_post,
@@ -113,6 +114,7 @@ from influenzer.playbook import (
     looks_like_server_splash,
     looks_like_roadmap,
     looks_like_event,
+    looks_like_apology,
     looks_like_calendar_filler,
     looks_like_counter_thanks,
     looks_like_fog,
@@ -129,6 +131,7 @@ from influenzer.playbook import (
     looks_like_prerelease,
     looks_like_waitlist,
     EVENT_NOT_A_SHIP,
+    APOLOGY_WITHOUT_SHIP_REASON,
     CALENDAR_FILLER_REASON,
     COUNTER_THANKS_REASON,
     FOG_REASON,
@@ -664,6 +667,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
     unsourced = unquotable_reason(_fact_triples(brief))
     if unsourced:
         return _kill(brief, unsourced)
+    if looks_like_apology(blob) and not apology_has_new_ship(_fact_triples(brief)):
+        if brief.claims_ship or is_social_arena(brief.preferred_arena):
+            return _kill(brief, APOLOGY_WITHOUT_SHIP_REASON)
+        return _changelog(brief, APOLOGY_WITHOUT_SHIP_REASON)
     if brief.story_kind is StoryKind.PATCH:
         return _changelog(brief, "patch_changelog_only")
     if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):
