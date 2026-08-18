@@ -1044,6 +1044,71 @@ class HomDraftCostumeTests(unittest.TestCase):
         self.assertNotIn("ebook", decision.draft.body.lower())
         self.assertNotIn("typeform", decision.draft.body.lower())
 
+    def test_fomo_is_undressable_even_when_score_says_draft(self) -> None:
+        pressure = (
+            "only 5 spots for the local tick",
+            "countdown to the launch",
+            "last chance to try the local tick",
+            "tylko 3 miejsca",
+            "ostatnia szansa",
+        )
+        for text in pressure:
+            with self.subTest(text=text):
+                brief = _ship_brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                fake = Score(
+                    brief_id=brief.brief_id,
+                    verdict=Verdict.DRAFT,
+                    reason="one_angle",
+                    arena=ArenaId.HN,
+                    angle="what shipped and why a stranger should try it",
+                    wave_checklist=ARENAS[ArenaId.HN].wave,
+                    canon_url=ARENAS[ArenaId.HN].canon_url,
+                )
+                self.assertIsNone(dress_brief(brief, fake))
+                payload = dress_payload(
+                    {
+                        "brief": brief_to_mapping(brief),
+                        "score": {
+                            "brief_id": brief.brief_id,
+                            "verdict": "draft",
+                            "reason": "one_angle",
+                            "arena": "hn",
+                            "angle": "what shipped and why a stranger should try it",
+                            "wave_checklist": list(ARENAS[ArenaId.HN].wave),
+                            "canon_url": ARENAS[ArenaId.HN].canon_url,
+                        },
+                    }
+                )
+                self.assertEqual(payload["status"], "noop")
+                self.assertIsNone(payload["body"])
+                dumped = json.dumps(payload)
+                self.assertNotIn("only 5 spots", dumped.lower())
+                self.assertNotIn("countdown", dumped.lower())
+                self.assertNotIn("last chance", dumped.lower())
+                self.assertNotIn("tylko 3", dumped.lower())
+                self.assertNotIn("ostatnia szansa", dumped.lower())
+                self.assertNotIn("Show HN:", dumped)
+
+    def test_product_copy_without_fomo_can_still_dress(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                Fact(text="parking spots near the office"),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertIn("parking spots", decision.draft.body)
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertNotIn("last chance", decision.draft.body.lower())
+        self.assertNotIn("countdown", decision.draft.body.lower())
+
     def test_logo_reveal_is_undressable_even_when_score_says_draft(self) -> None:
         looks = (
             "rebrand of the local tick",

@@ -511,6 +511,28 @@ class PackSilenceTests(unittest.TestCase):
         self.assertEqual(out["status"], "noop")
         self.assertEqual(out["reason"], "lead_magnet")
 
+    def test_last_chance_release_is_silence(self) -> None:
+        out = self._pack(
+            ship_script(
+                releases=GhCall(
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "tagName": "v0.0.0-last-chance",
+                                "name": "Last chance for the local tick",
+                                "isDraft": False,
+                                "isPrerelease": False,
+                                "publishedAt": "2026-08-12T18:00:00Z",
+                            }
+                        ]
+                    ),
+                )
+            )
+        )
+        self.assertEqual(out["status"], "noop")
+        self.assertEqual(out["reason"], "fomo")
+
     def test_rebrand_release_is_silence(self) -> None:
         out = self._pack(
             ship_script(

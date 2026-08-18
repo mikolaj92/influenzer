@@ -200,6 +200,27 @@ _LOGO_REVEAL_RE = re.compile(
     r"|\bnowy\s+branding\b"
     r")"
 )
+_FOMO_RE = re.compile(
+    r"(?i)(?:"
+    r"\bfomo\b"
+    r"|\blast\s+chances?\b"
+    r"|\blast\s+calls?\b"
+    r"|\bcount[- ]?downs?\b"
+    r"|\bonly\s+(?:n|\d+)\s+(?:spots?|seats?|places?|slots?|tickets?)\b"
+    r"|\bonly\s+(?:a\s+)?few\s+(?:spots?|seats?|places?|slots?)\b"
+    r"|\blast\s+(?:n|\d+)\s+(?:spots?|seats?|places?|slots?)\b"
+    r"|\blimited\s+(?:spots?|seats?|places?|slots?|tickets?)\b"
+    r"|\b(?:spots?|seats?|places?|slots?)\s+(?:left|remaining)\b"
+    r"|\blimited[- ]time\b"
+    r"|\bending\s+soon\b"
+    r"|\bdon['’]?t\s+miss\s+out\b"
+    r"|\bwhile\s+supplies\s+last\b"
+    r"|\bostatni[aea]\s+szans"
+    r"|\btylko\s+(?:n|\d+)\s+miejsc"
+    r"|\bostatni[ae]\s+miejsc"
+    r"|\bodliczani"
+    r")"
+)
 _SHIP_ARTIFACT_RE = re.compile(
     r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
     r"(?:pull/\d+|issues/\d+|releases(?:/tag/[A-Za-z0-9._~-]+|/\d+))$"
@@ -274,6 +295,13 @@ def looks_like_logo_reveal(text: str) -> bool:
     if not text or not text.strip():
         return False
     return bool(_LOGO_REVEAL_RE.search(text))
+
+
+def looks_like_fomo(text: str) -> bool:
+    """True for only-N-spots / countdown / last chance. Pressure is not a product."""
+    if not text or not text.strip():
+        return False
+    return bool(_FOMO_RE.search(text))
 
 
 def is_ship_artifact(url: str | None) -> bool:
