@@ -142,7 +142,7 @@ ARENAS: dict[ArenaId, ArenaPlay] = {
         costume="seminar",
         game="curiosity auction plus gravity; tryable thing, not a launch post",
         wave=(
-            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
+            "Title starts with Show HN and a working demo. One line, not a blog. Overflow is silence, not a mid-word clip. English only. A Polish Show HN is silence. A lab notebook is not Show HN: exploration / decision / failure do not sit, even with a demo — workshop or silence. Seminar only when a stranger can click and run a major or hard-issue ship. No waitlist, no FOMO, no only-N-spots, no countdown, no last chance, no meme, no Drake, no wojak, no reaction image, no deck, no pitch deck, no PDF slides, no Notion one-pager, no linktree, no Carrd, no bio site, no list of links, no roadmap, no webinar, no meetup, no calendar, no rebrand, no logo reveal, no moodboard, no palette, no draft release, no prerelease, no RC, no beta, no pending CI, no yellow CI, no red CI, no failed CI, no login wall, no listed 404 asset, no dead link, no server splash, no off-allowlist redirect, no blog-as-Show, no store-as-Show, no aggregator-as-Show, no ranking dump, no listicle, no shouty CAPS, no emoji, no issues-disabled repo, no fork, no empty repo, no missing README, no private repo, no archived repo, no disabled repo, no museum launch, no foreign-owner repo, no someone else's ship, no template repo, no generate-from-template without a ship, no boilerplate Show HN, no bot-only bump week, no version-diff launch.",
             "URL in the URL field (text posts eat nourl-factor).",
             "First comment = backstory from BrandProfile.maintainer, first person. Camp the thread. A second Show is silence. Human username. Brand voice is silence.",
             "Never solicit upvotes (ban / domain penalty).",
@@ -601,6 +601,29 @@ DECK_HOSTS: frozenset[str] = frozenset(
 _GOOGLE_SLIDES_RE = re.compile(
     r"^https://docs\.google\.com/presentation(?:/.*)?$",
     re.I,
+)
+# A linktree is not a tryable artifact. Carrd / bio site / a list of
+# links as the only URL is silence. The website is the repo, not a
+# link board. A link page next to a repo can stay as evidence.
+# Neighbor of #139 (CTA / link in bio) and #76 (trusted host): here
+# it is a list page, not a CTA.
+LINKTREE_HOSTS: frozenset[str] = frozenset(
+    {
+        "linktr.ee",
+        "linktree.com",
+        "carrd.co",
+        "bio.site",
+        "beacons.ai",
+        "lnk.bio",
+        "allmylinks.com",
+        "hoo.be",
+        "solo.to",
+        "campsite.bio",
+        "milkshake.app",
+        "heylink.me",
+        "linkin.bio",
+        "about.me",
+    }
 )
 # A ranking dump is not a tryable artifact. HN front / star-history /
 # shields / stargazers as the only URL is silence. The website is the repo,
@@ -1307,6 +1330,31 @@ DECK_RE = re.compile(
     r"|\bslideshare\b"
     r"|\bgoogle\s+slides\b"
     r"|\bdeck\s+nie\s+jest\s+artefakt"
+    r")"
+)
+# A linktree is not an artifact. Carrd / bio site / a list of links
+# instead of a product is silence. Neighbor of CTA in DM / link in
+# bio (#139) and trusted host (#76). Here it is a list page, not a
+# CTA. "link in the README" and a product site stay.
+LINKTREE_REASON = "linktree_not_an_artifact"
+LINKTREE_RE = re.compile(
+    r"(?i)(?:"
+    r"\blinktrees?\b"
+    r"|\blinktr\.ee\b"
+    r"|\bcarrds?\b"
+    r"|\bbio\s+sites?\b"
+    r"|\bbiosites?\b"
+    r"|\blista\s+link"
+    r"|\blink\s+lists?\b"
+    r"|\blists?\s+of\s+links?\b"
+    r"|\blink\s+boards?\b"
+    r"|\ball\s+my\s+links?\b"
+    r"|\bmy\s+links?\s+page\b"
+    r"|\blinks?\s+page\b"
+    r"|\bstron[aąeęy]\s+z\s+link"
+    r"|\btablic[aąęy]\s+link"
+    r"|\bbeacons\.ai\b"
+    r"|\blinktree\s+nie\s+jest\s+artefakt"
     r")"
 )
 # Press-release tone is not a social angle. We're excited / announcement /
@@ -2231,6 +2279,21 @@ def deck_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
     if any(is_ship_artifact_url(url) for url in cleaned):
         return False
     return all(is_deck_host_url(url) for url in cleaned)
+
+
+def is_linktree_host_url(url: str | None) -> bool:
+    """True for Linktree / Carrd / bio.site. A link board is not a tryable demo."""
+    return _host_in(url, LINKTREE_HOSTS)
+
+
+def linktree_urls_only(urls: tuple[str, ...] | list[str]) -> bool:
+    """True when every artifact URL is a link board and none is a repo."""
+    cleaned = [url.strip() for url in urls if url and url.strip()]
+    if not cleaned:
+        return False
+    if any(is_ship_artifact_url(url) for url in cleaned):
+        return False
+    return all(is_linktree_host_url(url) for url in cleaned)
 
 
 def is_ranking_host_url(url: str | None) -> bool:
@@ -3220,6 +3283,14 @@ def looks_like_deck(text: str) -> bool:
     return bool(DECK_RE.search(cleaned))
 
 
+def looks_like_linktree(text: str) -> bool:
+    """True for Linktree / Carrd / bio site / a list of links. A board is not an artifact."""
+    if not text or not text.strip():
+        return False
+    cleaned = _URL_IN_TEXT_RE.sub(" ", text)
+    return bool(LINKTREE_RE.search(cleaned))
+
+
 def looks_like_press_release(text: str) -> bool:
     """True for we're excited / announcement / unveiling / delighted to share."""
     if not text or not text.strip():
@@ -3760,7 +3831,7 @@ def unquotable_reason(
     facts: tuple[tuple[str, str, str | None], ...] | list[tuple[str, str, str | None]],
     extra: str = "",
 ) -> str | None:
-    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a deck, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
+    """Silence reason when a quote, 'users love', a gesture ask, a contest, a poll, a prompt dump, a calendar greeting, a vanity thank-you, a subtweet, a founder journal, a lead magnet, artificial FOMO, a meme, a deck, a linktree, a 1/n serial, a ranking dump, a tag wall, a summon, a private conversation, a secret, a world take, a hire/round/offsite, a source-available OSS sticker, or a number is not in the brief."""
     packed = tuple(facts)
     excerpts = feedback_excerpt_texts(packed)
     operator_texts = [
@@ -3811,6 +3882,11 @@ def unquotable_reason(
             return DECK_REASON
     if extra and looks_like_deck(extra):
         return DECK_REASON
+    for _kind, text, _url in packed:
+        if looks_like_linktree(text):
+            return LINKTREE_REASON
+    if extra and looks_like_linktree(extra):
+        return LINKTREE_REASON
     for _kind, text, url in packed:
         if looks_like_secret(text):
             return SECRET_REASON
@@ -4123,6 +4199,9 @@ __all__ = [
     "DECK_REASON",
     "DECK_RE",
     "DECK_HOSTS",
+    "LINKTREE_REASON",
+    "LINKTREE_RE",
+    "LINKTREE_HOSTS",
     "LOGO_REVEAL_NOT_A_SHIP",
     "LOGO_REVEAL_RE",
     "PENDING_CI_RE",
@@ -4177,8 +4256,10 @@ __all__ = [
     "has_tavern_seed",
     "has_workshop_life",
     "deck_urls_only",
+    "linktree_urls_only",
     "is_blog_host_url",
     "is_deck_host_url",
+    "is_linktree_host_url",
     "is_feedback_excerpt_fact",
     "is_launch_host_url",
     "is_merge_log_texts",
@@ -4282,6 +4363,7 @@ __all__ = [
     "looks_like_fomo",
     "looks_like_meme",
     "looks_like_deck",
+    "looks_like_linktree",
     "looks_like_logo_reveal",
     "looks_like_pending_ci",
     "looks_like_failed_ci",

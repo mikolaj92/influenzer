@@ -43,6 +43,7 @@ from influenzer.playbook import (
     stack_costume_reason,
     is_blog_host_url,
     is_deck_host_url,
+    is_linktree_host_url,
     is_launch_host_url,
     is_news_host_url,
     is_ranking_host_url,
@@ -60,6 +61,7 @@ from influenzer.playbook import (
     FOMO_REASON,
     MEME_REASON,
     DECK_REASON,
+    LINKTREE_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     DEAD_STAR_COUNT_REASON,
     looks_like_bot_author,
@@ -106,6 +108,7 @@ from influenzer.playbook import (
     looks_like_fomo,
     looks_like_meme,
     looks_like_deck,
+    looks_like_linktree,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -1144,6 +1147,80 @@ class PlaybookCopyTests(unittest.TestCase):
         self.assertFalse(is_deck_host_url("https://notnotion.so/local-tick"))
         self.assertFalse(is_deck_host_url("https://notion.so.evil.com/local-tick"))
         self.assertFalse(is_deck_host_url("https://docs.google.com/document/d/abc123/edit"))
+
+    def test_linktree_is_a_board_not_an_artifact(self) -> None:
+        boards = (
+            "linktree for the local tick",
+            "our Linktree",
+            "Carrd of the launch",
+            "bio site for the local tick",
+            "biosite of the launch",
+            "lista linków zamiast produktu",
+            "link list instead of a product",
+            "list of links",
+            "link board",
+            "all my links",
+            "my links page",
+            "links page",
+            "strona z linkami",
+            "tablica linków",
+            "linktree nie jest artefaktem",
+        )
+        for text in boards:
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_linktree(text))
+                self.assertEqual(
+                    unquotable_reason((("signal", text, SHIP_PR),)),
+                    LINKTREE_REASON,
+                )
+        allowed = (
+            "Local tick scores briefs and emits a draft",
+            "Windows install fails with a traceback",
+            "link in the README",
+            "screenshot of the local tick demo",
+            "tree of links in the AST",
+            "join the waitlist",
+        )
+        for text in allowed:
+            with self.subTest(text=text):
+                self.assertFalse(looks_like_linktree(text))
+                if text == "join the waitlist":
+                    continue
+                self.assertIsNone(unquotable_reason((("signal", text, SHIP_PR),)))
+
+    def test_linktree_host_is_carrd_or_bio_site_not_a_repo(self) -> None:
+        boards = (
+            "https://linktr.ee/someone",
+            "https://www.linktree.com/someone",
+            "https://someone.carrd.co",
+            "https://bio.site/someone",
+            "https://beacons.ai/someone",
+            "https://lnk.bio/someone",
+            "https://allmylinks.com/someone",
+            "https://hoo.be/someone",
+            "https://solo.to/someone",
+            "https://campsite.bio/someone",
+            "https://milkshake.app/someone",
+            "https://heylink.me/someone",
+            "https://linkin.bio/someone",
+            "https://about.me/someone",
+        )
+        for url in boards:
+            with self.subTest(url=url):
+                self.assertTrue(is_linktree_host_url(url))
+                self.assertFalse(is_ship_artifact(url))
+                self.assertFalse(is_video_host_url(url))
+                self.assertFalse(is_store_host_url(url))
+                self.assertFalse(is_blog_host_url(url))
+                self.assertFalse(is_launch_host_url(url))
+                self.assertFalse(is_ranking_host_url(url))
+                self.assertFalse(is_deck_host_url(url))
+        self.assertFalse(is_linktree_host_url(SHIP_REPO))
+        self.assertFalse(is_linktree_host_url(SHIP_PR))
+        self.assertFalse(is_linktree_host_url("https://example.com/linktree"))
+        self.assertFalse(is_linktree_host_url("https://notlinktr.ee/local-tick"))
+        self.assertFalse(is_linktree_host_url("https://linktr.ee.evil.com/local-tick"))
+        self.assertFalse(is_linktree_host_url("https://docs.google.com/document/d/abc123/edit"))
 
     def test_logo_reveal_is_look_not_a_product(self) -> None:
         looks = (
@@ -3313,6 +3390,28 @@ class ScoreBriefTests(unittest.TestCase):
                 self.assertIsNone(score.arena)
                 self.assertIsNone(compose_draft(brief, score))
 
+    def test_linktree_is_killed(self) -> None:
+        boards = (
+            "linktree for the local tick",
+            "Carrd bio site",
+            "lista linków zamiast produktu",
+            "all my links",
+            "strona z linkami",
+        )
+        for text in boards:
+            with self.subTest(text=text):
+                brief = self._brief(
+                    facts=(
+                        Fact(text=text, artifact_url=SHIP_PR),
+                        Fact(text="strangers can click and run the demo today"),
+                    )
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LINKTREE_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
     def test_logo_reveal_ship_claim_is_killed(self) -> None:
         looks = (
             "rebrand of the local tick",
@@ -4510,6 +4609,68 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertTrue(decision.draft.body.startswith("Show HN:"))
         self.assertIn(SHIP_REPO, decision.draft.body)
         self.assertNotIn("speakerdeck.com", decision.draft.body)
+
+    def test_linktree_carrd_or_bio_site_as_only_url_is_not_an_artifact(self) -> None:
+        boards = (
+            "https://linktr.ee/someone",
+            "https://someone.carrd.co",
+            "https://bio.site/someone",
+            "https://beacons.ai/someone",
+            "https://allmylinks.com/someone",
+            "https://about.me/someone",
+        )
+        for url in boards:
+            with self.subTest(url=url):
+                brief = self._brief(
+                    claims_ship=False,
+                    tryable=True,
+                    preferred_arena=ArenaId.HN,
+                    facts=(
+                        Fact(text="see the links", artifact_url=url),
+                        Fact(text="strangers can click the page today"),
+                    ),
+                )
+                score = score_brief(brief)
+                self.assertEqual(score.verdict, Verdict.KILL)
+                self.assertEqual(score.reason, LINKTREE_REASON)
+                self.assertIsNone(score.arena)
+                self.assertIsNone(compose_draft(brief, score))
+
+    def test_linktree_next_to_repo_is_still_killed_when_copy_is_a_board(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="linktree for the local tick", artifact_url=SHIP_REPO),
+                Fact(
+                    text="links as evidence",
+                    artifact_url="https://linktr.ee/someone",
+                ),
+            ),
+        )
+        score = score_brief(brief)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, LINKTREE_REASON)
+        self.assertIsNone(score.arena)
+        self.assertIsNone(compose_draft(brief, score))
+
+    def test_linktree_next_to_repo_can_still_be_show_hn(self) -> None:
+        brief = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_REPO),
+                Fact(
+                    text="links as evidence",
+                    artifact_url="https://linktr.ee/someone",
+                ),
+            ),
+        )
+        decision = apply_brief(brief)
+        self.assertEqual(decision.score.verdict, Verdict.DRAFT)
+        self.assertEqual(decision.score.arena, ArenaId.HN)
+        assert decision.draft is not None
+        self.assertTrue(decision.draft.body.startswith("Show HN:"))
+        self.assertIn(SHIP_REPO, decision.draft.body)
+        self.assertNotIn("linktr.ee", decision.draft.body)
 
     def test_hn_front_star_chart_or_badge_as_only_url_is_not_an_artifact(self) -> None:
         charts = (

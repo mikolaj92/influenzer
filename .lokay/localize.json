@@ -1,21 +1,36 @@
 {
   "paths": [
-    "influenzer/host.py",
+    "influenzer/playbook.py",
+    "influenzer/hom.py",
+    "influenzer/hom_draft.py",
+    "influenzer/brief_admit.py",
+    "github_pack/classify.py",
+    "github_pack/pack.py",
+    "skills/influenzer-hn/SKILL.md",
+    "tests/test_e2e_gates.py",
+    "tests/test_brief_admit.py",
+    "tests/test_github_pack.py",
+    "tests/test_hom_draft.py",
+    "tests/test_hom_operator.py"
+  ],
+  "source": "agent",
+  "seed_paths": [
+    "github_pack/pack.py",
+    "influenzer/adapters/base.py",
+    "influenzer/config.py",
+    "influenzer/content.py",
+    "influenzer/hom.py",
+    "influenzer/domain.py",
+    "github_feedback/feedback.py",
+    "influenzer/brief_admit.py",
     "tests/test_e2e_gates.py"
   ],
-  "source": "deterministic",
-  "seed_paths": [],
-  "matched_tokens": [
-    "host",
-    "influenzer",
-    "gate"
-  ],
+  "matched_tokens": ["linktree", "carrd", "bio site", "artifact", "gate"],
   "notes": [
-    "Agentless-style localization: deterministic paths only (no embeddings).",
-    "Empty path list fails closed — run_agent must not start.",
-    "Repo tree entries considered: 137."
+    "Same fail-closed shape as #151 (deck is not an artifact).",
+    "Neighbor of #139 (CTA / link in bio) and #76 (trusted host): here it is a list page, not a CTA."
   ],
-  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__152-localhost-i-staging-nie-s-tryable-55d4c66d",
-  "wrote": false,
+  "worktree": "/Users/mini-m4-main/.lokay/worktrees/mikolaj92__influenzer/ai__fix__153-linktree-nie-jest-artefaktem-4c9fe6e1",
+  "wrote": true,
   "localize_rel": ".lokay/localize.json"
 }

@@ -43,6 +43,7 @@ from influenzer.playbook import (
     has_named_subreddit,
     is_blog_host_url,
     is_deck_host_url,
+    is_linktree_host_url,
     is_launch_host_url,
     is_merge_log_texts,
     is_ranking_host_url,
@@ -108,6 +109,7 @@ from influenzer.playbook import (
     looks_like_fomo,
     looks_like_meme,
     looks_like_deck,
+    looks_like_linktree,
     looks_like_logo_reveal,
     looks_like_pending_ci,
     looks_like_failed_ci,
@@ -122,11 +124,13 @@ from influenzer.playbook import (
     FOMO_REASON,
     MEME_REASON,
     DECK_REASON,
+    LINKTREE_REASON,
     LOGO_REVEAL_NOT_A_SHIP,
     PRESS_RELEASE_REASON,
     WORSE_CLONE_REASON,
     ranking_urls_only,
     deck_urls_only,
+    linktree_urls_only,
     unquotable_reason,
 )
 
@@ -363,7 +367,7 @@ def _proof_url_for_brief(brief: Brief) -> str | None:
         return ship
     for fact in brief.facts:
         url = (fact.artifact_url or "").strip()
-        if is_tryable_artifact_url(url) and not is_ranking_host_url(url) and not is_deck_host_url(url):
+        if is_tryable_artifact_url(url) and not is_ranking_host_url(url) and not is_deck_host_url(url) and not is_linktree_host_url(url):
             return url
     return None
 
@@ -416,6 +420,11 @@ def _ranking_only_urls(brief: Brief) -> bool:
 def _deck_only_urls(brief: Brief) -> bool:
     """True when every artifact URL is a pitch / Notion / slides host and none is a repo."""
     return deck_urls_only(brief_artifacts(brief))
+
+
+def _linktree_only_urls(brief: Brief) -> bool:
+    """True when every artifact URL is a Linktree / Carrd / bio site and none is a repo."""
+    return linktree_urls_only(brief_artifacts(brief))
 
 
 def _news_only_urls(brief: Brief) -> bool:
@@ -519,6 +528,8 @@ def _gate_violation(brief: Brief, arena: ArenaId, blob: str) -> tuple[Verdict, s
         return Verdict.KILL, "ranking_not_an_artifact"
     if arena is ArenaId.HN and _deck_only_urls(brief):
         return Verdict.KILL, DECK_REASON
+    if arena is ArenaId.HN and _linktree_only_urls(brief):
+        return Verdict.KILL, LINKTREE_REASON
     if arena is ArenaId.HN and _news_only_urls(brief):
         return Verdict.KILL, "world_commentary"
     title = next(iter(_wearable_fact_texts(brief)), "")
@@ -721,6 +732,8 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         return _kill(brief, MEME_REASON)
     if looks_like_deck(blob) or _deck_only_urls(brief):
         return _kill(brief, DECK_REASON)
+    if looks_like_linktree(blob) or _linktree_only_urls(brief):
+        return _kill(brief, LINKTREE_REASON)
     if looks_like_logo_reveal(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, LOGO_REVEAL_NOT_A_SHIP)
