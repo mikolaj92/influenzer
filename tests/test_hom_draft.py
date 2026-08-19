@@ -8,7 +8,16 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from influenzer.hom import Brief, Fact, Score, apply_brief, brief_to_mapping, compose_draft, score_brief
+from influenzer.hom import (
+    Brief,
+    Fact,
+    Score,
+    angle_body_hash,
+    apply_brief,
+    brief_to_mapping,
+    compose_draft,
+    score_brief,
+)
 from influenzer.hom_draft import dress_brief, dress_payload, main as draft_main
 from influenzer.playbook import (
     ARENAS,
@@ -55,6 +64,23 @@ def _import_lines(path: Path) -> list[str]:
 
 
 class HomDraftCostumeTests(unittest.TestCase):
+    def test_draft_hash_is_body_only_not_costume_metadata(self) -> None:
+        brief = _ship_brief()
+        for arena in (ArenaId.HN, ArenaId.GITHUB):
+            score = Score(
+                brief_id=brief.brief_id,
+                verdict=Verdict.DRAFT,
+                reason="one_angle",
+                arena=arena,
+                angle="what shipped and why a stranger should try it",
+                wave_checklist=ARENAS[arena].wave,
+                canon_url=ARENAS[arena].canon_url,
+            )
+            draft = dress_brief(brief, score)
+            self.assertIsNotNone(draft)
+            assert draft is not None
+            self.assertEqual(draft.content_hash, angle_body_hash(draft.body))
+
     def test_hn_ship_tryable_is_show_hn_not_a_costume_prefix(self) -> None:
         brief = _ship_brief()
         with patch("subprocess.run", side_effect=AssertionError("draft must not call subprocess")):
