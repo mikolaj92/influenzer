@@ -87,6 +87,7 @@ from influenzer.playbook import (
     looks_like_hashtag_wall,
     looks_like_hire_fundraise,
     looks_like_invented_opinion,
+    looks_like_used_by,
     looks_like_listicle_title,
     looks_like_person_mention,
     looks_like_private_conversation,
@@ -4291,6 +4292,30 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(score.reason, "invented_opinion")
         self.assertIsNone(score.arena)
         self.assertIsNone(compose_draft(brief, score))
+
+    def test_used_by_requires_named_customer_support_from_another_fact(self) -> None:
+        self.assertTrue(looks_like_used_by("Used by Stripe"))
+        cases = (
+            ((Fact(text="Used by Stripe", artifact_url=SHIP_PR),), Verdict.KILL, "unproven_social_proof"),
+            (
+                (
+                    Fact(text="Used by Stripe", artifact_url=SHIP_PR),
+                    Fact(text="Stripe runs this in prod"),
+                ),
+                Verdict.DRAFT,
+                "one_angle",
+            ),
+            ((Fact(text="Local tick scores briefs", artifact_url=SHIP_PR),), Verdict.DRAFT, "one_angle"),
+        )
+        for facts, verdict, reason in cases:
+            with self.subTest(facts=facts):
+                decision = apply_brief(self._brief(facts=facts))
+                self.assertEqual(decision.score.verdict, verdict)
+                self.assertEqual(decision.score.reason, reason)
+                if verdict is Verdict.KILL:
+                    self.assertIsNone(decision.draft)
+                else:
+                    self.assertIsNotNone(decision.draft)
 
     def test_number_from_brief_can_still_draft(self) -> None:
         brief = self._brief(

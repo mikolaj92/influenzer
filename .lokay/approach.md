@@ -1,24 +1,26 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=45 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=137 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #45 — Głos się nie miesza, cross-dress = cisza
+Issue: #137 — Used by tylko z faktu w briefie
 
 ## Goal
 
-W `influenzer/hom.py` funkcja `apply_brief` (ok. L1064).
+W `influenzer/playbook.py` obok `looks_like_waitlist` dodaj:
 
 ## Files likely touched
 
+- `influenzer/playbook.py`
 - `influenzer/hom.py`
 - `tests/test_hom_operator.py`
 
 ## Test plan
 
-- `tests/test_hom_operator.py` funkcja `test_cross_project_dress_is_silence`:
-- brief `project_id="app-1"`, `apply_brief(..., project_id="builder-1")` → `draft is None`, `reason == "voice_cross_dress"`.
-- `project_id="app-1"` → nie ten reason.
+- `tests/test_hom_operator.py` — `test_used_by_needs_second_fact`:
+- 1. Jeden fact `"Used by Stripe"` + major/tryable → `verdict=kill`, `reason=unproven_social_proof`, `draft is None`.
+- 2. Dwa facty `"Used by Stripe"` i `"Stripe runs this in prod"` → nie kill z `unproven_social_proof`.
+- 3. Fact bez used-by → bez zmiany.
 
 ## Non-goals
 

@@ -725,6 +725,85 @@ WAITLIST_RE = re.compile(
     r"|\bno\s+demo\b"
     r")"
 )
+# Named social proof needs a separate supporting fact; the claim itself is
+# not evidence of the named customer's use.
+UNPROVEN_SOCIAL_PROOF_REASON = "unproven_social_proof"
+USED_BY_RE = re.compile(r"(?i)\b(?:used by|trusted by|customers include)\b")
+_LOGO_PREFIX_RE = re.compile(r"(?i:\blogos?\b)(?:\s*(?:[:=\-–—]|include(?:s)?|for)\s*)?")
+_LOGO_SUFFIX_RE = re.compile(r"(?P<name>[A-Z][A-Za-z0-9&.'-]*)\s+(?i:logos?)\b")
+_PROPER_NAME_RE = re.compile(r"[A-Z][A-Za-z0-9&.'-]*(?:\s+[A-Z][A-Za-z0-9&.'-]*)*")
+_SOCIAL_PROOF_STOPWORDS = frozenset({"DESIGN", "GIF", "IN", "INTRO", "LOGO", "OUTRO", "README", "REVEAL", "URL"})
+
+
+def looks_like_used_by(text: str) -> bool:
+    """True when copy makes a named-customer social-proof claim."""
+    if not text or not text.strip():
+        return False
+    return any(names for names in _social_proof_claim_names(text))
+
+
+def _social_proof_claim_names(text: str) -> tuple[tuple[str, ...], ...]:
+    claims: list[tuple[str, ...]] = []
+    for match in USED_BY_RE.finditer(text):
+        name = _PROPER_NAME_RE.match(text[match.end():].lstrip(" :,-–—"))
+        claims.append((name.group(0).strip(),) if name else ())
+    for match in _LOGO_PREFIX_RE.finditer(text):
+        name = _PROPER_NAME_RE.match(text[match.end():].lstrip(" :,-–—"))
+        claims.append((name.group(0).strip(),) if name else ())
+    for match in _LOGO_SUFFIX_RE.finditer(text):
+        claims.append((match.group("name"),))
+    return tuple(
+        tuple(name for name in names if name.upper() not in _SOCIAL_PROOF_STOPWORDS)
+        for names in claims
+    )
+
+
+def unproven_social_proof_reason(
+    facts: tuple[tuple[str, str, str | None], ...]
+    | list[tuple[str, str, str | None]],
+    extra: str = "",
+) -> str | None:
+    """Require each named social-proof customer in another fact."""
+    packed = tuple(facts)
+    claims = [
+        (index, _social_proof_claim_names(text))
+        for index, (_kind, text, _url) in enumerate(packed)
+    ]
+    for index, found in claims:
+        for names in found:
+            if not names:
+                continue
+            support = "\n".join(
+                text
+                for other_index, (_kind, text, _url) in enumerate(packed)
+                if other_index != index
+            )
+            if not all(
+                re.search(
+                    rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])",
+                    support,
+                    re.IGNORECASE,
+                )
+                for name in names
+            ):
+                return UNPROVEN_SOCIAL_PROOF_REASON
+    if extra:
+        for names in _social_proof_claim_names(extra):
+            if not names:
+                continue
+            support = "\n".join(text for _kind, text, _url in packed)
+            if not all(
+                re.search(
+                    rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])",
+                    support,
+                    re.IGNORECASE,
+                )
+                for name in names
+            ):
+                return UNPROVEN_SOCIAL_PROOF_REASON
+    return None
+
+
 # A CTA that sends access to a private message or a bio page is not a
 # tryable artifact. The artifact URL is the access path, not the CTA.
 DM_CTA_RE = re.compile(
@@ -4627,6 +4706,7 @@ __all__ = [
     "looks_like_linktree",
     "looks_like_logo_reveal",
     "looks_like_pending_ci",
+    "looks_like_used_by",
     "looks_like_failed_ci",
     "looks_like_prerelease",
     "looks_like_waitlist",
