@@ -113,8 +113,15 @@ class BrandProfile:
     maintainer: str
     tone: str = "builder"
     disclosures: tuple[str, ...] = ()
+    pillars: tuple[str, ...] = ()
     revision: int = 1
     profile_hash: str = ""
+
+    def __post_init__(self) -> None:
+        if len(self.pillars) > 4:
+            raise DomainError("brand profile supports at most 4 pillars")
+        if any(not isinstance(pillar, str) or not pillar.strip() for pillar in self.pillars):
+            raise DomainError("brand profile pillars must be non-empty strings")
 
     def with_hash(self) -> "BrandProfile":
         payload = {
@@ -125,6 +132,7 @@ class BrandProfile:
             "maintainer": self.maintainer,
             "tone": self.tone,
             "disclosures": list(self.disclosures),
+            "pillars": list(self.pillars),
             "revision": self.revision,
         }
         return BrandProfile(
@@ -135,6 +143,7 @@ class BrandProfile:
             maintainer=self.maintainer,
             tone=self.tone,
             disclosures=self.disclosures,
+            pillars=self.pillars,
             revision=self.revision,
             profile_hash=content_hash(payload),
         )
@@ -162,6 +171,7 @@ class Project:
         tone: str = "builder",
         kind: str = "app",
         disclosures: tuple[str, ...] = (),
+        pillars: tuple[str, ...] = (),
         created_at: str | None = None,
     ) -> "Project":
         require_slug(slug)
@@ -175,6 +185,7 @@ class Project:
             maintainer=maintainer,
             tone=tone,
             disclosures=disclosures,
+            pillars=pillars,
         ).with_hash()
         return Project(
             project_id=project_id,
