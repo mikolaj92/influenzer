@@ -107,6 +107,7 @@ from influenzer.playbook import (
     looks_like_dead_link,
     looks_like_dead_tls,
     looks_like_dead_release_asset,
+    looks_like_dm_cta,
     looks_like_issues_disabled,
     looks_like_fork,
     looks_like_empty_repo,
@@ -827,6 +828,10 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, APOLOGY_WITHOUT_SHIP_REASON)
         return _changelog(brief, APOLOGY_WITHOUT_SHIP_REASON)
+    if looks_like_dm_cta(blob):
+        if brief.claims_ship:
+            return _kill(brief, "dm_cta")
+        return _changelog(brief, "dm_cta")
     if brief.story_kind is StoryKind.PATCH:
         return _changelog(brief, "patch_changelog_only")
     if brief.facts and all(looks_like_commit_noise(fact.text) for fact in brief.facts):

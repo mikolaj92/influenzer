@@ -725,6 +725,19 @@ WAITLIST_RE = re.compile(
     r"|\bno\s+demo\b"
     r")"
 )
+# A CTA that sends access to a private message or a bio page is not a
+# tryable artifact. The artifact URL is the access path, not the CTA.
+DM_CTA_RE = re.compile(
+    r"(?i)(?:"
+    r"\bdm\s+(?:me|for)\b"
+    r"|\bslide\s+into\b"
+    r"|\blink\s+in\s+bio\b"
+    r"|\blinkinbio\b"
+    r"|\bcheck\s+the\s+bio\b"
+    r"|\bnapisz\s+na\s+priv\b"
+    r"|\bw\s+bio\b"
+    r")"
+)
 # Pending / yellow CI is not green. The look stays silent: not a ship, not
 # "it is broken". We do not know the result, so we do not lie. Failed CI
 # is a different gate (#81). A passing check / green CI stays. Pair of
@@ -3251,6 +3264,13 @@ def looks_like_waitlist(text: str) -> bool:
     return bool(WAITLIST_RE.search(text))
 
 
+def looks_like_dm_cta(text: str) -> bool:
+    """True for access routed through a DM or a link-in-bio CTA."""
+    if not text or not text.strip():
+        return False
+    return bool(DM_CTA_RE.search(text))
+
+
 def looks_like_pending_ci(text: str) -> bool:
     """True for pending / yellow CI. Unknown is silence, not a ship or a fail."""
     if not text or not text.strip():
@@ -4370,6 +4390,7 @@ __all__ = [
     "DEAD_TLS_RE",
     "DEAD_RELEASE_ASSET_RE",
     "DEAD_STAR_COUNT_RE",
+    "DM_CTA_RE",
     "DEAD_STAR_COUNT_REASON",
     "WORKSHOP_LIFE_RE",
     "ISSUES_DISABLED_RE",
@@ -4578,6 +4599,7 @@ __all__ = [
     "looks_like_dead_release_asset",
     "looks_like_dead_star_count",
     "looks_like_dead_star_story",
+    "looks_like_dm_cta",
     "looks_like_issues_disabled",
     "looks_like_fork",
     "looks_like_empty_repo",

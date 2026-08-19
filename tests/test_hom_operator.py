@@ -93,6 +93,7 @@ from influenzer.playbook import (
     looks_like_dead_link,
     looks_like_dead_tls,
     looks_like_dead_release_asset,
+    looks_like_dm_cta,
     looks_like_issues_disabled,
     looks_like_fork,
     looks_like_empty_repo,
@@ -2880,6 +2881,52 @@ class ScoreBriefTests(unittest.TestCase):
         score = score_brief(brief)
         self.assertEqual(score.verdict, Verdict.KILL)
         self.assertEqual(score.reason, "waitlist_not_tryable")
+
+    def test_dm_cta_is_silence_and_does_not_match_demo(self) -> None:
+        for text in (
+            "DM me for the repo",
+            "DM for access",
+            "slide into my DMs",
+            "link in bio",
+            "linkinbio",
+            "check the bio",
+            "napisz na priv",
+            "w bio",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(looks_like_dm_cta(text))
+
+        self.assertFalse(looks_like_dm_cta("demo: local tick scores briefs"))
+
+        ship = self._brief(
+            facts=(Fact(text="DM me for the repo", artifact_url=SHIP_PR),),
+            preferred_arena=ArenaId.HN,
+        )
+        score = score_brief(ship)
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "dm_cta")
+        self.assertIsNone(compose_draft(ship, score))
+
+        quiet = self._brief(
+            claims_ship=False,
+            tryable=False,
+            facts=(Fact(text="link in bio", artifact_url=SHIP_PR),),
+        )
+        quiet_score = score_brief(quiet)
+        self.assertEqual(quiet_score.verdict, Verdict.CHANGELOG_ONLY)
+        self.assertEqual(quiet_score.reason, "dm_cta")
+        self.assertIsNone(compose_draft(quiet, quiet_score))
+
+        clean = self._brief(
+            preferred_arena=ArenaId.HN,
+            facts=(
+                Fact(text="Local tick scores briefs", artifact_url=SHIP_PR),
+                Fact(text="A stranger can click and run it"),
+            ),
+        )
+        clean_decision = apply_brief(clean)
+        self.assertEqual(clean_decision.score.verdict, Verdict.DRAFT)
+        self.assertIsNotNone(clean_decision.draft)
 
     def test_shortener_utm_or_click_here_is_not_tryable(self) -> None:
         cases = (
