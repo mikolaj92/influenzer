@@ -2548,6 +2548,16 @@ class ScoreBriefTests(unittest.TestCase):
         kwargs.update(overrides)
         return Brief.create(**kwargs)  # type: ignore[arg-type]
 
+    def test_cross_project_dress_is_silence(self) -> None:
+        brief = self._brief()
+
+        cross_project = apply_brief(brief, project_id="builder-1")
+        self.assertIsNone(cross_project.draft)
+        self.assertEqual(cross_project.score.reason, "voice_cross_dress")
+
+        same_project = apply_brief(brief, project_id="app-1")
+        self.assertNotEqual(same_project.score.reason, "voice_cross_dress")
+
     def test_empty_facts_are_killed(self) -> None:
         score = score_brief(self._brief(facts=(), claims_ship=False, tryable=False))
         self.assertEqual(score.verdict, Verdict.KILL)

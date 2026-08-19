@@ -1064,9 +1064,12 @@ def compose_draft(brief: Brief, score: Score, *, now: str | None = None) -> Draf
 def apply_brief(
     brief: Brief,
     *,
+    project_id: str | None = None,
     now: str | None = None,
     stack_arena: ArenaId | str | None = None,
 ) -> OperatorDecision:
+    if project_id is not None and brief.project_id != project_id:
+        return OperatorDecision(brief=brief, score=_kill(brief, "voice_cross_dress"), draft=None)
     score = score_brief(brief, stack_arena=stack_arena)
     draft = compose_draft(brief, score, now=now)
     return OperatorDecision(brief=brief, score=score, draft=draft)
