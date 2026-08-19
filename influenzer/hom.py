@@ -137,6 +137,7 @@ from influenzer.playbook import (
     looks_like_failed_ci,
     looks_like_prerelease,
     looks_like_waitlist,
+    unproven_social_proof_reason,
     EVENT_NOT_A_SHIP,
     APOLOGY_WITHOUT_SHIP_REASON,
     SUNSET_NOT_A_SHIP_REASON,
@@ -851,6 +852,9 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "waitlist_not_tryable")
         return _changelog(brief, "waitlist_not_tryable")
+    social_proof = unproven_social_proof_reason(_fact_triples(brief))
+    if social_proof:
+        return _kill(brief, social_proof)
     if looks_like_pending_ci(blob):
         if brief.claims_ship or is_social_arena(brief.preferred_arena):
             return _kill(brief, "pending_ci_unknown")
