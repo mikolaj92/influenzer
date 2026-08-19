@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from influenzer.cli import main
 from influenzer.config import Config, write_config
+from influenzer.domain import BrandProfile
 from influenzer.hom import (
     Brief,
     Fact,
@@ -2558,6 +2559,35 @@ class ScoreBriefTests(unittest.TestCase):
 
         same_project = apply_brief(brief, project_id="app-1")
         self.assertNotEqual(same_project.score.reason, "voice_cross_dress")
+
+    def test_empty_brand_is_silence(self) -> None:
+        brief = self._brief(
+            facts=(
+                Fact(text="local tick scores briefs", artifact_url=SHIP_PR),
+                Fact(text="strangers can click and run the demo today"),
+            )
+        )
+        fields = dict(
+            project_id=brief.project_id,
+            display_name="Influenzer",
+            voice="product",
+            audience="builders",
+            maintainer="mikolaj92",
+        )
+        for display_name, voice in (("", "product"), ("Influenzer", ""), ("  ", " product ")):
+            with self.subTest(display_name=display_name, voice=voice):
+                brand = BrandProfile(**{**fields, "display_name": display_name, "voice": voice})
+                decision = apply_brief(brief, brand=brand)
+                self.assertIsNone(decision.draft)
+                self.assertEqual(decision.score.reason, "empty_brand")
+
+        ready = apply_brief(brief, brand=BrandProfile(**fields))
+        self.assertIsNotNone(ready.draft)
+
+    def test_missing_brand_is_silence(self) -> None:
+        decision = apply_brief(self._brief())
+        self.assertIsNone(decision.draft)
+        self.assertEqual(decision.score.reason, "empty_brand")
 
     def test_empty_facts_are_killed(self) -> None:
         score = score_brief(self._brief(facts=(), claims_ship=False, tryable=False))

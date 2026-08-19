@@ -1,26 +1,24 @@
 # Approach plan
 
-<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=137 -->
+<!-- lokay-approach source=deterministic repo=mikolaj92/influenzer issue=177 -->
 
 Repository: `mikolaj92/influenzer`  
-Issue: #137 — Used by tylko z faktu w briefie
+Issue: #177 — Bez profilu marki milczymy
 
 ## Goal
 
-W `influenzer/playbook.py` obok `looks_like_waitlist` dodaj:
+W `influenzer/hom.py` funkcja `apply_brief` (ok. L1064).
 
 ## Files likely touched
 
-- `influenzer/playbook.py`
 - `influenzer/hom.py`
 - `tests/test_hom_operator.py`
 
 ## Test plan
 
-- `tests/test_hom_operator.py` — `test_used_by_needs_second_fact`:
-- 1. Jeden fact `"Used by Stripe"` + major/tryable → `verdict=kill`, `reason=unproven_social_proof`, `draft is None`.
-- 2. Dwa facty `"Used by Stripe"` i `"Stripe runs this in prod"` → nie kill z `unproven_social_proof`.
-- 3. Fact bez used-by → bez zmiany.
+- `tests/test_hom_operator.py` funkcja `test_empty_brand_is_silence`:
+- `BrandProfile(display_name="", voice="product", ...)` + brief major/tryable → `decision.draft is None` i `reason == "empty_brand"`.
+- `display_name="Influenzer"` `voice="product"` → `decision.draft is not None`.
 
 ## Non-goals
 

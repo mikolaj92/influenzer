@@ -32,7 +32,7 @@ from influenzer.hom import (
 )
 from influenzer.playbook import CANON_URL
 from influenzer.policy import evaluate_policy
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 Handler = Callable[[AdapterRequest], AdapterResult]
 
@@ -56,6 +56,13 @@ def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
     """Ingested briefs → score → draft or explicit kill. Never publishes."""
     outcomes: list[dict[str, Any]] = []
     for brief in repo.list_pending_briefs():
+        # A draft may only wear the profile belonging to its project. A
+        # missing brand row is a fail-closed empty profile, not a tick error.
+        try:
+            project = repo.get_project(brief.project_id)
+        except StorageError:
+            project = None
+        brand = project.brand if project is not None else None
         # Exclude the pending brief itself: only an earlier admitted story can
         # silence this release. History is machine-wide, like the story lock.
         decision = drop_repeat_hn_url(
@@ -63,6 +70,7 @@ def run_operator_tick(repo: StateRepository, *, now: str) -> dict[str, Any]:
                 drop_repeat_angle(
                     apply_brief(
                         brief,
+                        brand=brand,
                         now=now,
                         stack_arena=repo.living_stack_arena(brief.project_id, now),
                     ),
