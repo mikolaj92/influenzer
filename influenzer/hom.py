@@ -15,7 +15,15 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 from urllib.parse import unquote, urlparse
 
-from influenzer.domain import DomainError, PAID_UNDISCLOSED_REASON, content_hash, paid_disclosure_reason, require_slug, utc_now
+from influenzer.domain import (
+    BrandProfile,
+    DomainError,
+    PAID_UNDISCLOSED_REASON,
+    content_hash,
+    paid_disclosure_reason,
+    require_slug,
+    utc_now,
+)
 from influenzer.host import (
     AGE_GATE_NOT_TRYABLE,
     CAPTCHA_NOT_TRYABLE,
@@ -1069,11 +1077,20 @@ def apply_brief(
     brief: Brief,
     *,
     project_id: str | None = None,
+    brand: BrandProfile | None = None,
     now: str | None = None,
     stack_arena: ArenaId | str | None = None,
 ) -> OperatorDecision:
     if project_id is not None and brief.project_id != project_id:
         return OperatorDecision(brief=brief, score=_kill(brief, "voice_cross_dress"), draft=None)
+    if (
+        brand is None
+        or not isinstance(brand.display_name, str)
+        or not brand.display_name.strip()
+        or not isinstance(brand.voice, str)
+        or not brand.voice.strip()
+    ):
+        return OperatorDecision(brief=brief, score=_kill(brief, "empty_brand"), draft=None)
     score = score_brief(brief, stack_arena=stack_arena)
     draft = compose_draft(brief, score, now=now)
     return OperatorDecision(brief=brief, score=score, draft=draft)
