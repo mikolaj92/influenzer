@@ -11,6 +11,10 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import urlparse
 
+_README_ONLY_RE = re.compile(r"(?i)^\s*readme(?:\.md)?\s*[-:]?\s*only\b")
+_DOC_PATH_ONLY_RE = re.compile(
+    r"(?i)^\s*(?:\.\/)?(?:docs?|documentation)(?:\/[A-Za-z0-9_.@+ -]+)+\/?\s*$"
+)
 _PATCH_ONLY_RE = re.compile(
     r"(?i)^\s*(?:docs|style|test|refactor|build)(?:\([^)]*\))?:\s|"
     r"^\s*(?:fix(?:es)?\s+)?(?:a\s+)?typo\b|"
@@ -20,6 +24,15 @@ _PATCH_ONLY_RE = re.compile(
 _COMMIT_NOISE_RE = re.compile(
     r"(?i)^\s*(?:chore|typo|lint|ci|wip|bump\s+(?:version|deps)|fix(?:es)?\s+tests|merge\s+branch)\b"
 )
+# Dependency automation is handled by the bot-bump gate (#85), not by the
+# human docs/typo/chore silence rule below.
+_BOT_BUMP_RE = re.compile(
+    r"(?i)(?:\b(?:dependabot|renovate|github-actions)(?:\[bot\])?\b|"
+    r"^\s*(?:chore(?:\([^)]*\))?:\s*)?bump\b|"
+    r"^\s*chore(?:\([^)]*\))?:\s*(?:update|upgrade)\b.*\b"
+    r"(?:deps?|dependencies|lockfiles?|actions?)\b)"
+)
+_MERGED_PR_PREFIX_RE = re.compile(r"(?i)^\s*merged\s+pr\s+#\d+\s*:\s*")
 _SHIP_TITLE_RE = re.compile(
     r"(?i)(?:^feat(?:ure)?(?:\([^)]*\))?:\s|"
     r"\b(?:ship(?:ped)?|launch(?:ed)?|released?)\b|"
@@ -402,7 +415,43 @@ def looks_like_patch_only(text: str) -> bool:
     stripped = text.strip()
     if _COMMIT_NOISE_RE.search(stripped):
         return True
-    return bool(_PATCH_ONLY_RE.search(stripped))
+    return bool(
+        _PATCH_ONLY_RE.search(stripped)
+        or _README_ONLY_RE.search(stripped)
+        or _DOC_PATH_ONLY_RE.fullmatch(stripped)
+    )
+
+
+def looks_like_docs_chore_only(text: str) -> bool:
+    """True for human docs/typo/chore changes, but not dependency bot bumps."""
+    stripped = _MERGED_PR_PREFIX_RE.sub("", text).strip()
+    if not stripped or _BOT_BUMP_RE.search(stripped):
+        return False
+    return bool(
+        looks_like_patch_only(stripped)
+        or _README_ONLY_RE.search(stripped)
+        or _DOC_PATH_ONLY_RE.fullmatch(stripped)
+    )
+
+
+def all_changes_are_docs_chore(changes: Sequence[Any]) -> bool:
+    """True when a non-empty change window contains only docs/typo/chore noise."""
+    texts: list[str] = []
+    for item in changes:
+        if isinstance(item, Mapping):
+            text = next(
+                (
+                    str(item.get(key) or "").strip()
+                    for key in ("title", "subject", "message", "text")
+                    if str(item.get(key) or "").strip()
+                ),
+                "",
+            )
+        else:
+            text = str(item or "").strip()
+        if text:
+            texts.append(text)
+    return bool(texts) and all(looks_like_docs_chore_only(text) for text in texts)
 
 
 def looks_like_ship_title(text: str) -> bool:
