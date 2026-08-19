@@ -207,6 +207,33 @@ class HomOutboxTests(unittest.TestCase):
         self.assertEqual(self._snapshot_drafts(), before)
         self.assertFalse(json.loads((self.home / "config.json").read_text(encoding="utf-8"))["scheduler"]["live_enabled"])
 
+    def test_same_body_across_arenas_is_silence_and_not_saved_twice(self) -> None:
+        body = f"same wearable body\n\n{SHIP_PR}"
+        first = _put_draft(
+            self.repo,
+            project_id="app-1",
+            brief_id="hn-first",
+            created_at="2026-08-13T05:00:00Z",
+            body=body,
+            arena=ArenaId.HN,
+        )
+        second = _put_draft(
+            self.repo,
+            project_id="app-1",
+            brief_id="github-second",
+            created_at="2026-08-13T06:00:00Z",
+            body=body,
+            arena=ArenaId.GITHUB,
+        )
+        self.assertEqual(len(self.repo.list_operator_drafts("app-1")), 1)
+        self.assertEqual(self.repo.list_operator_drafts("app-1")[0].draft_id, first.draft_id)
+        score = self.repo.get_operator_score("app-1", "github-second")
+        assert score is not None
+        self.assertEqual(score.verdict, Verdict.KILL)
+        self.assertEqual(score.reason, "same_body_other_arena")
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "github-second"))
+        self.assertEqual(second.content_hash, first.content_hash)
+
     def test_two_drafts_still_one_packet_newest_wearable(self) -> None:
         _put_draft(
             self.repo,

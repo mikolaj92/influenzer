@@ -33,6 +33,7 @@ from influenzer.hom import (
     Fact,
     HomError,
     Score,
+    angle_body_hash,
     brief_artifacts,
     brief_from_mapping,
     is_ship_artifact,
@@ -936,6 +937,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
             return None
     play = arena_play(score.arena)
     clock = now or utc_now()
+    # Content identity is the wearable copy, not the arena costume.
     return Draft(
         project_id=brief.project_id,
         brief_id=brief.brief_id,
@@ -947,7 +949,8 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
         wave_checklist=play.wave,
         canon_url=play.canon_url,
         created_at=clock,
-    ).with_hash()
+        content_hash=angle_body_hash(body),
+    )
 
 
 def score_from_mapping(data: Mapping[str, Any]) -> Score:

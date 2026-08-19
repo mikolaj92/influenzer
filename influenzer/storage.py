@@ -48,6 +48,9 @@ class StorageError(RuntimeError):
     """Base class for persistence failures."""
 
 
+SAME_BODY_OTHER_ARENA_REASON = "same_body_other_arena"
+
+
 class ArtifactCorruptionError(StorageError):
     """An artifact's bytes no longer match its content address."""
 
@@ -1081,7 +1084,13 @@ class StateRepository:
         revision: ContentRevision | None = None,
         now: str,
     ) -> None:
-        """Atomically record score, optional draft/revision, and mark the brief processed."""
+        """Atomically record score, optional draft/revision, and mark the brief processed.
+
+        A body's identity is independent of its arena costume. Check the full
+        project history in the same transaction so a second arena cannot save
+        a copy that was already dressed. Held drafts are archived history and
+        do not block a new body.
+        """
         with self.transaction() as c:
             self._require_project(c, brief.project_id)
             row = c.execute(
@@ -1092,60 +1101,85 @@ class StateRepository:
                 raise StorageError(f"unknown brief: {brief.brief_id}")
             if row["status"] != "pending":
                 raise StorageError(f"brief already processed: {brief.brief_id}")
+
+            stored_score = score
+            stored_draft = draft
+            stored_revision = revision
+            if draft is not None:
+                body_hash = angle_body_hash(draft.body)
+                duplicate = c.execute(
+                    "SELECT 1 FROM operator_drafts "
+                    "WHERE project_id=? AND content_hash=? "
+                    "AND coalesce(gate_verdict, '') != ? LIMIT 1",
+                    (brief.project_id, body_hash, "hold"),
+                ).fetchone() is not None
+                if duplicate:
+                    stored_score = Score(
+                        brief_id=brief.brief_id,
+                        verdict=Verdict.KILL,
+                        reason=SAME_BODY_OTHER_ARENA_REASON,
+                        arena=None,
+                        angle=None,
+                        wave_checklist=(),
+                        canon_url=score.canon_url,
+                    ).with_hash()
+                    stored_draft = None
+                    stored_revision = None
+
             c.execute(
                 "INSERT INTO operator_scores VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (
                     brief.project_id,
                     brief.brief_id,
-                    score.verdict.value,
-                    score.reason,
-                    None if score.arena is None else score.arena.value,
-                    score.angle,
-                    _json(score.wave_checklist),
-                    score.canon_url,
-                    score.score_hash,
+                    stored_score.verdict.value,
+                    stored_score.reason,
+                    None if stored_score.arena is None else stored_score.arena.value,
+                    stored_score.angle,
+                    _json(stored_score.wave_checklist),
+                    stored_score.canon_url,
+                    stored_score.score_hash,
                     now,
                 ),
             )
-            if draft is not None:
+            if stored_draft is not None:
                 c.execute(
                     "INSERT INTO operator_drafts("
                     "project_id, brief_id, draft_id, arena, costume, angle, body, "
                     "wave_checklist_json, canon_url, content_hash, created_at"
                     ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     (
-                        draft.project_id,
-                        draft.brief_id,
-                        draft.draft_id,
-                        draft.arena.value,
-                        draft.costume,
-                        draft.angle,
-                        draft.body,
-                        _json(draft.wave_checklist),
-                        draft.canon_url,
-                        draft.content_hash,
-                        draft.created_at,
+                        stored_draft.project_id,
+                        stored_draft.brief_id,
+                        stored_draft.draft_id,
+                        stored_draft.arena.value,
+                        stored_draft.costume,
+                        stored_draft.angle,
+                        stored_draft.body,
+                        _json(stored_draft.wave_checklist),
+                        stored_draft.canon_url,
+                        angle_body_hash(stored_draft.body),
+                        stored_draft.created_at,
                     ),
                 )
-            if revision is not None:
-                if revision.project_id != brief.project_id:
+            if stored_revision is not None:
+                if stored_revision.project_id != brief.project_id:
                     raise CrossProjectError("operator draft revision belongs to another project")
                 c.execute(
                     "INSERT INTO content_revisions VALUES (?,?,?,?,?,?,?,?,?,?)",
                     (
-                        revision.project_id,
-                        revision.content_id,
-                        revision.revision_id,
-                        revision.body,
-                        revision.kind,
-                        _enum(revision.status),
-                        revision.source,
-                        revision.source_digest,
-                        revision.created_at,
-                        revision.content_hash,
+                        stored_revision.project_id,
+                        stored_revision.content_id,
+                        stored_revision.revision_id,
+                        stored_revision.body,
+                        stored_revision.kind,
+                        _enum(stored_revision.status),
+                        stored_revision.source,
+                        stored_revision.source_digest,
+                        stored_revision.created_at,
+                        stored_revision.content_hash,
                     ),
                 )
-                self._event(revision.project_id, "content_revision.created", revision, conn=c)
+                self._event(stored_revision.project_id, "content_revision.created", stored_revision, conn=c)
             c.execute(
                 "UPDATE briefs SET status='processed' WHERE project_id=? AND brief_id=? AND status='pending'",
                 (brief.project_id, brief.brief_id),
@@ -1157,9 +1191,9 @@ class StateRepository:
                 "brief.scored",
                 {
                     "brief_id": brief.brief_id,
-                    "verdict": score.verdict.value,
-                    "reason": score.reason,
-                    "arena": None if score.arena is None else score.arena.value,
+                    "verdict": stored_score.verdict.value,
+                    "reason": stored_score.reason,
+                    "arena": None if stored_score.arena is None else stored_score.arena.value,
                     "published": False,
                 },
                 conn=c,
