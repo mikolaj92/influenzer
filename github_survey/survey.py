@@ -34,6 +34,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from look_limits import (
+    MAX_GH_LOOK_BYTES,
+    MAX_STATE_BYTES,
+    payload_byte_size,
+)
+
 from github_survey.gh import (
     PR_JSON_FIELDS,
     RELEASE_JSON_FIELDS,
@@ -55,8 +61,6 @@ _PROVIDER_PADS = frozenset({"gh_auth", "gh_error", "gh_rate", "gh_network", "sca
 
 LOOKBACK_DAYS = 7
 MAX_PAGES = 2
-MAX_GH_LOOK_BYTES = 1 * 1024 * 1024
-MAX_STATE_BYTES = 50 * 1024 * 1024
 LOOK_OVER_LIMIT = "look_over_limit"
 _GH_PAGE_SIZE = 100
 _PAGED_KINDS = frozenset({"prs", "releases", "tags", "issue_comments", "pull_comments", "issues"})
@@ -337,28 +341,12 @@ def look_declared_gh(repo_slug: str, gh: GhRunner | None = None) -> GhRunner:
     return _declared
 
 
-def payload_byte_size(blob: object) -> int:
-    """UTF-8 byte length of a gh blob or JSON payload. Unserializable is over."""
-    if blob is None:
-        return 0
-    if isinstance(blob, (bytes, bytearray)):
-        return len(blob)
-    if isinstance(blob, str):
-        return len(blob.encode("utf-8"))
-    try:
-        return len(json.dumps(blob, ensure_ascii=False).encode("utf-8"))
-    except (TypeError, ValueError, OverflowError):
-        return MAX_STATE_BYTES + 1
-
-
 def look_bytes_over_limit(blob: object, *, limit: int | None = None) -> bool:
-    """True when README/comments/JSON exceeds the hard look-byte cap."""
     cap = MAX_GH_LOOK_BYTES if limit is None else limit
     return payload_byte_size(blob) > cap
 
 
 def state_bytes_over_limit(blob: object) -> bool:
-    """True when a payload would put 50MB in state.db. Do not swallow."""
     return payload_byte_size(blob) > MAX_STATE_BYTES
 
 

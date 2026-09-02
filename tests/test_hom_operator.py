@@ -18,7 +18,7 @@ from influenzer.hom import (
     HomError,
     Score,
     angle_body_hash,
-    apply_brief,
+    apply_brief as _apply_brief,
     brief_from_mapping,
     compose_draft,
     drop_repeat_angle,
@@ -167,6 +167,21 @@ def _project(repo: StateRepository, project_id: str = "app-1") -> None:
             kind="app",
         )
     )
+
+
+TEST_BRAND = BrandProfile(
+    project_id="app-1",
+    display_name="Influenzer",
+    voice="product",
+    audience="builders",
+    maintainer="mikolaj92",
+)
+
+
+def apply_brief(brief: Brief, **kwargs: object):
+    """Call the fail-closed API with an authored test brand by default."""
+    kwargs.setdefault("brand", TEST_BRAND)
+    return _apply_brief(brief, **kwargs)
 
 
 class PlaybookCopyTests(unittest.TestCase):
@@ -2560,6 +2575,17 @@ class ScoreBriefTests(unittest.TestCase):
         same_project = apply_brief(brief, project_id="app-1")
         self.assertNotEqual(same_project.score.reason, "voice_cross_dress")
 
+        foreign_brand = BrandProfile(
+            project_id="builder-1",
+            display_name="Foreign",
+            voice="foreign",
+            audience="builders",
+            maintainer="other-user",
+        )
+        cross_brand = _apply_brief(brief, brand=foreign_brand)
+        self.assertIsNone(cross_brand.draft)
+        self.assertEqual(cross_brand.score.reason, "voice_cross_dress")
+
     def test_empty_brand_is_silence(self) -> None:
         brief = self._brief(
             facts=(
@@ -2585,7 +2611,7 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertIsNotNone(ready.draft)
 
     def test_missing_brand_is_silence(self) -> None:
-        decision = apply_brief(self._brief())
+        decision = _apply_brief(self._brief())
         self.assertIsNone(decision.draft)
         self.assertEqual(decision.score.reason, "empty_brand")
 
@@ -2633,7 +2659,10 @@ class ScoreBriefTests(unittest.TestCase):
         self.assertEqual(decision.score.arena, ArenaId.HN)
         self.assertEqual(decision.score.reason, "one_angle")
         assert decision.draft is not None
-        self.assertEqual(decision.draft.body, f"Show HN: {human}\n\n{SHIP_REPO}")
+        self.assertEqual(
+            decision.draft.body,
+            f"Show HN: {human}\n\n{SHIP_REPO}\n\nI'm mikolaj92, the maintainer. The link above is the working artifact.",
+        )
         self.assertNotIn("/pull/1", decision.draft.body)
 
     def test_hype_without_tryable_demo_is_killed(self) -> None:
@@ -5728,7 +5757,10 @@ class TickBriefPathTests(unittest.TestCase):
         self.assertEqual(out["status"], "ok")
         self.assertFalse(out["empty"])
         body = out["body"]
-        self.assertEqual(body, f"Show HN: {human}\n\n{SHIP_REPO}")
+        self.assertEqual(
+            body,
+            f"Show HN: {human}\n\n{SHIP_REPO}\n\nI'm mikolaj92, the maintainer. The link above is the working artifact.",
+        )
         self.assertIn(SHIP_REPO, body)
         self.assertNotIn("/pull/1", body)
         self.assertFalse(out["published"])
@@ -5771,6 +5803,7 @@ class TickBriefPathTests(unittest.TestCase):
                     "facts": [
                         {"kind": "pain", "text": "subprocess timeouts looked like success in r/SideProject"},
                         {"kind": "fix", "text": "unknown plus reconcile, no blind retry"},
+                        {"kind": "disclosure", "text": "I'm the maintainer of this project; source: https://github.com/mikolaj92/influenzer", "artifact_url": "https://github.com/mikolaj92/influenzer"},
                     ],
                 }
             ),
@@ -5881,7 +5914,7 @@ class FalaPackageAndCatalogTests(unittest.TestCase):
         effectors = paths["operator_tick"]["effectors"]
         self.assertEqual(len(effectors), 1)
         self.assertEqual(effectors[0]["adapter"]["kind"], "subprocess")
-        self.assertEqual(effectors[0]["adapter"]["command"], ["python3", "-m", "influenzer.tick_all"])
+        self.assertEqual(effectors[0]["adapter"]["command"], ["uv", "run", "python", "-m", "influenzer.tick_all"])
         blob = json.dumps(package)
         self.assertNotIn("ads", blob.lower())
         self.assertNotIn("native_function", blob)
@@ -5898,6 +5931,13 @@ class FalaPackageAndCatalogTests(unittest.TestCase):
                 "input": {
                     "project_id": "app-1",
                     "brief_id": "b-ship",
+                    "brand": {
+                        "project_id": "app-1",
+                        "display_name": "Influenzer",
+                        "voice": "product",
+                        "audience": "builders",
+                        "maintainer": "mikolaj92",
+                    },
                     "story_kind": "major",
                     "claims_ship": True,
                     "tryable": True,
@@ -5923,6 +5963,13 @@ class FalaPackageAndCatalogTests(unittest.TestCase):
                 "input": {
                     "project_id": "app-1",
                     "brief_id": "b-kill",
+                    "brand": {
+                        "project_id": "app-1",
+                        "display_name": "Influenzer",
+                        "voice": "product",
+                        "audience": "builders",
+                        "maintainer": "mikolaj92",
+                    },
                     "story_kind": "major",
                     "claims_ship": True,
                     "tryable": True,

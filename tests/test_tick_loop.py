@@ -300,7 +300,7 @@ class TickLoopTests(unittest.TestCase):
         self.assertEqual(DEFAULT_INTERVAL_SECONDS, 300)
         package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
         command = package["correlation_paths"][0]["effectors"][0]["adapter"]["command"]
-        self.assertEqual(command, ["python3", "-m", "influenzer.tick_all"])
+        self.assertEqual(command, ["uv", "run", "python", "-m", "influenzer.tick_all"])
         self.assertNotEqual(command[-1], "influenzer.tick")
         script = root / "contrib" / "always-on-tick.sh"
         script_text = script.read_text(encoding="utf-8")

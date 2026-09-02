@@ -671,7 +671,7 @@ class HomWatchBlockBoundaryTests(unittest.TestCase):
         self.assertNotIn("hom_watch", paths)
         self.assertEqual(
             paths["operator_tick"]["effectors"][0]["adapter"]["command"],
-            ["python3", "-m", "influenzer.tick_all"],
+            ["uv", "run", "python", "-m", "influenzer.tick_all"],
         )
         blob = json.dumps(package)
         self.assertNotIn("influenzer.hom_watch", blob)

@@ -20,3 +20,6 @@ output/
 cards/
 drafts/
 weekly/
+
+# Lokay mill state is host-local.
+.lokay/

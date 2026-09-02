@@ -1063,14 +1063,20 @@ def score_brief(brief: Brief, *, stack_arena: ArenaId | str | None = None) -> Sc
     ).with_hash()
 
 
-def compose_draft(brief: Brief, score: Score, *, now: str | None = None) -> Draft | None:
+def compose_draft(
+    brief: Brief,
+    score: Score,
+    *,
+    now: str | None = None,
+    brand: BrandProfile | None = None,
+) -> Draft | None:
     """Costume-native body for the single chosen arena. Kill/changelog emit nothing.
 
     Scoring stays here. Dressing is influenzer.hom_draft — this is a thin call.
     """
     from influenzer.hom_draft import dress_brief
 
-    return dress_brief(brief, score, now=now)
+    return dress_brief(brief, score, now=now, brand=brand)
 
 
 def apply_brief(
@@ -1081,7 +1087,10 @@ def apply_brief(
     now: str | None = None,
     stack_arena: ArenaId | str | None = None,
 ) -> OperatorDecision:
-    if project_id is not None and brief.project_id != project_id:
+    if (
+        (project_id is not None and brief.project_id != project_id)
+        or (brand is not None and brand.project_id != brief.project_id)
+    ):
         return OperatorDecision(brief=brief, score=_kill(brief, "voice_cross_dress"), draft=None)
     if (
         brand is None
@@ -1092,7 +1101,7 @@ def apply_brief(
     ):
         return OperatorDecision(brief=brief, score=_kill(brief, "empty_brand"), draft=None)
     score = score_brief(brief, stack_arena=stack_arena)
-    draft = compose_draft(brief, score, now=now)
+    draft = compose_draft(brief, score, now=now, brand=brand)
     return OperatorDecision(brief=brief, score=score, draft=draft)
 
 

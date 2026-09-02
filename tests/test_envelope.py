@@ -90,6 +90,13 @@ class EnvelopeTests(unittest.TestCase):
                 "input": {
                     "project_id": "app-1",
                     "brief_id": "b-secret",
+                    "brand": {
+                        "project_id": "app-1",
+                        "display_name": "Influenzer",
+                        "voice": "product",
+                        "audience": "builders",
+                        "maintainer": "mikolaj92",
+                    },
                     "story_kind": "major",
                     "claims_ship": True,
                     "tryable": True,
@@ -112,6 +119,61 @@ class EnvelopeTests(unittest.TestCase):
         self.assertFalse(result.get("published", False))
         self.assertFalse(result["mutated"])
         self.assertNotIn(leak, str(result))
+
+
+    def test_score_brief_without_brand_is_fail_closed(self) -> None:
+        result = effector.run(
+            {
+                "handler": "score_brief",
+                "input": {
+                    "project_id": "app-1",
+                    "brief_id": "b-no-brand",
+                    "story_kind": "major",
+                    "claims_ship": True,
+                    "tryable": True,
+                    "facts": [{"text": "local tick scores briefs", "artifact_url": "https://github.com/mikolaj92/influenzer/pull/12"}],
+                },
+            }
+        )
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["verdict"], "kill")
+        self.assertEqual(result["reason"], "empty_brand")
+        self.assertFalse(result["mutated"])
+
+
+    def test_score_brief_rejects_foreign_project_brand(self) -> None:
+        result = effector.run(
+            {
+                "handler": "score_brief",
+                "input": {
+                    "project_id": "app-1",
+                    "brief_id": "b-foreign-brand",
+                    "brand": {
+                        "project_id": "app-2",
+                        "display_name": "Foreign",
+                        "voice": "foreign",
+                        "audience": "builders",
+                        "maintainer": "other-user",
+                    },
+                    "story_kind": "major",
+                    "claims_ship": True,
+                    "tryable": True,
+                    "facts": [
+                        {
+                            "text": "local tick scores briefs",
+                            "artifact_url": "https://github.com/mikolaj92/influenzer",
+                        },
+                        {"text": "strangers can click and run the demo today"},
+                    ],
+                },
+            }
+        )
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["verdict"], "kill")
+        self.assertEqual(result["reason"], "voice_cross_dress")
+        self.assertNotIn("other-user", str(result))
+        self.assertFalse(result["mutated"])
+
 
 
 if __name__ == "__main__":

@@ -670,7 +670,7 @@ class HomPassBlockBoundaryTests(unittest.TestCase):
         paths = {item["id"]: item for item in package["correlation_paths"]}
         self.assertIn("hom_pass", paths)
         commands = [item["adapter"]["command"] for item in paths["hom_pass"]["effectors"]]
-        self.assertEqual(commands, [["python3", "-m", "influenzer.hom_pass"]])
+        self.assertEqual(commands, [["uv", "run", "python", "-m", "influenzer.hom_pass"]])
         self.assertEqual(len(paths["hom_pass"]["effectors"]), 1)
         self.assertEqual(len(paths["operator_tick"]["effectors"]), 1)
         self.assertEqual(len(paths["github_scan_due"]["effectors"]), 1)
@@ -682,8 +682,8 @@ class HomPassBlockBoundaryTests(unittest.TestCase):
         self.assertIn("Does not", paths["hom_pass"]["description"])
         self.assertIn("verdict", paths["hom_pass"]["description"].lower())
         self.assertIn("influenzer.hom_pass", blob)
-        self.assertEqual(paths["operator_tick"]["effectors"][0]["adapter"]["command"], ["python3", "-m", "influenzer.tick_all"])
-        self.assertEqual(package["correlation_paths"][0]["effectors"][0]["adapter"]["command"], ["python3", "-m", "influenzer.tick_all"])
+        self.assertEqual(paths["operator_tick"]["effectors"][0]["adapter"]["command"], ["uv", "run", "python", "-m", "influenzer.tick_all"])
+        self.assertEqual(package["correlation_paths"][0]["effectors"][0]["adapter"]["command"], ["uv", "run", "python", "-m", "influenzer.tick_all"])
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ from influenzer.host import (
     looks_like_geo_block,
     looks_like_payment_gate,
 )
+from influenzer.domain import BrandProfile
 from influenzer.hom import (
     Brief,
     Draft,
@@ -491,17 +492,19 @@ def _show_hn_title(one_liner: str) -> str | None:
     return dressed
 
 
-def _hn_backstory(bits: CopyBits) -> str | None:
-    """First leftover fact is the first comment. A dump of the rest is a blog."""
+def _hn_backstory(bits: CopyBits, brand: BrandProfile | None) -> str | None:
+    """Use a human fact, or a factual first-person maintainer fallback."""
     title = bits.one_liner.strip()
     for text in bits.rest:
         cleaned = text.strip()
         if cleaned and cleaned != title:
             return cleaned
-    return None
+    if brand is None or not brand.maintainer.strip():
+        return None
+    return f"I'm {brand.maintainer.strip()}, the maintainer. The link above is the working artifact."
 
 
-def _dress_hn(bits: CopyBits, score: Score) -> str | None:
+def _dress_hn(bits: CopyBits, score: Score, brand: BrandProfile | None = None) -> str | None:
     """Seminar: Show HN title + tryable URL + first-comment backstory."""
     if seminar_reason(bits.blob):
         return None
@@ -536,7 +539,7 @@ def _dress_hn(bits: CopyBits, score: Score) -> str | None:
     title = _show_hn_title(bits.one_liner)
     if title is None:
         return None
-    backstory = _hn_backstory(bits)
+    backstory = _hn_backstory(bits, brand)
     if not backstory:
         return None
     if looks_like_waitlist(backstory) or looks_like_event(backstory) or looks_like_calendar_filler(backstory) or looks_like_counter_thanks(backstory) or looks_like_fog(backstory) or looks_like_founder_journal(backstory) or looks_like_lead_magnet(backstory) or looks_like_fomo(backstory) or looks_like_meme(backstory) or looks_like_deck(backstory) or looks_like_linktree(backstory) or looks_like_cloud_drive(backstory) or looks_like_logo_reveal(backstory) or looks_like_solicit_gesture(backstory):
@@ -774,7 +777,13 @@ _DRESSERS = {
 assert set(_DRESSERS) == set(ARENAS)
 
 
-def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft | None:
+def dress_brief(
+    brief: Brief,
+    score: Score,
+    *,
+    now: str | None = None,
+    brand: BrandProfile | None = None,
+) -> Draft | None:
     """Wear the chosen costume. Kill/changelog/undressable → None."""
     if score.verdict is not Verdict.DRAFT or score.arena is None or score.angle is None:
         return None
@@ -869,7 +878,7 @@ def dress_brief(brief: Brief, score: Score, *, now: str | None = None) -> Draft 
     dresser = _DRESSERS.get(score.arena)
     if dresser is None:
         return None
-    body = dresser(bits, score)
+    body = _dress_hn(bits, score, brand) if score.arena is ArenaId.HN else dresser(bits, score)
     if body is not None and _overflows_arena(score.arena, bits, body):
         return None
     if (

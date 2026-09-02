@@ -432,6 +432,11 @@ def choose_arena(
             )
         except ValueError:
             wanted = None
+    # Explicit costumes stay seated long enough for their fail-closed gates.
+    # Otherwise a ship would silently fall through to HN and bypass the
+    # arena-specific policy that the author selected.
+    if wanted in {ArenaId.MASTODON, ArenaId.SHORTS}:
+        return wanted
     # #49/#31: village without disclosure is spam. Sit so a named room
     # without ujawnienie + repo is silence.
     if wanted is ArenaId.REDDIT:

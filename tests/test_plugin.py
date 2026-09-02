@@ -54,18 +54,12 @@ class PluginRegistrationTests(unittest.TestCase):
         module.register(ctx)
         self.assertEqual(ctx.cli_commands[0][0], "influenzer")
         skill_names = [name for name, _path, _desc in ctx.skills]
-        self.assertEqual(
-            skill_names,
-            [
-                "influenzer-profile",
-                "influenzer-content",
-                "influenzer-campaign",
-                "influenzer-publish",
-                "influenzer-hom",
-            ],
-        )
-        for _name, path, _desc in ctx.skills:
+        on_disk = sorted(path.parent.name for path in (PLUGIN_ROOT / "skills").glob("influenzer-*/SKILL.md"))
+        self.assertEqual(skill_names, on_disk)
+        self.assertEqual(len(skill_names), 15)
+        for _name, path, description in ctx.skills:
             self.assertTrue(path.exists(), path)
+            self.assertTrue(description.strip())
 
     def test_cli_parser_registers_subcommands(self) -> None:
         from influenzer import cli

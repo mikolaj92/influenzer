@@ -442,8 +442,8 @@ class FeedbackBlockBoundaryTests(unittest.TestCase):
         self.assertEqual(
             commands,
             [
-                ["python3", "-m", "github_feedback"],
-                ["python3", "-m", "influenzer.hom_feedback"],
+                ["uv", "run", "python", "-m", "github_feedback"],
+                ["uv", "run", "python", "-m", "influenzer.hom_feedback"],
             ],
         )
         blob = json.dumps(package)

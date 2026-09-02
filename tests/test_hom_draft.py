@@ -8,12 +8,13 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from influenzer.domain import BrandProfile
 from influenzer.hom import (
     Brief,
     Fact,
     Score,
     angle_body_hash,
-    apply_brief,
+    apply_brief as _apply_brief,
     brief_to_mapping,
     compose_draft,
     score_brief,
@@ -31,6 +32,21 @@ from influenzer.playbook import (
 )
 
 from tests.test_hom_operator import FEEDBACK_COMMENT, SHIP_PR, SHIP_RELEASE, SHIP_REPO
+
+
+TEST_BRAND = BrandProfile(
+    project_id="app-1",
+    display_name="Influenzer",
+    voice="product",
+    audience="builders",
+    maintainer="mikolaj92",
+)
+
+
+def apply_brief(brief: Brief, **kwargs: object):
+    """Call the fail-closed API with an authored test brand by default."""
+    kwargs.setdefault("brand", TEST_BRAND)
+    return _apply_brief(brief, **kwargs)
 
 
 def _ship_brief(**overrides: object) -> Brief:
@@ -4384,7 +4400,7 @@ class HomDraftBlockBoundaryTests(unittest.TestCase):
         paths = {item["id"]: item for item in package["correlation_paths"]}
         self.assertIn("hom_draft", paths)
         commands = [item["adapter"]["command"] for item in paths["hom_draft"]["effectors"]]
-        self.assertEqual(commands, [["python3", "-m", "influenzer.hom_draft"]])
+        self.assertEqual(commands, [["uv", "run", "python", "-m", "influenzer.hom_draft"]])
         self.assertEqual(len(paths["operator_tick"]["effectors"]), 1)
         blob = json.dumps(package)
         self.assertNotIn("native_function", blob)

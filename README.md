@@ -93,7 +93,7 @@ uv run influenzer-tick --once
 uv run influenzer-tick --once --pass-if-due
 ```
 
-Fala (`mikolaj92/Fala`) may conduct the score-only one-shot as a **subprocess** organ (`python3 -m influenzer.tick_all` in [`fala-package.toml`](fala-package.toml)), the GitHub scan as `github_survey` → `github_pack` → `influenzer.brief_admit`, inbound replies as `github_feedback` → `influenzer.hom_feedback`, the coarse look as `python3 -m influenzer.scan_due` (not on the 5-minute Fala tick), and one CMO cycle as `python3 -m influenzer.hom_pass`. Watch set is host CLI only — no Fala organ. `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` is the weekly-ish look; `influenzer pass` is listen → scan-due → tick → one angle; `influenzer feedback` is replies → 0 or 1 brief. Domain state stays in `state.db`. Do **not** install a LaunchAgent on a laptop.
+Fala (`mikolaj92/Fala`) may conduct the score-only one-shot as a **subprocess** organ (`uv run influenzer-tick-all` in [`fala-package.toml`](fala-package.toml)), the GitHub scan as `github_survey` → `github_pack` → `influenzer.brief_admit`, inbound replies as `github_feedback` → `influenzer.hom_feedback`, the coarse look as `uv run python -m influenzer.scan_due` (not on the 5-minute Fala tick), and one CMO cycle as `uv run python -m influenzer.hom_pass`. Watch set is host CLI only — no Fala organ. `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` is the weekly-ish look; `influenzer pass` is listen → scan-due → tick → one angle; `influenzer feedback` is replies → 0 or 1 brief. Domain state stays in `state.db`. Do **not** install a LaunchAgent on a laptop.
 
 ## Configure
 
@@ -122,13 +122,13 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 - **github_survey** — public GitHub → JSON. Does not know briefs, drafts, `state.db`, scoring, publishing, or arenas. See [`github_survey/README.md`](github_survey/README.md).
 - **github_pack** — survey JSON → facts + ship/tryable, or silence. Tryable is a README+URL heuristic, not a live run. Does not call `gh`, write SQLite, or tick. See [`github_pack/README.md`](github_pack/README.md).
 - **github_feedback** — public issue/PR comments → facts, or silence. Bots, LGTM, and empty thanks fail closed. Does not write SQLite, post replies, survey releases/PRs, or load Influenzer. See [`github_feedback/README.md`](github_feedback/README.md).
-- **hom_feedback** — host compose: collect replies and admit at most one pending brief (`source=github-feedback`), or silence when a story is already open. Does not score, dress, publish, enable live, or auto-post. Host compose is `influenzer feedback`. Fala may run `python3 -m github_feedback` then `python3 -m influenzer.hom_feedback`.
-- **hom_draft** — scored brief → costume-native one-arena `body`, or silence. Does not score, pick the arena, survey GitHub, write `state.db`, or publish. Host compose is `apply_brief` / tick. Fala may run `python3 -m influenzer.hom_draft`.
-- **hom_outbox** — `state.db` → at most one wearable draft packet, or silence. Newest wearable by `created_at`, then `draft_id`. Does not score, dress, survey GitHub, call `gh`, publish, enable live, send mail, or write SQLite. Host compose is `influenzer angle`. Fala may run `python3 -m influenzer.hom_outbox`.
-- **hom_verdict** — hold or pass the current wearable angle. Hold archives that draft so the one-story lock releases and scan-due may run again. Pass records fit and does not post, enable live, or call adapters. Host compose is `influenzer verdict hold` / `influenzer verdict pass`. Fala may run `python3 -m influenzer.hom_verdict`.
-- **hom_pass** — one CMO look: `hom_feedback` → `scan_due` → tick (score pending briefs) → `hom_outbox` (at most one angle). Reuses those functions; does not copy github_feedback/survey/pack/admit/score/dress/outbox. Does not verdict, publish, enable live, call `gh`, know Heimdall, or run every tick interval. Host compose is `influenzer pass --project-id ID --repo owner/name`. The interval loop may invoke this once when a declared watch is due. Fala may run `python3 -m influenzer.hom_pass`.
+- **hom_feedback** — host compose: collect replies and admit at most one pending brief (`source=github-feedback`), or silence when a story is already open. Does not score, dress, publish, enable live, or auto-post. Host compose is `influenzer feedback`. Fala may run `uv run python -m github_feedback` then `uv run python -m influenzer.hom_feedback`.
+- **hom_draft** — scored brief → costume-native one-arena `body`, or silence. Does not score, pick the arena, survey GitHub, write `state.db`, or publish. Host compose is `apply_brief` / tick. Fala may run `uv run python -m influenzer.hom_draft`.
+- **hom_outbox** — `state.db` → at most one wearable draft packet, or silence. Newest wearable by `created_at`, then `draft_id`. Does not score, dress, survey GitHub, call `gh`, publish, enable live, send mail, or write SQLite. Host compose is `influenzer angle`. Fala may run `uv run python -m influenzer.hom_outbox`.
+- **hom_verdict** — hold or pass the current wearable angle. Hold archives that draft so the one-story lock releases and scan-due may run again. Pass records fit and does not post, enable live, or call adapters. Host compose is `influenzer verdict hold` / `influenzer verdict pass`. Fala may run `uv run python -m influenzer.hom_verdict`.
+- **hom_pass** — one CMO look: `hom_feedback` → `scan_due` → tick (score pending briefs) → `hom_outbox` (at most one angle). Reuses those functions; does not copy github_feedback/survey/pack/admit/score/dress/outbox. Does not verdict, publish, enable live, call `gh`, know Heimdall, or run every tick interval. Host compose is `influenzer pass --project-id ID --repo owner/name`. The interval loop may invoke this once when a declared watch is due. Fala may run `uv run python -m influenzer.hom_pass`.
 - **hom_watch** — declare one project → one repo (`influenzer watch set` / `watch show`). Persisted in `state.db`. The interval tick reuses `scan_due_reason` and runs existing `hom_pass` when due; otherwise it only scores. Look does not run the project. Launching on watch is silence. `--once` does not scan unless `--pass-if-due`. No Fala organ.
-- **scan_due** — same as scan (0 or 1 brief) only when the coarse window elapsed, else silence. Reuses `scan_github`; does not call `gh`, score, dress, publish, enable live, or run every tick interval. Host compose is `influenzer brief scan-due`. Fala may run `python3 -m influenzer.scan_due`.
+- **scan_due** — same as scan (0 or 1 brief) only when the coarse window elapsed, else silence. Reuses `scan_github`; does not call `gh`, score, dress, publish, enable live, or run every tick interval. Host compose is `influenzer brief scan-due`. Fala may run `uv run python -m influenzer.scan_due`.
 - **uv** is the Python env/tooling. Mojo is not used here — the HoM copy is fail-closed rules/data in Python.
 - Local only. No hosted service, no Ads spend, no live social in this path. 24/7 tick is an always-on host process, not a laptop LaunchAgent.
 
@@ -174,7 +174,7 @@ uv run python -m unittest discover -s tests
 uv run python tools/hygiene_check.py .
 ```
 
-`python3 -m unittest discover -s tests` also works.
+The canonical local gate is `uv run python -m unittest discover -s tests`.
 
 ## Safety
 

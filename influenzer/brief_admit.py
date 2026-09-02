@@ -28,7 +28,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from github_pack.pack import sanitize_inbound_facts
-from github_survey.survey import look_bytes_over_limit, state_bytes_over_limit
+from look_limits import look_bytes_over_limit, state_bytes_over_limit
 
 from influenzer.config import load_config
 from influenzer.domain import foreign_owner_reason, utc_now
