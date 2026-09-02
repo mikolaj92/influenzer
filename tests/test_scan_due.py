@@ -557,16 +557,16 @@ class ScanDueBlockBoundaryTests(unittest.TestCase):
         paths = {item["id"]: item for item in package["correlation_paths"]}
         self.assertIn("github_scan_due", paths)
         commands = [item["adapter"]["command"] for item in paths["github_scan_due"]["effectors"]]
-        self.assertEqual(commands, [["python3", "-m", "influenzer.scan_due"]])
+        self.assertEqual(commands, [["uv", "run", "python", "-m", "influenzer.scan_due"]])
         self.assertEqual(
             [item["adapter"]["command"] for item in paths["github_scan"]["effectors"]],
             [
-                ["python3", "-m", "github_survey"],
-                ["python3", "-m", "github_pack"],
-                ["python3", "-m", "influenzer.brief_admit"],
+                ["uv", "run", "python", "-m", "github_survey"],
+                ["uv", "run", "python", "-m", "github_pack"],
+                ["uv", "run", "python", "-m", "influenzer.brief_admit"],
             ],
         )
-        self.assertEqual(paths["operator_tick"]["effectors"][0]["adapter"]["command"], ["python3", "-m", "influenzer.tick_all"])
+        self.assertEqual(paths["operator_tick"]["effectors"][0]["adapter"]["command"], ["uv", "run", "python", "-m", "influenzer.tick_all"])
         self.assertEqual(len(paths["operator_tick"]["effectors"]), 1)
         blob = json.dumps(package)
         self.assertNotIn("native_function", blob)

@@ -30,12 +30,12 @@ class ScanPathOwnershipTests(unittest.TestCase):
         self.assertEqual(
             commands,
             [
-                ["python3", "-m", "github_survey"],
-                ["python3", "-m", "github_pack"],
-                ["python3", "-m", "influenzer.brief_admit"],
+                ["uv", "run", "python", "-m", "github_survey"],
+                ["uv", "run", "python", "-m", "github_pack"],
+                ["uv", "run", "python", "-m", "influenzer.brief_admit"],
             ],
         )
-        self.assertEqual(paths["operator_tick"]["effectors"][0]["adapter"]["command"], ["python3", "-m", "influenzer.tick_all"])
+        self.assertEqual(paths["operator_tick"]["effectors"][0]["adapter"]["command"], ["uv", "run", "python", "-m", "influenzer.tick_all"])
         blob = json.dumps(package)
         self.assertNotIn("native_function", blob)
         self.assertNotIn("ads", blob.lower())

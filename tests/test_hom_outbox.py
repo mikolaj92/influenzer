@@ -416,7 +416,7 @@ class HomOutboxBlockBoundaryTests(unittest.TestCase):
         paths = {item["id"]: item for item in package["correlation_paths"]}
         self.assertIn("hom_outbox", paths)
         commands = [item["adapter"]["command"] for item in paths["hom_outbox"]["effectors"]]
-        self.assertEqual(commands, [["python3", "-m", "influenzer.hom_outbox"]])
+        self.assertEqual(commands, [["uv", "run", "python", "-m", "influenzer.hom_outbox"]])
         self.assertEqual(len(paths["operator_tick"]["effectors"]), 1)
         self.assertEqual(len(paths["hom_draft"]["effectors"]), 1)
         blob = json.dumps(package)

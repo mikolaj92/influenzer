@@ -88,7 +88,7 @@ def ship_script(**overrides: GhCall) -> dict[str, GhCall]:
                 [
                     {
                         "tagName": "v0.1.0",
-                        "name": "v0.1.0",
+                        "name": "Local operator v0.1.0",
                         "isDraft": False,
                         "isPrerelease": False,
                         "publishedAt": "2026-08-12T18:00:00Z",

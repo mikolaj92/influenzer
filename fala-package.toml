@@ -33,7 +33,7 @@ title = "Brief → score → draft or kill"
 [[correlation_paths.effectors]]
 id = "tick"
 capability = "tick_all"
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.tick_all"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.tick_all"] }
 
 [[impulse_types]]
 id = "github.scan"
@@ -82,19 +82,19 @@ description = "Fala conducts github_survey → github_pack → influenzer.brief_
 [[correlation_paths.effectors]]
 id = "survey"
 capability = "github_survey"
-adapter = { kind = "subprocess", command = ["python3", "-m", "github_survey"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "github_survey"] }
 
 [[correlation_paths.effectors]]
 id = "pack"
 capability = "github_pack"
 conduction = ["survey"]
-adapter = { kind = "subprocess", command = ["python3", "-m", "github_pack"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "github_pack"] }
 
 [[correlation_paths.effectors]]
 id = "admit"
 capability = "brief_admit"
 conduction = ["pack"]
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.brief_admit"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.brief_admit"] }
 
 [[impulse_types]]
 id = "github.scan_due"
@@ -116,7 +116,7 @@ description = "Same effect as scan only when due. Does not score, dress, publish
 [[correlation_paths.effectors]]
 id = "scan_due"
 capability = "scan_due"
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.scan_due"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.scan_due"] }
 
 [[impulse_types]]
 id = "github.feedback"
@@ -149,13 +149,13 @@ description = "Fala conducts github_feedback → influenzer.hom_feedback. Bots/L
 [[correlation_paths.effectors]]
 id = "feedback"
 capability = "github_feedback"
-adapter = { kind = "subprocess", command = ["python3", "-m", "github_feedback"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "github_feedback"] }
 
 [[correlation_paths.effectors]]
 id = "admit_feedback"
 capability = "hom_feedback"
 conduction = ["feedback"]
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_feedback"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.hom_feedback"] }
 
 [[impulse_types]]
 id = "hom.scored_brief"
@@ -182,7 +182,7 @@ description = "Does not survey GitHub, call gh, write state.db, pick the arena, 
 [[correlation_paths.effectors]]
 id = "draft"
 capability = "hom_draft"
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_draft"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.hom_draft"] }
 
 [[impulse_types]]
 id = "hom.angle"
@@ -209,7 +209,7 @@ description = "Does not survey GitHub, call gh, score, dress, publish, enable li
 [[correlation_paths.effectors]]
 id = "outbox"
 capability = "hom_outbox"
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_outbox"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.hom_outbox"] }
 
 [[impulse_types]]
 id = "hom.verdict"
@@ -236,7 +236,7 @@ description = "Does not survey GitHub, call gh, score, dress, scan, publish, ena
 [[correlation_paths.effectors]]
 id = "verdict"
 capability = "hom_verdict"
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_verdict"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.hom_verdict"] }
 
 [[impulse_types]]
 id = "hom.pass"
@@ -263,7 +263,7 @@ description = "Compose existing hom_feedback, scan_due, tick_all, and hom_outbox
 [[correlation_paths.effectors]]
 id = "pass"
 capability = "hom_pass"
-adapter = { kind = "subprocess", command = ["python3", "-m", "influenzer.hom_pass"] }
+adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influenzer.hom_pass"] }
 
 # Always-on interval loop is `influenzer-tick` on a Mac mini (not a laptop LaunchAgent).
 # Interval scores every time and may compose hom_pass when a declared watch is due; --once stays score-only.

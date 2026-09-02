@@ -8,6 +8,7 @@ from typing import Any
 
 from . import envelope
 from .catalog import resolve
+from .domain import BrandProfile
 from .hom import HomError, apply_brief, brief_from_mapping, decision_to_dict
 
 _SECRET_KEY = re.compile(
@@ -48,7 +49,17 @@ def score_brief(request: Mapping[str, Any]) -> dict[str, Any]:
         payload = dict(cfg.get("brief") or request.get("brief") or {})
     try:
         brief = brief_from_mapping(payload)
-        decision = apply_brief(brief)
+        brand_payload = payload.get("brand")
+        if not isinstance(brand_payload, Mapping):
+            brand_payload = {}
+        brand = BrandProfile(
+            project_id=str(brand_payload.get("project_id") or brief.project_id),
+            display_name=str(brand_payload.get("display_name") or ""),
+            voice=str(brand_payload.get("voice") or ""),
+            audience=str(brand_payload.get("audience") or ""),
+            maintainer=str(brand_payload.get("maintainer") or ""),
+        )
+        decision = apply_brief(brief, brand=brand)
     except (HomError, ValueError, TypeError, KeyError) as exc:
         return envelope.fail(str(exc), failure_class="validation")
     out = decision_to_dict(decision)

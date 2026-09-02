@@ -5,13 +5,21 @@ from pathlib import Path
 from influenzer import cli
 
 
-SKILLS = (
-    ("profile", "Manage one app or builder BrandProfile."),
-    ("content", "Create project-scoped social content."),
-    ("campaign", "Plan organic and paid campaigns without spend."),
-    ("publish", "Inspect policy-gated publish plans."),
-    ("hom", "Head of Marketing: score briefs, choose one arena, draft or kill."),
-)
+def _registered_skills() -> tuple[tuple[str, Path, str], ...]:
+    base = Path(__file__).parent / "skills"
+    registered: list[tuple[str, Path, str]] = []
+    for path in sorted(base.glob("influenzer-*/SKILL.md")):
+        name = path.parent.name
+        description = next(
+            (
+                line.strip()
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.startswith("#")
+            ),
+            name,
+        )
+        registered.append((name, path, description))
+    return tuple(registered)
 
 
 def register(ctx):
@@ -22,7 +30,5 @@ def register(ctx):
         cli.handle_cli,
         description="Local multi-project social operator",
     )
-    base = Path(__file__).parent / "skills"
-    for name, description in SKILLS:
-        path = base / f"influenzer-{name}" / "SKILL.md"
-        ctx.register_skill(f"influenzer-{name}", path, description=description)
+    for name, path, description in _registered_skills():
+        ctx.register_skill(name, path, description=description)
