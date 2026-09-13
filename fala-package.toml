@@ -98,19 +98,19 @@ adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influe
 
 [[impulse_types]]
 id = "github.scan_due"
-title = "Coarse public GitHub look for one project+repo"
+title = "Monday-started, resumable public GitHub look for one project+repo (Europe/Warsaw)"
 media_types = ["application/json"]
-value_schema = { type = "object", properties = { project_id = { type = "string" }, repo = { type = "string" }, window_days = { type = "integer" } }, required = ["project_id", "repo"] }
+value_schema = { type = "object", properties = { project_id = { type = "string" }, repo = { type = "string" } }, required = ["project_id", "repo"] }
 
 [[capabilities]]
 id = "scan_due"
-title = "Survey public GitHub only when the coarse window elapsed; 0 or 1 brief or silence"
+title = "Start a new GitHub survey on Monday (Europe/Warsaw); interrupted looks may resume later; 0 or 1 brief or silence"
 accepts_impulse_types = ["github.scan_due"]
 emits_reaction_kinds = ["hom.brief"]
 
 [[correlation_paths]]
 id = "github_scan_due"
-title = "Coarse GitHub look → 0 or 1 pending brief, or not-due silence"
+title = "Monday-started, resumable GitHub look → 0 or 1 pending brief, or silence"
 description = "Same effect as scan only when due. Does not score, dress, publish, enable live, know Heimdall, know my-auth, implement github_pack shape, or run every tick interval. Tick still does not survey GitHub. Requires project-id and repo."
 
 [[correlation_paths.effectors]]
@@ -242,7 +242,7 @@ adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influe
 id = "hom.pass"
 title = "One CMO look for one project+repo"
 media_types = ["application/json"]
-value_schema = { type = "object", properties = { project_id = { type = "string" }, repo = { type = "string" }, window_days = { type = "integer" } }, required = ["project_id", "repo"] }
+value_schema = { type = "object", properties = { project_id = { type = "string" }, repo = { type = "string" } }, required = ["project_id", "repo"] }
 
 [[reaction_kinds]]
 id = "hom.pass"
@@ -267,9 +267,9 @@ adapter = { kind = "subprocess", command = ["uv", "run", "python", "-m", "influe
 
 # Always-on interval loop is `influenzer-tick` on a Mac mini (not a laptop LaunchAgent).
 # Interval scores every time and may compose hom_pass when a declared watch is due; --once stays score-only.
-# Fala conducts tick-all, always-run github_scan, coarse github_scan_due, inbound github_feedback, and one-shot hom_pass.
+# Fala conducts tick-all, always-run github_scan, Monday-started/resumable github_scan_due (Europe/Warsaw), inbound github_feedback, and one-shot hom_pass.
 # Watch set is host CLI only (no Fala organ).
-# `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` is the weekly-ish look; `influenzer pass` is one CMO cycle; `influenzer feedback` is inbound replies → 0 or 1 brief.
+# `influenzer brief scan` is always-run host compose; `influenzer brief scan-due` starts a new look on Monday (Europe/Warsaw) if none has completed that Monday, but resumes an interrupted look later; `influenzer pass` is one CMO cycle; `influenzer feedback` is inbound replies → 0 or 1 brief.
 
 # Fala-owned journal. Domain state stays in state.db. Effectors never open this file.
 [runtime.backend]

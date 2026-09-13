@@ -246,6 +246,25 @@ class ScanDueTests(unittest.TestCase):
         self.assertTrue(fake.calls)
         self.assertEqual(len(self.repo.list_briefs("app-1")), 1)
 
+    def test_interrupted_look_resumes_after_monday(self) -> None:
+        self.repo.record_github_look("app-1", REPO, started_at="2026-08-10T06:00:00Z")
+        fake = ScriptedGh(noise_script())
+        with (
+            patch("subprocess.run", side_effect=AssertionError("scan-due must not call subprocess")),
+            patch("urllib.request.urlopen", side_effect=AssertionError("scan-due must not fetch")),
+        ):
+            resumed = scan_github_if_due(
+                self.repo,
+                project_id="app-1",
+                repo_slug=REPO,
+                gh=fake,
+                now="2026-08-12T06:00:00Z",
+            )
+
+        self.assertEqual(resumed["reason"], "commit_noise")
+        self.assertTrue(fake.calls)
+        self.assertEqual(self.repo.look_state(REPO), "done")
+
     def test_window_days_does_not_open_a_wednesday(self) -> None:
         self.repo.record_github_scan("app-1", REPO, scanned_at="2026-08-05T06:00:00Z")
         fake = ScriptedGh(ship_script())
@@ -548,6 +567,38 @@ class ScanDueBlockBoundaryTests(unittest.TestCase):
             for path in (Path(__file__).resolve().parents[1] / "github_pack").rglob("*.py")
         )
         self.assertNotIn("scan_due", pack)
+
+    def test_docs_and_fala_schema_match_monday_due_rhythm(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        docs = [
+            "README.md",
+            "after-install.md",
+            "skills/influenzer-hom/SKILL.md",
+            "fala-package.toml",
+        ]
+        stale_claims = (
+            "newer than 7 days",
+            "overridable",
+            "weekly-ish",
+            "about weekly",
+            "coarse window elapsed",
+        )
+        for relative_path in docs:
+            text = (root / relative_path).read_text(encoding="utf-8").lower()
+            with self.subTest(path=relative_path):
+                self.assertIn("monday", text)
+                self.assertIn("europe/warsaw", text)
+                self.assertIn("interrupted", text)
+                self.assertIn("resume", text)
+                self.assertIn("later", text)
+                for claim in stale_claims:
+                    self.assertNotIn(claim, text)
+
+        package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
+        impulses = {item["id"]: item for item in package["impulse_types"]}
+        for impulse_id in ("github.scan_due", "hom.pass"):
+            with self.subTest(impulse=impulse_id):
+                self.assertNotIn("window_days", impulses[impulse_id]["value_schema"]["properties"])
 
     def test_fala_package_lists_scan_due_organ_separate_from_tick(self) -> None:
         root = Path(__file__).resolve().parents[1]
