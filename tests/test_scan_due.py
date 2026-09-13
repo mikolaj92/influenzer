@@ -549,6 +549,29 @@ class ScanDueBlockBoundaryTests(unittest.TestCase):
         )
         self.assertNotIn("scan_due", pack)
 
+    def test_docs_and_fala_schema_match_monday_due_rhythm(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        docs = [
+            "README.md",
+            "after-install.md",
+            "skills/influenzer-hom/SKILL.md",
+            "fala-package.toml",
+        ]
+        stale_claims = ("newer than 7 days", "overridable", "weekly-ish", "about weekly", "coarse window elapsed")
+        for relative_path in docs:
+            text = (root / relative_path).read_text(encoding="utf-8").lower()
+            with self.subTest(path=relative_path):
+                self.assertIn("monday", text)
+                self.assertIn("europe/warsaw", text)
+                for claim in stale_claims:
+                    self.assertNotIn(claim, text)
+
+        package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
+        impulses = {item["id"]: item for item in package["impulse_types"]}
+        for impulse_id in ("github.scan_due", "hom.pass"):
+            with self.subTest(impulse=impulse_id):
+                self.assertNotIn("window_days", impulses[impulse_id]["value_schema"]["properties"])
+
     def test_fala_package_lists_scan_due_organ_separate_from_tick(self) -> None:
         root = Path(__file__).resolve().parents[1]
         package = tomllib.loads((root / "fala-package.toml").read_text(encoding="utf-8"))
