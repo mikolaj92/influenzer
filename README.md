@@ -55,7 +55,8 @@ uv run influenzer --config /tmp/influenzer/config.json brief ingest \
 uv run influenzer --config /tmp/influenzer/config.json brief ingest \
   --project-id app-1 --brief-id b-ship --story-kind major --claim-ship --tryable \
   --artifact-url https://github.com/mikolaj92/influenzer \
-  --fact "Local tick scores briefs and emits a draft" --arena hn
+  --fact "Local tick scores briefs and emits a draft" \
+  --fact "Dry-run still default" --arena hn
 uv run influenzer-tick-all --config /tmp/influenzer/config.json
 # same one-shot via the local loop CLI:
 uv run influenzer-tick --config /tmp/influenzer/config.json --once

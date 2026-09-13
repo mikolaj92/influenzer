@@ -1,12 +1,66 @@
 from __future__ import annotations
 
+import io
+import json
+import shlex
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from influenzer.cli import main
 from influenzer.config import load_config
 from influenzer.storage import StateRepository
+from influenzer.tick import main as tick_main
+from influenzer.tick_all import main as tick_all_main
+
+TMP_DEMO_HOME = "/tmp/influenzer"
+
+
+def _readme_demo_commands(readme: str) -> list[str]:
+    marker = "## 3-minute local demo"
+    heading = readme.index(marker)
+    fence = readme.index("```bash", heading)
+    body_start = readme.index("\n", fence) + 1
+    body_end = readme.index("```", body_start)
+    commands: list[str] = []
+    buf: list[str] = []
+    for line in readme[body_start:body_end].splitlines():
+        stripped = line.rstrip()
+        if not stripped or stripped.lstrip().startswith("#"):
+            continue
+        if stripped.endswith("\\"):
+            buf.append(stripped[:-1].rstrip())
+            continue
+        buf.append(stripped)
+        commands.append(" ".join(buf))
+        buf = []
+    if buf:
+        commands.append(" ".join(buf))
+    return commands
+
+
+def _demo_argv(command: str, *, config: Path, home: Path) -> tuple[str, list[str]]:
+    argv = [
+        token.replace(TMP_DEMO_HOME, str(home))
+        for token in shlex.split(command)
+    ]
+    if argv[:2] != ["uv", "run"]:
+        raise AssertionError(f"demo command must start with uv run: {command}")
+    prog = argv[2]
+    rest = argv[3:]
+    rewritten: list[str] = []
+    skip_next = False
+    for token in rest:
+        if skip_next:
+            skip_next = False
+            continue
+        if token == "--config":
+            rewritten.extend(["--config", str(config)])
+            skip_next = True
+            continue
+        rewritten.append(token)
+    return prog, rewritten
 
 
 class InfluenzerInitDemoTests(unittest.TestCase):
@@ -141,11 +195,80 @@ class InfluenzerInitDemoTests(unittest.TestCase):
         self.assertIn("uv run influenzer", readme)
         self.assertIn("--artifact-url https://github.com/mikolaj92/influenzer", readme)
         self.assertIn("--claim-ship", readme)
+        self.assertIn('--fact "Local tick scores briefs and emits a draft"', readme)
+        self.assertIn('--fact "Dry-run still default"', readme)
         self.assertNotIn("mikolaj92/influenzer/pull/1", readme)
         after = (root / "after-install.md").read_text(encoding="utf-8")
         self.assertIn("uv run influenzer", after)
         self.assertNotIn("python -m influenzer.cli", after)
         self.assertNotIn("mikolaj92/influenzer/pull/1", after)
+
+    def test_readme_demo_commands_leave_a_wearable_hn_angle(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        commands = _readme_demo_commands(readme)
+        self.assertGreaterEqual(len(commands), 8)
+        blob = " ".join(commands)
+        self.assertIn("brief ingest", blob)
+        self.assertIn("brief show", blob)
+        self.assertIn("angle", blob)
+        ship = next(cmd for cmd in commands if "b-ship" in cmd and "brief ingest" in cmd)
+        facts: list[str] = []
+        take_fact = False
+        for token in shlex.split(ship):
+            if take_fact:
+                facts.append(token)
+                take_fact = False
+                continue
+            take_fact = token == "--fact"
+        self.assertGreaterEqual(len(facts), 2, "HN demo needs title + first-comment backstory")
+        human, backstory = facts[0], facts[1]
+        show: dict[str, object] | None = None
+        angle: dict[str, object] | None = None
+        for command in commands:
+            prog, argv = _demo_argv(command, config=self.config, home=self.home)
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                if prog == "influenzer":
+                    code = main(argv)
+                elif prog == "influenzer-tick-all":
+                    code = tick_all_main(argv)
+                elif prog == "influenzer-tick":
+                    code = tick_main(argv)
+                else:
+                    self.fail(f"unexpected demo program: {prog}")
+            self.assertEqual(code, 0, command)
+            tokens = argv[2:] if argv[:1] == ["--config"] else argv
+            if tokens[:2] == ["brief", "show"]:
+                show = json.loads(buf.getvalue())
+            elif tokens[:1] == ["angle"]:
+                angle = json.loads(buf.getvalue())
+        self.assertIsNotNone(show)
+        self.assertIsNotNone(angle)
+        assert show is not None and angle is not None
+        self.assertEqual(show["status"], "ok")
+        self.assertEqual(show["brief_id"], "b-ship")
+        self.assertEqual(show["verdict"], "draft")
+        self.assertEqual(show["arena"], "hn")
+        self.assertGreaterEqual(int(show["fact_count"]), 3)
+        self.assertEqual(show["costume"], "seminar")
+        self.assertFalse(show["published"])
+        self.assertIn("body", show)
+        self.assertTrue(str(show["body"]).startswith("Show HN:"))
+        self.assertIn(human, str(show["body"]))
+        self.assertIn(backstory, str(show["body"]))
+        self.assertIn("https://github.com/mikolaj92/influenzer", str(show["body"]))
+        self.assertNotIn("/pull/", str(show["body"]))
+        self.assertEqual(angle["status"], "ok")
+        self.assertEqual(angle["arena"], "hn")
+        self.assertEqual(angle["costume"], "seminar")
+        self.assertFalse(angle["empty"])
+        self.assertFalse(angle["published"])
+        self.assertEqual(angle["body"], show["body"])
+        self.assertEqual(
+            angle["body"],
+            f"Show HN: {human}\n\nhttps://github.com/mikolaj92/influenzer\n\n{backstory}",
+        )
 
 
 if __name__ == "__main__":
