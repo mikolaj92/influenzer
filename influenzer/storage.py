@@ -538,8 +538,37 @@ class StateRepository:
         # Pre-v5 rows keep the stored hash (no pillars key) and empty pillars_json.
         # Wiping authored pillars_json while keeping that hash is the #379 hole.
         if not _profile_hash_matches_pillars(brand):
-            raise StorageError(f"project {project_id} brand profile_hash does not match pillars")
+            raise StorageError(
+                f"project {project_id} brand profile_hash does not match pillars; "
+                "restore the original pillars with repair_brand_pillars(project_id, pillars)"
+            )
         return Project(project_id=row["project_id"], slug=row["slug"], name=row["name"], created_at=row["created_at"], brand=brand, kind=row["kind"])
+
+    def repair_brand_pillars(self, project_id: str, pillars: tuple[str, ...]) -> None:
+        """Restore known original pillars without changing any profile fields/hash.
+
+        Use when a pre-v5 profile lost pillars and no matching event survives.
+        The supplied pillars must reproduce the stored hash; never guess/clear.
+        """
+        if not isinstance(pillars, tuple):
+            raise StorageError("repair pillars must be a tuple of strings")
+        with self.transaction() as c:
+            row = c.execute("SELECT * FROM brand_profiles WHERE project_id=?", (project_id,)).fetchone()
+            if row is None:
+                raise StorageError(f"project {project_id} has no brand profile")
+            try:
+                brand = BrandProfile(
+                    project_id=project_id, display_name=row["display_name"], voice=row["voice"],
+                    audience=row["audience"], maintainer=row["maintainer"], tone=row["tone"],
+                    disclosures=_string_tuple(row["disclosures_json"], field="disclosures_json"),
+                    revision=row["revision"], profile_hash=row["profile_hash"], pillars=pillars,
+                )
+            except (DomainError, TypeError) as exc:
+                raise StorageError("invalid repair pillars") from exc
+            if brand.with_hash().profile_hash != brand.profile_hash:
+                raise StorageError("repair pillars do not reproduce the stored profile_hash")
+            c.execute("UPDATE brand_profiles SET pillars_json=? WHERE project_id=?", (_json(pillars), project_id))
+            self._event(project_id, "brand_profile.pillars_repaired", brand, conn=c)
 
     def save_brand_profile(self, brand: BrandProfile, *, event_type: str = "brand_profile.saved") -> None:
         if not _profile_hash_matches_pillars(brand):

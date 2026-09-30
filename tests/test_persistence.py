@@ -124,6 +124,65 @@ class PersistenceTests(unittest.TestCase):
                 conn.close()
                 other.close()
 
+    def test_v5_rejects_incompatible_preexisting_pillars_column(self):
+        from influenzer.migrations import migrate
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            with StateRepository(path) as repo:
+                _replace_brand_profiles_with_pre_v5(repo.conn)
+                repo.conn.execute("ALTER TABLE brand_profiles ADD COLUMN pillars_json TEXT")
+                repo.conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+                with self.assertRaises(MigrationError):
+                    migrate(repo.conn)
+                self.assertEqual(repo.conn.execute(
+                    "SELECT value FROM schema_meta WHERE key='schema_version'"
+                ).fetchone()[0], "4")
+
+    def test_v5_recovers_lost_pillars_from_matching_events(self):
+        from dataclasses import replace
+
+        for updated in (False, True):
+            with self.subTest(updated=updated), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "state.db"
+                project = self.project("legacy", "legacy")
+                brand = replace(project.brand, pillars=("durable automation",)).with_hash()
+                with StateRepository(path) as repo:
+                    repo.save_project(replace(project, brand=brand))
+                    if updated:
+                        brand = replace(brand, pillars=("local-first",), revision=2).with_hash()
+                        repo.save_brand_profile(brand)
+                    repo.conn.execute("ALTER TABLE brand_profiles DROP COLUMN pillars_json")
+                    repo.conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+                with StateRepository(path) as repo:
+                    self.assertEqual(repo.get_project("legacy").brand, brand)
+                with StateRepository(path) as repo:
+                    self.assertEqual(repo.get_project("legacy").brand, brand)
+
+    def test_lost_pillars_require_explicit_hash_checked_repair_without_matching_event(self):
+        from dataclasses import replace
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            project = self.project("legacy", "legacy")
+            brand = replace(project.brand, pillars=("durable automation",)).with_hash()
+            with StateRepository(path) as repo:
+                repo.save_project(replace(project, brand=brand))
+                # A payload with the right pillars/hash but wrong profile fields
+                # must not be trusted as recovery evidence.
+                payload = json.loads(repo.events("legacy")[0]["payload_json"])
+                payload["brand"]["voice"] = "different"
+                repo.conn.execute("UPDATE domain_events SET payload_json=?", (json.dumps(payload),))
+                repo.conn.execute("ALTER TABLE brand_profiles DROP COLUMN pillars_json")
+                repo.conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+            with StateRepository(path) as repo:
+                with self.assertRaisesRegex(StorageError, "repair_brand_pillars"):
+                    repo.get_project("legacy")
+                with self.assertRaises(StorageError):
+                    repo.repair_brand_pillars("legacy", ("wrong",))
+                repo.repair_brand_pillars("legacy", brand.pillars)
+                self.assertEqual(repo.get_project("legacy").brand, brand)
+
     def test_brand_profile_pillars_round_trip_and_hash(self):
         # Exercise the four-pillar limit and Unicode without changing order.
         pillars = ("local-first", "durable state", "calm automation", "narzędzia twórców")

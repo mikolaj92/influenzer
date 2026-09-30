@@ -1,7 +1,10 @@
 """Versioned SQLite schema for Influenzer's host-owned state database."""
 from __future__ import annotations
 
+import json
 import sqlite3
+
+from .domain import BrandProfile, DomainError
 
 SCHEMA_VERSION = 5
 
@@ -171,6 +174,57 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
             )
             if pillar is None or (pillar[2].upper(), pillar[3], pillar[4]) != ("TEXT", 1, "'[]'"):
                 raise MigrationError("state database cannot add brand_profiles.pillars_json") from exc
+    pillar = next(
+        (row for row in conn.execute("PRAGMA table_info(brand_profiles)")
+         if row[1] == "pillars_json"), None,
+    )
+    if pillar is None or (pillar[2].upper(), pillar[3], pillar[4]) != ("TEXT", 1, "'[]'"):
+        raise MigrationError("state database has incompatible brand_profiles.pillars_json")
+    _recover_v5_pillars(conn)
+
+
+def _recover_v5_pillars(conn: sqlite3.Connection) -> None:
+    """Recover omitted pillars only from an event matching the entire profile."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name=? AND type=?", ("domain_events", "table")).fetchone() is None:
+        return
+    fields = ("project_id", "display_name", "voice", "audience", "maintainer", "tone",
+              "disclosures", "revision", "profile_hash")
+    rows = conn.execute(
+        "SELECT project_id, display_name, voice, audience, maintainer, tone, "
+        "disclosures_json, revision, profile_hash FROM brand_profiles WHERE pillars_json=?",
+        ("[]",),
+    ).fetchall()
+    for row in rows:
+        stored = dict(zip(fields, row))
+        try:
+            stored["disclosures"] = json.loads(stored["disclosures"])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        events = conn.execute(
+            "SELECT event_type, payload_json FROM domain_events WHERE project_id=? "
+            "AND event_type IN (?,?) ORDER BY event_id DESC",
+            (stored["project_id"], "project.created", "brand_profile.saved"),
+        )
+        for event_type, raw in events:
+            try:
+                payload = json.loads(raw)
+                candidate = payload.get("brand") if event_type == "project.created" else payload
+                if not isinstance(candidate, dict) or any(candidate.get(key) != value for key, value in stored.items()):
+                    continue
+                pillars = candidate.get("pillars")
+                if not isinstance(pillars, list) or not pillars:
+                    continue
+                brand = BrandProfile(**{**stored, "disclosures": tuple(stored["disclosures"]),
+                                        "pillars": tuple(pillars)})
+                if brand.with_hash().profile_hash != stored["profile_hash"]:
+                    continue
+            except (AttributeError, TypeError, ValueError, DomainError):
+                continue
+            conn.execute(
+                "UPDATE brand_profiles SET pillars_json=? WHERE project_id=? AND pillars_json=? AND profile_hash=?",
+                (json.dumps(pillars, ensure_ascii=False), stored["project_id"], "[]", stored["profile_hash"]),
+            )
+            break
 
 
 def current_version(conn: sqlite3.Connection) -> int:
