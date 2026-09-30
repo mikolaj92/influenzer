@@ -1,4 +1,4 @@
-"""Single scheduled mutator: score pending briefs.
+"""Score pending briefs; no due-plan selection or dispatch.
 
 Does not survey GitHub. Does not call gh. Does not admit briefs.
 Does not open runtime.db. Never auto-publishes.
@@ -17,8 +17,10 @@ from influenzer.storage import StateRepository, overlap_silence, try_acquire_tic
 
 
 def run_tick(*, config_path: str | None = None, cli_live: bool = False) -> dict:
-    """One dry-run-default mutator pass against state.db. Does not open runtime.db.
+    """Score pending briefs in state.db. Does not open runtime.db.
 
+    Always supplies due=(): no plan selection, dispatch, or publishing, even
+    with scheduler.live_enabled. CLI live intent does not change this.
     A second tick on this state.db is cisza: no second look.
     """
     cfg = load_config(config_path)
@@ -39,11 +41,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--live",
         action="store_true",
-        help="ignored by tick-all; only scheduler.live_enabled can authorize live mutation",
+        help="ignored; tick-all does not dispatch or publish plans, even with scheduler.live_enabled",
     )
     args = parser.parse_args(argv)
-    # Briefs are scored every tick. Due-plan selection for live publish lands with
-    # a deeper scheduler; empty due set remains the safe default (no auto-spam).
+    # Briefs are scored every tick; run_tick supplies no due plans to dispatch.
     out = run_tick(config_path=args.config, cli_live=bool(args.live))
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out)
