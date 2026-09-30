@@ -67,6 +67,63 @@ class PersistenceTests(unittest.TestCase):
                 self.assertEqual(len(repo.events("app")), 1)
                 self.assertEqual(len(repo.events("builder")), 1)
 
+    def test_v5_migration_accepts_column_added_by_another_connection(self):
+        from influenzer.migrations import SCHEMA_VERSION, migrate
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            with StateRepository(path) as repo:
+                _replace_brand_profiles_with_pre_v5(repo.conn)
+                repo.conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+            other = sqlite3.connect(path, isolation_level=None)
+
+            class InterleavedConnection(sqlite3.Connection):
+                def executescript(self, sql):
+                    if "ADD COLUMN pillars_json" in sql:
+                        # Both connections observed v4; the competitor wins
+                        # after this connection's column check, before ALTER.
+                        self.competitor_version = migrate(other)
+                    return super().executescript(sql)
+
+            conn = sqlite3.connect(path, isolation_level=None, factory=InterleavedConnection)
+            try:
+                self.assertEqual(migrate(conn), SCHEMA_VERSION)
+                self.assertEqual(conn.competitor_version, SCHEMA_VERSION)
+                columns = list(conn.execute("PRAGMA table_info(brand_profiles)"))
+                self.assertEqual(sum(row[1] == "pillars_json" for row in columns), 1)
+                self.assertEqual(migrate(other), SCHEMA_VERSION)
+            finally:
+                conn.close()
+                other.close()
+
+    def test_v5_migration_rejects_invalid_column_added_by_another_connection(self):
+        from influenzer.migrations import migrate
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "state.db"
+            with StateRepository(path) as repo:
+                _replace_brand_profiles_with_pre_v5(repo.conn)
+                repo.conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+            other = sqlite3.connect(path, isolation_level=None)
+
+            class InterleavedConnection(sqlite3.Connection):
+                def executescript(self, sql):
+                    if "ADD COLUMN pillars_json" in sql:
+                        other.execute("ALTER TABLE brand_profiles ADD COLUMN pillars_json INTEGER")
+                    return super().executescript(sql)
+
+            conn = sqlite3.connect(path, isolation_level=None, factory=InterleavedConnection)
+            try:
+                with self.assertRaises(MigrationError) as raised:
+                    migrate(conn)
+                self.assertIsInstance(raised.exception.__cause__, sqlite3.OperationalError)
+                self.assertEqual(conn.execute(
+                    "SELECT value FROM schema_meta WHERE key='schema_version'"
+                ).fetchone()[0], "4")
+            finally:
+                conn.close()
+                other.close()
+
     def test_brand_profile_pillars_round_trip_and_hash(self):
         # Exercise the four-pillar limit and Unicode without changing order.
         pillars = ("local-first", "durable state", "calm automation", "narzędzia twórców")

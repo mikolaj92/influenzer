@@ -162,7 +162,15 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
         try:
             conn.executescript(_V5_SCHEMA)
         except sqlite3.OperationalError as exc:
-            raise MigrationError("state database cannot add brand_profiles.pillars_json") from exc
+            # Another autocommit connection may have added the column since
+            # our check. Accept only the schema this migration would create.
+            pillar = next(
+                (row for row in conn.execute("PRAGMA table_info(brand_profiles)")
+                 if row[1] == "pillars_json"),
+                None,
+            )
+            if pillar is None or (pillar[2].upper(), pillar[3], pillar[4]) != ("TEXT", 1, "'[]'"):
+                raise MigrationError("state database cannot add brand_profiles.pillars_json") from exc
 
 
 def current_version(conn: sqlite3.Connection) -> int:
