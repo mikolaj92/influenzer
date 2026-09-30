@@ -52,12 +52,17 @@ def score_brief(request: Mapping[str, Any]) -> dict[str, Any]:
         brand_payload = payload.get("brand")
         if not isinstance(brand_payload, Mapping):
             brand_payload = {}
+        raw_pillars = brand_payload.get("pillars")
+        if raw_pillars is not None and not isinstance(raw_pillars, (list, tuple)):
+            raise TypeError("brand pillars must be a list")
+        pillars = tuple(raw_pillars or ())
         brand = BrandProfile(
             project_id=str(brand_payload.get("project_id") or brief.project_id),
             display_name=str(brand_payload.get("display_name") or ""),
             voice=str(brand_payload.get("voice") or ""),
             audience=str(brand_payload.get("audience") or ""),
             maintainer=str(brand_payload.get("maintainer") or ""),
+            pillars=pillars,
         )
         decision = apply_brief(brief, brand=brand)
     except (HomError, ValueError, TypeError, KeyError) as exc:

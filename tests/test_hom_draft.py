@@ -42,6 +42,15 @@ TEST_BRAND = BrandProfile(
     maintainer="mikolaj92",
 )
 
+PILLAR_BRAND = BrandProfile(
+    project_id="app-1",
+    display_name="Influenzer",
+    voice="product",
+    audience="builders",
+    maintainer="mikolaj92",
+    pillars=("local-first", "durable automation"),
+)
+
 
 def apply_brief(brief: Brief, **kwargs: object):
     """Call the fail-closed API with an authored test brand by default."""
@@ -3763,6 +3772,218 @@ class HomDraftCostumeTests(unittest.TestCase):
             canon_url=ARENAS[ArenaId.HN].canon_url,
         )
         self.assertIsNone(dress_brief(brief, fake))
+
+    def test_linkedin_pillar_matching_respects_words_case_and_punctuation(self) -> None:
+        from influenzer.hom_draft import _insight_matches_pillar
+
+        cases = (
+            ("DURABLE—automation makes recovery explicit", ("durable automation",), True),
+            ("Automation makes recovery explicit", ("durable automation",), False),
+            ("Durable recovery makes failures explicit", ("durable automation",), False),
+            ("Local-first tools keep state nearby", ("local-first",), True),
+            ("Locality comes first in these tools", ("local-first",), False),
+            ("NARZĘDZIA twórców keep recovery explicit", ("narzędzia twórców",), True),
+            ("Durable automation makes recovery explicit", ("other topic", "durable automation"), True),
+            ("Durable automation makes recovery explicit", ("---",), False),
+        )
+        for insight, pillars, expected in cases:
+            with self.subTest(insight=insight, pillars=pillars):
+                self.assertEqual(_insight_matches_pillar(insight, pillars), expected)
+
+    def test_linkedin_insight_must_match_a_configured_pillar(self) -> None:
+        fake = Score(
+            brief_id="b-pillar-gate",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.LINKEDIN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.LINKEDIN].wave,
+            canon_url=ARENAS[ArenaId.LINKEDIN].canon_url,
+        )
+        unrelated = _ship_brief(
+            brief_id="b-pillar-gate",
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            facts=(
+                Fact(text="The queue got a cleaner dashboard"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        self.assertIsNone(dress_brief(unrelated, fake, brand=PILLAR_BRAND))
+
+        matching = _ship_brief(
+            brief_id="b-pillar-gate",
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            facts=(
+                Fact(text="Durable automation makes recovery explicit"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        draft = dress_brief(matching, fake, brand=PILLAR_BRAND)
+        self.assertIsNotNone(draft)
+        assert draft is not None
+        self.assertTrue(draft.body.startswith("Durable automation makes recovery explicit\n\n"))
+
+        payload = dress_payload(
+            {
+                "brief": brief_to_mapping(matching),
+                "score": {
+                    "brief_id": fake.brief_id,
+                    "verdict": fake.verdict.value,
+                    "reason": fake.reason,
+                    "arena": fake.arena.value,
+                    "angle": fake.angle,
+                    "wave_checklist": list(fake.wave_checklist),
+                    "canon_url": fake.canon_url,
+                },
+                "brand": {
+                    "project_id": PILLAR_BRAND.project_id,
+                    "display_name": PILLAR_BRAND.display_name,
+                    "voice": PILLAR_BRAND.voice,
+                    "audience": PILLAR_BRAND.audience,
+                    "maintainer": PILLAR_BRAND.maintainer,
+                    "pillars": list(PILLAR_BRAND.pillars),
+                },
+            }
+        )
+        self.assertEqual(payload["status"], "ok")
+
+        null_pillars = dress_payload(
+            {
+                "brief": brief_to_mapping(matching),
+                "score": {
+                    "brief_id": fake.brief_id,
+                    "verdict": fake.verdict.value,
+                    "reason": fake.reason,
+                    "arena": fake.arena.value,
+                    "angle": fake.angle,
+                    "wave_checklist": list(fake.wave_checklist),
+                    "canon_url": fake.canon_url,
+                },
+                "brand": {
+                    "project_id": PILLAR_BRAND.project_id,
+                    "display_name": PILLAR_BRAND.display_name,
+                    "voice": PILLAR_BRAND.voice,
+                    "audience": PILLAR_BRAND.audience,
+                    "maintainer": PILLAR_BRAND.maintainer,
+                    "pillars": [None],
+                },
+            }
+        )
+        self.assertEqual(null_pillars["status"], "noop")
+        self.assertEqual(null_pillars["reason"], "undressable")
+        self.assertIsNone(null_pillars["body"])
+
+    def test_linkedin_payload_rejects_malformed_brand_instead_of_bypassing_pillars(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            facts=(
+                Fact(text="Dry-run still default on every tick"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        payload = {
+            "brief": brief_to_mapping(brief),
+            "score": {
+                "brief_id": brief.brief_id,
+                "verdict": Verdict.DRAFT.value,
+                "reason": "one_angle",
+                "arena": ArenaId.LINKEDIN.value,
+                "angle": "what shipped and why a stranger should try it",
+                "wave_checklist": list(ARENAS[ArenaId.LINKEDIN].wave),
+                "canon_url": ARENAS[ArenaId.LINKEDIN].canon_url,
+            },
+        }
+        self.assertEqual(dress_payload(payload)["status"], "ok")
+        for malformed in ([], "durable automation", 42):
+            with self.subTest(brand=malformed):
+                result = dress_payload({**payload, "brand": malformed})
+                self.assertEqual(result["status"], "noop")
+                self.assertEqual(result["reason"], "undressable")
+                self.assertIsNone(result["body"])
+
+    def test_linkedin_payload_rejects_explicit_null_pillars(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            facts=(
+                Fact(text="Dry-run still default on every tick"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        payload = {
+            "brief": brief_to_mapping(brief),
+            "score": {
+                "brief_id": brief.brief_id,
+                "verdict": Verdict.DRAFT.value,
+                "reason": "one_angle",
+                "arena": ArenaId.LINKEDIN.value,
+                "angle": "what shipped and why a stranger should try it",
+                "wave_checklist": list(ARENAS[ArenaId.LINKEDIN].wave),
+                "canon_url": ARENAS[ArenaId.LINKEDIN].canon_url,
+            },
+            "brand": {"project_id": brief.project_id},
+        }
+        # Omitted or explicitly empty pillars are valid; JSON null is not
+        # an authored empty list and must not silently disable the gate.
+        self.assertEqual(dress_payload(payload)["status"], "ok")
+        self.assertEqual(
+            dress_payload({**payload, "brand": {"pillars": []}})["status"], "ok"
+        )
+        result = dress_payload({**payload, "brand": {"pillars": None}})
+        self.assertEqual(result["status"], "noop")
+        self.assertEqual(result["reason"], "undressable")
+        self.assertIsNone(result["body"])
+
+    def test_linkedin_pillar_gate_selects_later_matching_insight(self) -> None:
+        score = Score(
+            brief_id="b-later-pillar",
+            verdict=Verdict.DRAFT,
+            reason="one_angle",
+            arena=ArenaId.LINKEDIN,
+            angle="what shipped and why a stranger should try it",
+            wave_checklist=ARENAS[ArenaId.LINKEDIN].wave,
+            canon_url=ARENAS[ArenaId.LINKEDIN].canon_url,
+        )
+        for insight, accepted in (
+            ("DURABLE automation makes recovery explicit", True),
+            ("Durable dashboards make recovery explicit", False),
+            ("Durable automations make recovery explicit", False),
+        ):
+            with self.subTest(insight=insight):
+                brief = _ship_brief(
+                    brief_id=score.brief_id,
+                    preferred_arena=ArenaId.LINKEDIN,
+                    claims_ship=False,
+                    facts=(
+                        Fact(text="The queue got a cleaner dashboard"),
+                        Fact(text=insight),
+                        Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+                    ),
+                )
+                draft = dress_brief(brief, score, brand=PILLAR_BRAND)
+                if accepted:
+                    self.assertIsNotNone(draft)
+                    assert draft is not None
+                    self.assertEqual(draft.body.split("\n\n", 1)[0], insight)
+                    self.assertIn("The queue got a cleaner dashboard", draft.body)
+                else:
+                    self.assertIsNone(draft)
+
+    def test_linkedin_without_configured_pillars_keeps_existing_insight_gate(self) -> None:
+        brief = _ship_brief(
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            facts=(
+                Fact(text="Dry-run still default on every tick"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        decision = apply_brief(brief)
+        assert decision.draft is not None
+        self.assertEqual(decision.draft.costume, "court")
 
     def test_linkedin_fold_is_insight_first_and_under_210(self) -> None:
         brief = _ship_brief(

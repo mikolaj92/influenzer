@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class MigrationError(RuntimeError):
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS brand_profiles (
     project_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, voice TEXT NOT NULL,
     audience TEXT NOT NULL, maintainer TEXT NOT NULL, tone TEXT NOT NULL,
     disclosures_json TEXT NOT NULL, revision INTEGER NOT NULL, profile_hash TEXT NOT NULL,
+    pillars_json TEXT NOT NULL DEFAULT '[]',
     FOREIGN KEY(project_id) REFERENCES projects(project_id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS content_revisions (
@@ -144,6 +145,25 @@ CREATE TABLE IF NOT EXISTS hom_watch (
 );
 """
 
+_V5_SCHEMA = """
+ALTER TABLE brand_profiles ADD COLUMN pillars_json TEXT NOT NULL DEFAULT '[]';
+"""
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Add the profile pillars column to databases created before v5."""
+    kind = conn.execute(
+        "SELECT type FROM sqlite_master WHERE name = 'brand_profiles'"
+    ).fetchone()
+    if kind is None or kind[0] != "table":
+        raise MigrationError("state database is missing brand_profiles")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(brand_profiles)")}
+    if "pillars_json" not in columns:
+        try:
+            conn.executescript(_V5_SCHEMA)
+        except sqlite3.OperationalError as exc:
+            raise MigrationError("state database cannot add brand_profiles.pillars_json") from exc
+
 
 def current_version(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
@@ -160,24 +180,17 @@ def migrate(conn: sqlite3.Connection) -> int:
         conn.executescript(_V2_SCHEMA)
         conn.executescript(_V3_SCHEMA)
         conn.executescript(_V4_SCHEMA)
-        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-        conn.commit()
-        return SCHEMA_VERSION
-    if version == 1:
+    elif version == 1:
         conn.executescript(_V2_SCHEMA)
         conn.executescript(_V3_SCHEMA)
         conn.executescript(_V4_SCHEMA)
-        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-        conn.commit()
-        return SCHEMA_VERSION
-    if version == 2:
+    elif version == 2:
         conn.executescript(_V3_SCHEMA)
         conn.executescript(_V4_SCHEMA)
-        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-        conn.commit()
-        return SCHEMA_VERSION
-    if version == 3:
+    elif version == 3:
         conn.executescript(_V4_SCHEMA)
+    if version <= 4:
+        _migrate_v5(conn)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
     return SCHEMA_VERSION

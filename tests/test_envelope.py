@@ -120,6 +120,72 @@ class EnvelopeTests(unittest.TestCase):
         self.assertFalse(result["mutated"])
         self.assertNotIn(leak, str(result))
 
+    def test_score_brief_passes_brand_pillars_to_linkedin_dressing(self) -> None:
+        result = effector.run(
+            {
+                "handler": "score_brief",
+                "input": {
+                    "project_id": "app-1",
+                    "brief_id": "b-pillar-effector",
+                    "brand": {
+                        "project_id": "app-1",
+                        "display_name": "Influenzer",
+                        "voice": "product",
+                        "audience": "builders",
+                        "maintainer": "mikolaj92",
+                        "pillars": ["durable state"],
+                    },
+                    "story_kind": "major",
+                    "claims_ship": False,
+                    "tryable": True,
+                    "preferred_arena": "linkedin",
+                    "facts": [
+                        {"text": "Durable state keeps restart recovery boring"},
+                        {
+                            "text": "the artifact is ready",
+                            "artifact_url": "https://github.com/mikolaj92/influenzer/pull/12",
+                        },
+                    ],
+                },
+            }
+        )
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["verdict"], "draft")
+        self.assertEqual(result["arena"], "linkedin")
+        self.assertIn("Durable state keeps restart recovery boring", result["body"])
+
+    def test_score_brief_rejects_null_pillars_instead_of_none_string(self) -> None:
+        result = effector.run(
+            {
+                "handler": "score_brief",
+                "input": {
+                    "project_id": "app-1",
+                    "brief_id": "b-null-pillar",
+                    "brand": {
+                        "project_id": "app-1",
+                        "display_name": "Influenzer",
+                        "voice": "product",
+                        "audience": "builders",
+                        "maintainer": "mikolaj92",
+                        "pillars": [None],
+                    },
+                    "story_kind": "major",
+                    "claims_ship": False,
+                    "tryable": True,
+                    "preferred_arena": "linkedin",
+                    "facts": [
+                        {"text": "None of this should become a pillar"},
+                        {
+                            "text": "the artifact is ready",
+                            "artifact_url": "https://github.com/mikolaj92/influenzer/pull/12",
+                        },
+                    ],
+                },
+            }
+        )
+        self.assertFalse(result["ok"], result)
+        self.assertNotIn("body", result)
+        self.assertNotEqual(result.get("verdict"), "draft")
 
     def test_score_brief_without_brand_is_fail_closed(self) -> None:
         result = effector.run(

@@ -52,9 +52,10 @@ from influenzer.brief_admit import SOURCE, host_error, host_silence, open_story_
 from influenzer.brief_scan import scan_github
 from influenzer.config import load_config
 from influenzer.domain import foreign_owner_reason, utc_now
+from influenzer.envelope import fail
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Brief
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 DEFAULT_WINDOW_DAYS = 7
 CMO_TZ = ZoneInfo("Europe/Warsaw")
@@ -216,7 +217,10 @@ def scan_due_reason(
     clock = now or utc_now()
     if invalid_repo_reason(slug):
         return "repo must be owner/name"
-    project = repo.get_project(project_id)
+    try:
+        project = repo.get_project(project_id)
+    except StorageError as exc:
+        return str(exc)
     maintainer = project.brand.maintainer if project is not None else None
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
@@ -307,14 +311,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = scan_github_if_due(
-            repo,
-            project_id=args.project_id,
-            repo_slug=args.repo,
-            now=args.now,
-            window_days=args.window_days,
-        )
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = scan_github_if_due(
+                repo,
+                project_id=args.project_id,
+                repo_slug=args.repo,
+                now=args.now,
+                window_days=args.window_days,
+            )
+    except StorageError as exc:
+        out = fail(str(exc), published=False)
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.brief")
     return 0

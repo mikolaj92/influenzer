@@ -18,11 +18,11 @@ import json
 from typing import Any
 
 from influenzer.config import load_config
-from influenzer.envelope import noop, ok
+from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Draft
 from influenzer.playbook import looks_like_secret
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 # Bodies must look like the arena, not operator metadata.
 _FORBIDDEN_IN_BODY = (
@@ -88,8 +88,12 @@ def emit_angle(repo: StateRepository, *, project_id: str | None = None) -> dict[
 
     No adapters. ``scheduler.live_enabled`` cannot publish from angle.
     """
-    if project_id is not None and repo.get_project(project_id) is None:
-        return _silence("project not found", project_id=project_id)
+    if project_id is not None:
+        try:
+            if repo.get_project(project_id) is None:
+                return _silence("project not found", project_id=project_id)
+        except StorageError as exc:
+            return _silence(str(exc), project_id=project_id)
     chosen = choose_draft(repo.list_operator_drafts(project_id))
     if chosen is None:
         return _silence("no_draft", project_id=project_id)
@@ -103,8 +107,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = emit_angle(repo, project_id=args.project_id)
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = emit_angle(repo, project_id=args.project_id)
+    except StorageError as exc:
+        out = fail(str(exc), published=False)
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.angle")
     return 0

@@ -12,6 +12,8 @@ The ranker retrieves from an interest graph, then scores long dwell. Comments/sa
 4. First 60–90 min — reply with new substance (re-entry). Golden hour is nurture, not posting time.
 5. Zero-click — insight in the post. Harvest profile visits and ICP DMs.
 
+Configured `BrandProfile.pillars` gate the opening insight: it must contain all words of at least one pillar (case-insensitive, punctuation ignored), or court is quiet. Empty pillars keep the existing insight gate; the runtime accepts 0–4 pillars, while 3–4 is the retrieval strategy above.
+
 Fold without pitch, CTA, or URL, or silence. If the draft starts with CTA, a URL, or “we’re launching” — court is quiet; other arena or kill. One story. Does not publish. Does not go live.
 
 ## Don’t

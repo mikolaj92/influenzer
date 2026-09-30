@@ -15,7 +15,7 @@ from typing import Any, Iterator, Mapping, TextIO
 
 from .domain import (
     BrandProfile, Campaign, CampaignKind, CampaignStatus, ContentRevision, ContentStatus,
-    PlatformAccount, PolicyActivationGrant, PolicyVersion, Project, PublishPlan,
+    DomainError, PlatformAccount, PolicyActivationGrant, PolicyVersion, Project, PublishPlan,
     PublicationAttempt, AccountStatus, PlanStatus, AttemptStatus,
 )
 from .domain import content_hash
@@ -235,6 +235,43 @@ def _json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=lambda x: x.value if hasattr(x, "value") else str(x))
 
 
+def _pre_v5_profile_hash(brand: BrandProfile) -> str:
+    """Hash used before pillars entered BrandProfile.with_hash."""
+    return content_hash(
+        {
+            "project_id": brand.project_id,
+            "display_name": brand.display_name,
+            "voice": brand.voice,
+            "audience": brand.audience,
+            "maintainer": brand.maintainer,
+            "tone": brand.tone,
+            "disclosures": list(brand.disclosures),
+            "revision": brand.revision,
+        }
+    )
+
+
+def _profile_hash_matches_pillars(brand: BrandProfile) -> bool:
+    """True when stored hash matches authored pillars, or a pre-v5 empty profile."""
+    if brand.with_hash().profile_hash == brand.profile_hash:
+        return True
+    return not brand.pillars and brand.profile_hash == _pre_v5_profile_hash(brand)
+
+
+def _string_tuple(raw: str | None, *, field: str) -> tuple[str, ...]:
+    if not isinstance(raw, str) or not raw.strip():
+        raise StorageError(f"brand profile {field} is missing")
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise StorageError(f"brand profile {field} is not JSON") from exc
+    if not isinstance(parsed, list):
+        raise StorageError(f"brand profile {field} must be a JSON list")
+    if any(not isinstance(item, str) for item in parsed):
+        raise StorageError(f"brand profile {field} must be a JSON list of strings")
+    return tuple(parsed)
+
+
 def _enum(value: Any) -> str:
     return value.value if hasattr(value, "value") else str(value)
 
@@ -281,7 +318,11 @@ class StateRepository:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA busy_timeout = 30000")
         self.conn.execute("PRAGMA journal_mode = WAL")
-        migrate(raw)
+        try:
+            migrate(raw)
+        except MigrationError as exc:
+            raw.close()
+            raise StateUnusable(str(exc)) from exc
 
     def close(self) -> None:
         self.conn.close()
@@ -447,10 +488,31 @@ class StateRepository:
     def save_project(self, project: Project, *, event_type: str = "project.created", event_payload: Any | None = None) -> None:
         if project.brand.project_id != project.project_id:
             raise CrossProjectError("brand profile belongs to another project")
+        if not _profile_hash_matches_pillars(project.brand):
+            raise StorageError(f"project {project.project_id} brand profile_hash does not match pillars")
         with self.transaction() as c:
             c.execute("INSERT INTO projects VALUES (?,?,?,?,?)", (project.project_id, project.slug, project.name, project.kind, project.created_at))
             b = project.brand
-            c.execute("INSERT INTO brand_profiles VALUES (?,?,?,?,?,?,?,?,?)", (b.project_id,b.display_name,b.voice,b.audience,b.maintainer,b.tone,_json(b.disclosures),b.revision,b.profile_hash))
+            c.execute(
+                """
+                INSERT INTO brand_profiles(
+                    project_id, display_name, voice, audience, maintainer, tone,
+                    disclosures_json, revision, profile_hash, pillars_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    b.project_id,
+                    b.display_name,
+                    b.voice,
+                    b.audience,
+                    b.maintainer,
+                    b.tone,
+                    _json(b.disclosures),
+                    b.revision,
+                    b.profile_hash,
+                    _json(b.pillars),
+                ),
+            )
             self._event(project.project_id, event_type, event_payload if event_payload is not None else project, conn=c)
 
     def get_project(self, project_id: str) -> Project | None:
@@ -458,13 +520,52 @@ class StateRepository:
         if row is None: return None
         b = self.conn.execute("SELECT * FROM brand_profiles WHERE project_id=?", (project_id,)).fetchone()
         if b is None: raise StorageError(f"project {project_id} has no brand profile")
-        brand = BrandProfile(project_id=project_id, display_name=b["display_name"], voice=b["voice"], audience=b["audience"], maintainer=b["maintainer"], tone=b["tone"], disclosures=tuple(json.loads(b["disclosures_json"])), revision=b["revision"], profile_hash=b["profile_hash"])
+        try:
+            brand = BrandProfile(
+                project_id=project_id,
+                display_name=b["display_name"],
+                voice=b["voice"],
+                audience=b["audience"],
+                maintainer=b["maintainer"],
+                tone=b["tone"],
+                disclosures=_string_tuple(b["disclosures_json"], field="disclosures_json"),
+                pillars=_string_tuple(b["pillars_json"], field="pillars_json"),
+                revision=b["revision"],
+                profile_hash=b["profile_hash"],
+            )
+        except (DomainError, IndexError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise StorageError(f"project {project_id} has an unusable brand profile") from exc
+        # Pre-v5 rows keep the stored hash (no pillars key) and empty pillars_json.
+        # Wiping authored pillars_json while keeping that hash is the #379 hole.
+        if not _profile_hash_matches_pillars(brand):
+            raise StorageError(f"project {project_id} brand profile_hash does not match pillars")
         return Project(project_id=row["project_id"], slug=row["slug"], name=row["name"], created_at=row["created_at"], brand=brand, kind=row["kind"])
 
     def save_brand_profile(self, brand: BrandProfile, *, event_type: str = "brand_profile.saved") -> None:
+        if not _profile_hash_matches_pillars(brand):
+            raise StorageError(f"project {brand.project_id} brand profile_hash does not match pillars")
         with self.transaction() as c:
             self._require_project(c, brand.project_id)
-            c.execute("INSERT OR REPLACE INTO brand_profiles VALUES (?,?,?,?,?,?,?,?,?)", (brand.project_id,brand.display_name,brand.voice,brand.audience,brand.maintainer,brand.tone,_json(brand.disclosures),brand.revision,brand.profile_hash))
+            c.execute(
+                """
+                INSERT OR REPLACE INTO brand_profiles(
+                    project_id, display_name, voice, audience, maintainer, tone,
+                    disclosures_json, revision, profile_hash, pillars_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    brand.project_id,
+                    brand.display_name,
+                    brand.voice,
+                    brand.audience,
+                    brand.maintainer,
+                    brand.tone,
+                    _json(brand.disclosures),
+                    brand.revision,
+                    brand.profile_hash,
+                    _json(brand.pillars),
+                ),
+            )
             self._event(brand.project_id, event_type, brand, conn=c)
 
     def save_content_revision(self, revision: ContentRevision, *, event_type: str = "content_revision.created") -> None:
@@ -1276,6 +1377,7 @@ __all__ = [
     "MigrationError",
     "SQLiteRepository",
     "StateRepository",
+    "StateUnusable",
     "StorageError",
     "TICK_LOCK_NAME",
     "TickLock",

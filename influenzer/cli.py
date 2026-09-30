@@ -62,6 +62,7 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     create.add_argument("--maintainer", required=True)
     create.add_argument("--kind", choices=("app", "personal", "builder"), default="app")
     create.add_argument("--tone", default="builder")
+    create.add_argument("--pillar", action="append", default=[], help="LinkedIn brand pillar (up to 4)")
     show = project_sub.add_parser("show", help="show a project and brand profile")
     show.add_argument("--id", required=True)
 
@@ -305,20 +306,27 @@ def handle_cli(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "project" and args.project_command == "create":
-        project = Project.create(
-            project_id=args.id,
-            slug=args.slug,
-            name=args.name,
-            display_name=args.display_name,
-            voice=args.voice,
-            audience=args.audience,
-            maintainer=args.maintainer,
-            kind=args.kind,
-            tone=args.tone,
-        )
-        with _repo(args) as repo:
-            repo.save_project(project)
-            stored = repo.get_project(project.project_id)
+        try:
+            project = Project.create(
+                project_id=args.id,
+                slug=args.slug,
+                name=args.name,
+                display_name=args.display_name,
+                voice=args.voice,
+                audience=args.audience,
+                maintainer=args.maintainer,
+                kind=args.kind,
+                tone=args.tone,
+                pillars=tuple(args.pillar),
+            )
+        except DomainError as exc:
+            return _fail(str(exc))
+        try:
+            with _repo(args) as repo:
+                repo.save_project(project)
+                stored = repo.get_project(project.project_id)
+        except StorageError as exc:
+            return _fail(str(exc))
         assert stored is not None
         print(
             json.dumps(
@@ -336,11 +344,13 @@ def handle_cli(args: argparse.Namespace) -> int:
         return 0
 
     if args.command == "project" and args.project_command == "show":
-        with _repo(args) as repo:
-            stored = repo.get_project(args.id)
+        try:
+            with _repo(args) as repo:
+                stored = repo.get_project(args.id)
+        except StorageError as exc:
+            return _fail(str(exc))
         if stored is None:
-            print(json.dumps({"status": "failed", "reason": "project not found"}, sort_keys=True), file=sys.stderr)
-            return 1
+            return _fail("project not found")
         print(
             json.dumps(
                 {
@@ -352,6 +362,7 @@ def handle_cli(args: argparse.Namespace) -> int:
                         "display_name": stored.brand.display_name,
                         "voice": stored.brand.voice,
                         "audience": stored.brand.audience,
+                        "pillars": list(stored.brand.pillars),
                         "profile_hash": stored.brand.profile_hash,
                     },
                 },
@@ -867,7 +878,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="influenzer")
     setup_parser(parser)
     args = parser.parse_args(argv)
-    return handle_cli(args)
+    try:
+        return handle_cli(args)
+    except StorageError as exc:
+        return _fail(str(exc))
 
 
 if __name__ == "__main__":

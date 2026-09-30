@@ -199,6 +199,17 @@ class ScanDueTests(unittest.TestCase):
         self.assertEqual(fake.calls, [])
         self.assertIsNone(self.repo.get_brief("app-1", "scan-v0-1-0"))
 
+    def test_corrupt_pillars_json_is_silence_without_gh(self) -> None:
+        self.repo.conn.execute(
+            "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+            ('\"durable\"', "app-1"),
+        )
+        out, fake = self._due(ship_script())
+        self.assertEqual(out["status"], "noop")
+        self.assertIn("pillars_json", out["reason"])
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])
+
     def test_social_draft_is_silence_without_gh(self) -> None:
         pending = Brief.create(
             project_id="app-1",

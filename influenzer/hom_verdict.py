@@ -18,11 +18,11 @@ import json
 from typing import Any
 
 from influenzer.config import load_config
-from influenzer.envelope import noop
+from influenzer.envelope import fail, noop
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import Draft
 from influenzer.hom_outbox import choose_draft, packet_for
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 _VERDICTS = frozenset({"hold", "pass"})
 
@@ -66,8 +66,12 @@ def apply_verdict(
     """Stamp pass|hold on the current angle, or silence. Hold dismisses; pass does not post."""
     if verdict not in _VERDICTS:
         return _silence("no_draft", project_id=project_id)
-    if project_id is not None and repo.get_project(project_id) is None:
-        return _silence("project not found", project_id=project_id)
+    if project_id is not None:
+        try:
+            if repo.get_project(project_id) is None:
+                return _silence("project not found", project_id=project_id)
+        except StorageError as exc:
+            return _silence(str(exc), project_id=project_id)
     chosen = pick_current_draft(repo.list_operator_drafts(project_id), draft_id=draft_id)
     if chosen is None:
         return _silence("no_draft", project_id=project_id)
@@ -87,13 +91,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     cfg = load_config(args.config)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = apply_verdict(
-            repo,
-            args.verdict,
-            project_id=args.project_id,
-            draft_id=args.draft_id,
-        )
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = apply_verdict(
+                repo,
+                args.verdict,
+                project_id=args.project_id,
+                draft_id=args.draft_id,
+            )
+    except StorageError as exc:
+        out = fail(str(exc), published=False)
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.verdict")
     return 0

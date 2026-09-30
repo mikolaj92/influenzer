@@ -63,7 +63,7 @@ from influenzer.brief_admit import already_told, open_story_reason
 from influenzer.brief_scan import repo_is_archived, repo_is_empty, repo_is_fork, repo_is_private
 from influenzer.config import load_config
 from influenzer.domain import foreign_owner_reason, utc_now
-from influenzer.envelope import noop, ok
+from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom import HomError, brief_from_mapping
 from influenzer.playbook import (
@@ -106,7 +106,10 @@ def resolve_target(
     bad = invalid_repo_reason(slug)
     if bad:
         return host_silence(bad, project_id=pid, repo_slug=slug)
-    project = repo.get_project(pid)
+    try:
+        project = repo.get_project(pid)
+    except StorageError as exc:
+        return host_silence(str(exc), project_id=pid, repo_slug=slug)
     maintainer = project.brand.maintainer if project is not None else None
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
@@ -126,7 +129,10 @@ def admit_feedback(
         return host_silence("empty_feedback", project_id=project_id, repo_slug=slug)
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
-    project = repo.get_project(project_id)
+    try:
+        project = repo.get_project(project_id)
+    except StorageError as exc:
+        return host_silence(str(exc), project_id=project_id, repo_slug=slug)
     maintainer = project.brand.maintainer if project is not None else None
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
@@ -275,16 +281,19 @@ def main(argv: list[str] | None = None) -> int:
             payload = loaded
     cfg = load_config(args.config)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        if payload is not None:
-            out = admit_feedback(repo, payload, project_id=args.project_id, now=args.now)
-        else:
-            out = collect_and_admit(
-                repo,
-                project_id=args.project_id,
-                repo_slug=args.repo,
-                now=args.now,
-            )
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            if payload is not None:
+                out = admit_feedback(repo, payload, project_id=args.project_id, now=args.now)
+            else:
+                out = collect_and_admit(
+                    repo,
+                    project_id=args.project_id,
+                    repo_slug=args.repo,
+                    now=args.now,
+                )
+    except StorageError as exc:
+        out = fail(str(exc), published=False)
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.brief")
     return 0

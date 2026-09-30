@@ -121,8 +121,11 @@ def open_story_reason(
     now: str | None = None,
 ) -> str | None:
     """Lock is state.db, not one project_id. One story on the machine."""
-    if repo.get_project(project_id) is None:
-        return "project not found"
+    try:
+        if repo.get_project(project_id) is None:
+            return "project not found"
+    except StorageError as exc:
+        return str(exc)
     if repo.list_pending_briefs():
         return "pending_brief"
     for draft in repo.list_operator_drafts():
@@ -159,7 +162,10 @@ def admit_pack(
         return host_silence("empty_survey", project_id=project_id, repo_slug=slug)
     if payload.get("status") != "ok":
         return host_silence(str(payload.get("reason") or "scan_failed"), project_id=project_id, repo_slug=slug)
-    project = repo.get_project(project_id)
+    try:
+        project = repo.get_project(project_id)
+    except StorageError as exc:
+        return host_silence(str(exc), project_id=project_id, repo_slug=slug)
     maintainer = project.brand.maintainer if project is not None else None
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:
@@ -304,8 +310,11 @@ def main(argv: list[str] | None = None) -> int:
         payload = {}
     cfg = load_config(args.config)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        out = admit_pack(repo, payload, project_id=args.project_id)
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            out = admit_pack(repo, payload, project_id=args.project_id)
+    except StorageError as exc:
+        out = fail(str(exc), published=False)
     print(json.dumps(out, sort_keys=True))
     write_fala_result(out, reaction_kind="hom.brief")
     return 0
