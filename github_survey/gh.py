@@ -22,9 +22,12 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
+import threading
 from collections.abc import Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -380,6 +383,65 @@ def _remove_gh_cwd(cwd: str | None) -> None:
     shutil.rmtree(cwd, ignore_errors=True)
 
 
+class GhCancellation:
+    """One look call owns only its children, including a spawn racing timeout."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._cancelled = False
+        self._child: subprocess.Popen | None = None
+
+    def spawn(self, argv: Sequence[str], **kwargs: Any) -> subprocess.Popen:
+        with self._lock:
+            if self._cancelled:
+                raise subprocess.TimeoutExpired(argv, 0)
+            self._child = subprocess.Popen(argv, **kwargs)
+            return self._child
+
+    def cancel(self) -> None:
+        with self._lock:
+            self._cancelled = True
+            if self._child is not None:
+                _kill_gh_child(self._child)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._child = None
+
+
+gh_cancellation: ContextVar[GhCancellation | None] = ContextVar("gh_cancellation", default=None)
+
+
+def _kill_gh_child(child: subprocess.Popen) -> None:
+    # start_new_session makes this PID the child's group, never the host's.
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    child.wait()
+
+
+def _run_gh_child(
+    argv: Sequence[str], *, timeout: float, cwd: str, env: dict[str, str],
+    shell: bool,
+) -> subprocess.CompletedProcess:
+    cancellation = gh_cancellation.get() or GhCancellation()
+    child = cancellation.spawn(
+        argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd,
+        env=env, shell=shell, start_new_session=True,
+    )
+    try:
+        try:
+            stdout, stderr = child.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            cancellation.cancel()
+            child.communicate()
+            raise
+        return subprocess.CompletedProcess(argv, child.returncode, stdout, stderr)
+    finally:
+        cancellation.clear()
+
+
 def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
     cwd: str | None = None
     try:
@@ -392,11 +454,9 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
-        completed = subprocess.run(
+        completed = _run_gh_child(
             child_argv,
-            capture_output=True,
             timeout=timeout,
-            check=False,
             cwd=cwd,
             shell=False,
             env=child_env,
