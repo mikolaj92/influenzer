@@ -97,10 +97,22 @@ class DryRunContractTests(unittest.TestCase):
         self.assertIn("media refs", out["reason"])
 
     def test_live_path_fails_closed_in_v1_dry_run_build(self) -> None:
-        out = get_adapter("x")(self._req("x", dry_run=False))
-        self.assertFalse(out["ok"])
-        self.assertFalse(out["mutated"])
-        self.assertIn("dry-run only", out["reason"])
+        for platform, contract in PLATFORM_CONTRACTS.items():
+            with self.subTest(platform=platform):
+                host = "mastodon.social" if contract["host_required"] else None
+                req = self._req(platform, host=host, dry_run=False)
+                out = run_adapter(get_adapter(platform), req)
+                self.assertFalse(out["ok"])
+                self.assertFalse(out["mutated"])
+                self.assertEqual(out["failure_class"], "terminal")
+                self.assertFalse(out["retry_safe"])
+                self.assertIn("dry-run only", out["reason"])
+                probe = READBACK[platform](req, "provider-id")
+                self.assertFalse(probe["ok"])
+                self.assertFalse(probe["mutated"])
+                self.assertEqual(probe["failure_class"], "terminal")
+                self.assertFalse(probe["retry_safe"])
+                self.assertIn("live readback not enabled", probe["reason"])
 
     def test_meta_handlers_are_independent(self) -> None:
         ig = run_adapter(get_adapter("instagram"), self._req("instagram"))

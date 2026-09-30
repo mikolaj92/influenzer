@@ -1,4 +1,4 @@
-"""Single scheduled mutator: due plans, policy gate, adapter dispatch."""
+"""Due plans, policy gate, adapter dispatch; shipped v1 adapters reject live."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ class DueWork:
 
 
 def resolve_live_intent(*, scheduler: bool, cli_live: bool, config: Config) -> bool:
-    """Tick-all ignores CLI --live; only durable scheduler.live_enabled authorizes."""
+    """Resolve dispatch intent, not adapter capability; tick-all ignores CLI --live."""
     if scheduler:
         return bool(config.scheduler_live_enabled)
     return bool(cli_live)
@@ -119,11 +119,13 @@ def tick(
     handlers: dict[str, Handler] | None = None,
     score_only: bool = False,
 ) -> dict[str, Any]:
-    """Process pending briefs, then due plans. Live mutation requires durable scheduler.live_enabled + grant.
+    """Process briefs, then explicitly supplied due plans through the policy gate.
 
-    Look/pass/angle call this with ``score_only=True``: no adapters, even when
-    ``scheduler.live_enabled`` and due plans exist. Live is a separate
-    grant+intent path, not a Monday look side effect.
+    Durable scheduler.live_enabled + a current grant permit live dispatch,
+    not platform publication: shipped v1 adapters reject dry_run=False, leaving
+    failed plans/attempts without platform mutation. Injected handlers may
+    simulate success; they are not evidence of shipped live capability.
+    Look/pass/angle use score_only=True (no adapters); tick-all supplies due=().
     """
     clock = now or utc_now()
     if score_only:

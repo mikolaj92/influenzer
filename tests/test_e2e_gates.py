@@ -283,8 +283,41 @@ class OrderedLiveGateTests(unittest.TestCase):
         self.assertEqual(stored_builder.kind, "builder")
         self.assertNotEqual(stored_app.brand.profile_hash, stored_builder.brand.profile_hash)
 
+    def test_live_intent_and_grant_do_not_enable_shipped_adapters(self) -> None:
+        for platform in ("bluesky", "mastodon", "x", "linkedin", "instagram", "facebook_pages"):
+            with self.subTest(platform=platform):
+                work = self._seed(
+                    project_id="app-1",
+                    platform=platform,
+                    plan_id=f"real-{platform}",
+                    host="mastodon.social" if platform == "mastodon" else None,
+                )
+                # No injected handlers: exercise the shipped get_adapter path.
+                out = tick(
+                    self.repo,
+                    Config(home=self.home, scheduler_live_enabled=True),
+                    due=[work],
+                    now="2026-01-02T00:00:00Z",
+                )
+                self.assertFalse(out["mutated"])
+                adapter = out["outcomes"][0]["adapter"]
+                self.assertFalse(adapter["ok"])
+                self.assertIn("dry-run only", adapter["reason"])
+                self.assertEqual(
+                    self.repo.conn.execute(
+                        "SELECT status FROM publish_plans WHERE plan_id=?", (work.plan.plan_id,)
+                    ).fetchone()["status"],
+                    PlanStatus.FAILED.value,
+                )
+                attempt = self.repo.conn.execute(
+                    "SELECT status, provider_id FROM publication_attempts WHERE plan_id=?",
+                    (work.plan.plan_id,),
+                ).fetchone()
+                self.assertEqual(attempt["status"], AttemptStatus.FAILED.value)
+                self.assertIsNone(attempt["provider_id"])
+
     def test_ordered_live_gates_with_fake_handlers(self) -> None:
-        # Order: Bluesky+Mastodon -> X -> LinkedIn -> Meta (instagram/facebook_pages)
+        # Synthetic handler order only; these are not shipped live canaries.
         order = [
             ("bluesky", None),
             ("mastodon", "mastodon.social"),
