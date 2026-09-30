@@ -114,7 +114,19 @@ Override with `--config PATH` or `HERMES_INFLUENZER_CONFIG`.
 }
 ```
 
-Secrets never go in config. Platform accounts store `credential_ref` only (`env:NAME` or `keychain:SERVICE/ACCOUNT`).
+Secrets never go in config. Register an existing platform account with `influenzer account add --credential-ref`; platform accounts store `credential_ref` only (`env:NAME` or `keychain:SERVICE/ACCOUNT`). For example, after creating `app-1`:
+
+```bash
+uv run influenzer account add --project-id app-1 --account-id x-1 \
+  --platform x --handle @myapp --credential-ref env:X_TOKEN
+uv run influenzer account list --project-id app-1
+uv run influenzer policy create --project-id app-1 --policy-version-id pol-1 \
+  --account-id x-1
+uv run influenzer grant activate --project-id app-1 --grant-id g-1 \
+  --policy-version-id pol-1 --account-id x-1 --actor you
+```
+
+Use `--config PATH` before the command when using a non-default workspace. Accounts default to `disconnected`; registering an account does not connect it or verify credentials. Mastodon accounts also require `--host INSTANCE_HOSTNAME`. The policy and grant above record local authorization only; they do not enable live publication through the shipped adapters.
 
 ## Stack
 
@@ -148,6 +160,10 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer angle` | One wearable draft from `state.db`, or silence. Does not publish. |
 | `influenzer verdict` | Hold or pass the current angle. Hold releases the one-story lock. Pass does not post. |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
+| `influenzer account add/list` | Register existing project-scoped platform accounts using credential refs only; list accounts without secrets |
+| `influenzer policy create` | Create an immutable autopublish policy version with account/action scope and limits |
+| `influenzer grant activate` | Record a hash-bound activation grant for a policy version; does not enable live adapters |
+| `influenzer publish handoff/confirm` | Open an existing approved X plan for manual posting; confirm the manually published status URL with `--url`. No automatic posting. |
 | `influenzer-tick-all` | Score pending briefs; does not select, dispatch, or publish plans |
 | `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini. Scores every time; may `hom_pass` when a declared watch is due. `--once` is score-only unless `--pass-if-due`. |
 
@@ -180,7 +196,9 @@ The canonical local gate is `uv run python -m unittest discover -s tests`.
 ## Safety
 
 - No Ads spend path.
-- No plaintext secrets in config/DB/logs/receipts.
+- No plaintext secrets in config/DB/logs/receipts. Use `influenzer account add --credential-ref env:NAME` (or `keychain:SERVICE/ACCOUNT`), never a raw token.
+- Scheduler authorization requires durable live intent (`scheduler.live_enabled=true`) and a current hash-bound grant: create the policy with `influenzer policy create`, then record the grant with `influenzer grant activate`. Neither enables live publication through v1 adapters; CLI ticks do not dispatch plans.
+- `influenzer publish handoff --project-id ID --plan-id ID` opens an existing approved X plan for a human to post. Only `influenzer publish confirm --project-id ID --plan-id ID --url https://x.com/HANDLE/status/STATUS_ID` records manual publication; opening the handoff alone does not claim publication.
 - No blind retry after ambiguous create — use `unknown` + reconcile.
 - Cross-project references are denied.
 - SSRF guard: HTTPS-only, host binding, private IP denial, redirect revalidation, size/type bounds.
