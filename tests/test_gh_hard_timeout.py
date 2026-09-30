@@ -14,6 +14,113 @@ from influenzer.tick import loop_ticks
 
 
 class HardGhTimeoutTests(unittest.TestCase):
+    def test_entered_spawn_cannot_block_deadline(self) -> None:
+        entered = threading.Event()
+        release = threading.Event()
+        returned = threading.Event()
+        finished = threading.Event()
+        children = []
+        results = []
+        popen = subprocess.Popen
+
+        def spawn(argv, **kwargs):
+            entered.set()
+            release.wait()
+            child = popen([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+            children.append(child)
+            return child
+
+        def inner(argv):
+            try:
+                return run_gh(argv)
+            finally:
+                finished.set()
+
+        def call():
+            results.append(look_hard_gh(inner, timeout_s=0.1)(["repo", "view", "owner/name"]))
+            returned.set()
+
+        with patch("github_survey.gh.subprocess.Popen", side_effect=spawn):
+            caller = threading.Thread(target=call)
+            caller.start()
+            try:
+                self.assertTrue(entered.wait(2))
+                self.assertTrue(returned.wait(0.5), "deadline blocked by entered Popen")
+            finally:
+                release.set()
+                caller.join(2)
+                self.assertTrue(finished.wait(2))
+        self.assertEqual(results[0].returncode, 124)
+        self.assertEqual(children[0].returncode, -9)
+
+    def test_blocked_reaping_cannot_block_deadline(self) -> None:
+        release = threading.Event()
+        entered = threading.Event()
+        returned = threading.Event()
+        finished = threading.Event()
+        from github_survey.gh import _kill_gh_child
+        popen = subprocess.Popen
+
+        def spawn(argv, **kwargs):
+            return popen([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+
+        def blocked_cleanup(child):
+            entered.set()
+            release.wait()
+            _kill_gh_child(child)
+
+        def inner(argv):
+            try:
+                return run_gh(argv)
+            finally:
+                finished.set()
+
+        def call():
+            look_hard_gh(inner, timeout_s=0.1)(["repo", "view", "owner/name"])
+            returned.set()
+
+        with patch("github_survey.gh.subprocess.Popen", side_effect=spawn), patch(
+            "github_survey.gh._kill_gh_child", side_effect=blocked_cleanup,
+        ):
+            caller = threading.Thread(target=call)
+            caller.start()
+            try:
+                self.assertTrue(entered.wait(2))
+                self.assertTrue(returned.wait(0.5))
+            finally:
+                release.set()
+                caller.join(2)
+                self.assertTrue(finished.wait(2))
+
+    def test_communication_exception_cleans_actual_child(self) -> None:
+        for error in (OSError("pipe failure"), KeyboardInterrupt()):
+            with self.subTest(error=type(error).__name__):
+                children = []
+                popen = subprocess.Popen
+
+                def spawn(argv, **kwargs):
+                    child = popen([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+                    children.append(child)
+                    child.communicate = lambda **kw: (_ for _ in ()).throw(error)
+                    return child
+
+                try:
+                    with patch("github_survey.gh.subprocess.Popen", side_effect=spawn):
+                        if isinstance(error, OSError):
+                            self.assertEqual(run_gh(["repo", "view", "owner/name"]).returncode, 127)
+                        else:
+                            with self.assertRaises(KeyboardInterrupt):
+                                run_gh(["repo", "view", "owner/name"])
+                    self.assertIsNotNone(children[0].returncode)
+                    self.assertTrue(children[0].stdout.closed)
+                    self.assertTrue(children[0].stderr.closed)
+                finally:
+                    for child in children:
+                        child.kill()
+                        child.wait()
+                        child.stdout.close()
+                        child.stderr.close()
+
     def test_wrapped_real_child_is_killed_reaped_and_isolated(self) -> None:
         children = []
         popen = subprocess.Popen
@@ -39,6 +146,7 @@ class HardGhTimeoutTests(unittest.TestCase):
                 call = runner(["repo", "view", "owner/name"])
             self.assertEqual(call.returncode, 124)
             self.assertEqual(len(children), 1)
+            self.assertTrue(finished.wait(2))
             self.assertEqual(children[0].returncode, -9)
             with self.assertRaises(ChildProcessError):
                 os.waitpid(children[0].pid, os.WNOHANG)

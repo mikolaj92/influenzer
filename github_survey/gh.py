@@ -395,14 +395,26 @@ class GhCancellation:
         with self._lock:
             if self._cancelled:
                 raise subprocess.TimeoutExpired(argv, 0)
-            self._child = subprocess.Popen(argv, **kwargs)
-            return self._child
+        # Popen may stall before returning a handle. Never hold the state
+        # lock across process creation: the deadline must still be able to win.
+        child = subprocess.Popen(argv, **kwargs)
+        with self._lock:
+            cancelled = self._cancelled
+            if not cancelled:
+                self._child = child
+        if cancelled:
+            _cleanup_gh_child(child)
+            raise subprocess.TimeoutExpired(argv, 0)
+        return child
 
     def cancel(self) -> None:
         with self._lock:
             self._cancelled = True
-            if self._child is not None:
-                _kill_gh_child(self._child)
+            child = self._child
+        if child is not None:
+            # Reaping can stall too. The deadline caller only requests it;
+            # the worker retains ownership of communication and pipe closure.
+            threading.Thread(target=_kill_gh_child, args=(child,), daemon=True).start()
 
     def clear(self) -> None:
         with self._lock:
@@ -421,6 +433,22 @@ def _kill_gh_child(child: subprocess.Popen) -> None:
     child.wait()
 
 
+def _cleanup_gh_child(child: subprocess.Popen) -> None:
+    try:
+        _kill_gh_child(child)
+    finally:
+        _close_gh_pipes(child)
+
+
+def _close_gh_pipes(child: subprocess.Popen) -> None:
+    for pipe in (child.stdin, child.stdout, child.stderr):
+        if pipe is not None:
+            try:
+                pipe.close()
+            except OSError:
+                pass
+
+
 def _run_gh_child(
     argv: Sequence[str], *, timeout: float, cwd: str, env: dict[str, str],
     shell: bool,
@@ -433,12 +461,17 @@ def _run_gh_child(
     try:
         try:
             stdout, stderr = child.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            cancellation.cancel()
-            child.communicate()
+        except BaseException:
+            # Match subprocess.run's exception safety, including interrupts.
+            # Cleanup failures must not replace the original exception.
+            try:
+                _cleanup_gh_child(child)
+            except BaseException:
+                pass
             raise
         return subprocess.CompletedProcess(argv, child.returncode, stdout, stderr)
     finally:
+        _close_gh_pipes(child)
         cancellation.clear()
 
 
