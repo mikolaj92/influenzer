@@ -69,6 +69,7 @@ PLATFORM_CONTRACTS: dict[str, dict[str, Any]] = {
 
 
 def validate_request(request: AdapterRequest, platform: str) -> AdapterResult | None:
+    """Validate v1 contract inputs; live requests are rejected regardless of intent/grant."""
     contract = PLATFORM_CONTRACTS[platform]
     if request.platform != platform:
         return fail(f"handler/platform mismatch: {request.platform}", failure_class="terminal")
@@ -141,7 +142,7 @@ def planned_create(request: AdapterRequest, platform: str, *, planned_id: str) -
 
 
 def readback_probe(request: AdapterRequest, platform: str, provider_id: str) -> AdapterResult:
-    """Read-only reconcile shape. Live readback is rejected until Wave 4 canaries."""
+    """Simulated read-only reconcile shape; v1 has no live readback capability."""
     if not request.dry_run:
         return fail(
             f"{platform} live readback not enabled in this build",

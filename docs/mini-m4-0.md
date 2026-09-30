@@ -23,4 +23,4 @@ Lokay's mill already heartbeats on this box: LaunchAgent label `ai.mikolaj.lokay
 
 ## Live social stays off
 
-Dry-run is default. Keep `scheduler.live_enabled` false. CLI `--live` is ignored on this path; only the durable config flag can authorize live mutation, and we are not flipping it.
+The shipped v1 platform adapters are dry-run-only. Keep `scheduler.live_enabled` false. CLI `--live` is ignored on this path, and tick-all supplies no due plans. Even with the durable config flag and a current hash-bound grant, explicitly supplied Python API due plans only reach adapter dispatch: live create/readback are rejected without platform mutation, and dispatched plans/attempts fail. The flag does not unlock live organic publication or live canaries; we are not flipping it.

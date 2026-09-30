@@ -4,7 +4,7 @@ Local multi-project social operator for organic posting and campaign planning.
 
 Influenzer runs on your machine as a **local 24/7 Head of Marketing operator**. Every app has its own Project + BrandProfile. The builder is also a first-class Project (`kind=builder`) with a separate profile and accounts.
 
-On each `influenzer-tick-all` (or an always-on `influenzer-tick` loop on a Mac mini), pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Scoring is fail-closed: borderline briefs do not leak a social draft. Not every commit/event becomes a post. Drafts are local; they are not auto-published. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
+On each `influenzer-tick-all` (or an always-on `influenzer-tick` loop on a Mac mini), pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Scoring is fail-closed: borderline briefs do not leak a social draft. Not every commit/event becomes a post. Drafts are local; they are not auto-published. The shipped v1 platform adapters are dry-run-only: durable live intent plus a hash-bound policy grant can pass the scheduler gate, but cannot enable platform publication. Paid campaigns are planning/export only — no spend APIs.
 
 Playbook canon (first person): https://github.com/mikolaj92/influenzer-playbook — encoded as rules/data in `influenzer/playbook.py`.
 
@@ -71,7 +71,7 @@ uv run influenzer --config /tmp/influenzer/config.json angle
 
 `brief scan-due` (or `brief scan --if-due`) is the same compose **only when due**: a pending brief or unprocessed social draft is silence; a new GitHub look starts only on Monday (Europe/Warsaw) if no look has completed for that Monday. An interrupted look can resume on a later day, even after Monday. Otherwise it is `not due` and does not call `gh`; the legacy `--window-days` flag is accepted but ignored. `influenzer pass --project-id ID --repo owner/name` is **one CMO look**: listen (0 or 1 github-feedback brief), that scan-due, then score pending briefs, then at most one wearable angle. Verdict stays the gate. Declare the look with `influenzer watch set --project-id ID --repo owner/name`. The interval loop still scores every time; when that watch exists and scan-due would consider it due, it runs `hom_pass` once. `--once` stays score-only unless `--pass-if-due`.
 
-`tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It selects no due plans from `state.db` and does not dispatch or publish plans, even with `scheduler.live_enabled=true`. `influenzer-tick-all --live` is ignored. The scheduler's Python API can process explicitly supplied `DueWork` items with durable live intent and a current grant; the CLI always supplies `due=()`.
+`tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It selects no due plans from `state.db` and does not dispatch or publish plans, even with `scheduler.live_enabled=true`. `influenzer-tick-all --live` is ignored. The scheduler's Python API can dispatch explicitly supplied `DueWork` items with durable live intent and a current grant; the CLI always supplies `due=()`. Shipped adapters reject that `dry_run=False` dispatch without platform mutation, and the scheduler records failed plans/attempts. `scheduler.live_enabled=true` does not unlock live organic publication.
 
 ## Always-on tick (Mac mini)
 
@@ -155,7 +155,7 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 
 Separate handlers: X, Bluesky, Mastodon, LinkedIn, Instagram, Facebook Pages.
 
-Each dry-run create returns planned envelope fields for capabilities, official API selection note, media limits, rate/idempotency metadata, access/host requirements, and read-only readback/reconcile shape. Live canaries are ordered: Bluesky+Mastodon → X → LinkedIn → Meta.
+Each dry-run create returns planned envelope fields for capabilities, official API selection note, media limits, rate/idempotency metadata, access/host requirements, and a simulated readback/reconcile shape. These are contract metadata, not implemented network capabilities. All six shipped handlers reject live create and live readback; no live canaries are available in v1. Scheduler success tests using injected fake handlers exercise state transitions, not real platform publication.
 
 ## Skills
 
