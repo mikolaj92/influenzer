@@ -139,6 +139,32 @@ class PersistenceTests(unittest.TestCase):
                     "SELECT value FROM schema_meta WHERE key='schema_version'"
                 ).fetchone()[0], "4")
 
+    def test_v5_skips_event_history_for_valid_empty_profiles(self):
+        from dataclasses import replace
+        from influenzer.migrations import migrate
+        from influenzer.storage import _pre_v5_profile_hash
+
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy), tempfile.TemporaryDirectory() as tmp:
+                with StateRepository(Path(tmp) / "state.db") as repo:
+                    project = self.project("empty", "empty")
+                    if legacy:
+                        project = replace(project, brand=replace(
+                            project.brand, profile_hash=_pre_v5_profile_hash(project.brand),
+                        ))
+                    repo.save_project(project)
+                    repo.conn.execute("ALTER TABLE brand_profiles DROP COLUMN pillars_json")
+                    repo.conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+                    queries = []
+                    repo.conn.set_trace_callback(queries.append)
+                    migrate(repo.conn)
+                    repo.conn.set_trace_callback(None)
+                    self.assertFalse(any(
+                        "SELECT event_type, payload_json FROM domain_events" in query
+                        for query in queries
+                    ), queries)
+                    self.assertEqual(repo.get_project("empty").brand, project.brand)
+
     def test_v5_recovers_lost_pillars_from_matching_events(self):
         from dataclasses import replace
 

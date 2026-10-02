@@ -4,7 +4,7 @@ Local multi-project social operator for organic posting and campaign planning.
 
 Influenzer runs on your machine as a **local 24/7 Head of Marketing operator**. Every app has its own Project + BrandProfile. The builder is also a first-class Project (`kind=builder`) with a separate profile and accounts.
 
-On each `influenzer-tick-all` (or an always-on `influenzer-tick` loop on a Mac mini), pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Scoring is fail-closed: borderline briefs do not leak a social draft. Not every commit/event becomes a post. Drafts are local; they are not auto-published. Dry-run is default; live organic publish needs durable live intent plus a hash-bound policy grant. Paid campaigns are planning/export only — no spend APIs.
+On each `influenzer-tick-all` (or an always-on `influenzer-tick` loop on a Mac mini), pending **briefs** (many facts) are scored: **kill**, **changelog-only**, or **one-angle draft** in **one primary arena**. Scoring is fail-closed: borderline briefs do not leak a social draft. Not every commit/event becomes a post. Drafts are local; they are not auto-published. The shipped v1 platform adapters are dry-run-only: durable live intent plus a hash-bound policy grant can pass the scheduler gate, but cannot enable platform publication. Paid campaigns are planning/export only — no spend APIs.
 
 Playbook canon (first person): https://github.com/mikolaj92/influenzer-playbook — encoded as rules/data in `influenzer/playbook.py`.
 
@@ -71,7 +71,7 @@ uv run influenzer --config /tmp/influenzer/config.json angle
 
 `brief scan-due` (or `brief scan --if-due`) is the same compose **only when due**: a pending brief or unprocessed social draft is silence; a new GitHub look starts only on Monday (Europe/Warsaw) if no look has completed for that Monday. An interrupted look can resume on a later day, even after Monday. Otherwise it is `not due` and does not call `gh`; the legacy `--window-days` flag is accepted but ignored. `influenzer pass --project-id ID --repo owner/name` is **one CMO look**: listen (0 or 1 github-feedback brief), that scan-due, then score pending briefs, then at most one wearable angle. Verdict stays the gate. Declare the look with `influenzer watch set --project-id ID --repo owner/name`. The interval loop still scores every time; when that watch exists and scan-due would consider it due, it runs `hom_pass` once. `--once` stays score-only unless `--pass-if-due`.
 
-`tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It still does not auto-publish. `influenzer-tick-all --live` is ignored. Only `scheduler.live_enabled=true` in config can authorize live mutation, and only with a current grant.
+`tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It selects no due plans from `state.db` and does not dispatch or publish plans, even with `scheduler.live_enabled=true`. `influenzer-tick-all --live` is ignored. The scheduler's Python API can dispatch explicitly supplied `DueWork` items with durable live intent and a current grant; the CLI always supplies `due=()`. Shipped adapters reject that `dry_run=False` dispatch without platform mutation, and the scheduler records failed plans/attempts. `scheduler.live_enabled=true` does not unlock live organic publication.
 
 ## Always-on tick (Mac mini)
 
@@ -114,12 +114,24 @@ Override with `--config PATH` or `HERMES_INFLUENZER_CONFIG`.
 }
 ```
 
-Secrets never go in config. Platform accounts store `credential_ref` only (`env:NAME` or `keychain:SERVICE/ACCOUNT`).
+Secrets never go in config. Register an existing platform account with `influenzer account add --credential-ref`; platform accounts store `credential_ref` only (`env:NAME` or `keychain:SERVICE/ACCOUNT`). For example, after creating `app-1`:
+
+```bash
+uv run influenzer account add --project-id app-1 --account-id x-1 \
+  --platform x --handle @myapp --credential-ref env:X_TOKEN
+uv run influenzer account list --project-id app-1
+uv run influenzer policy create --project-id app-1 --policy-version-id pol-1 \
+  --account-id x-1
+uv run influenzer grant activate --project-id app-1 --grant-id g-1 \
+  --policy-version-id pol-1 --account-id x-1 --actor you
+```
+
+Use `--config PATH` before the command when using a non-default workspace. Accounts default to `disconnected`; registering an account does not connect it or verify credentials. Mastodon accounts also require `--host INSTANCE_HOSTNAME`. The policy and grant above record local authorization only; they do not enable live publication through the shipped adapters.
 
 ## Stack
 
 - **SQLite** `state.db` is the host-owned domain (projects, briefs, drafts). `runtime.db` is reserved for the Fala journal; effectors do not open it.
-- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for `operator_tick` (`influenzer-tick-all`), `github_scan` (`github_survey` → `github_pack` → `influenzer.brief_admit`), inbound `github_feedback` (`github_feedback` → `influenzer.hom_feedback`), Monday-started, resumable `github_scan_due` (`influenzer.scan_due`), draft-only `hom_draft`, read-only `hom_outbox`, gate `hom_verdict`, and one-shot `hom_pass`. Survey and pack are separate blocks; the host admits into `state.db`. Tick scores then asks `hom_draft` for wearable copy. `influenzer angle` leaves at most one draft. `influenzer pass` composes listen → scan-due → tick → angle once. Effectors never open `runtime.db`. The engine stays Mojo; Influenzer does not embed a second host.
+- **Fala** (`mikolaj92/Fala`) is the correlator. This repo ships [`fala-package.toml`](fala-package.toml) for score-only `operator_tick` (`influenzer-tick-all`; no plan selection or dispatch), `github_scan` (`github_survey` → `github_pack` → `influenzer.brief_admit`), inbound `github_feedback` (`github_feedback` → `influenzer.hom_feedback`), Monday-started, resumable `github_scan_due` (`influenzer.scan_due`), draft-only `hom_draft`, read-only `hom_outbox`, gate `hom_verdict`, and one-shot `hom_pass`. Survey and pack are separate blocks; the host admits into `state.db`. Tick scores then asks `hom_draft` for wearable copy. `influenzer angle` leaves at most one draft. `influenzer pass` composes listen → scan-due → tick → angle once. Effectors never open `runtime.db`. The engine stays Mojo; Influenzer does not embed a second host.
 - **github_survey** — public GitHub → JSON. Does not know briefs, drafts, `state.db`, scoring, publishing, or arenas. See [`github_survey/README.md`](github_survey/README.md).
 - **github_pack** — survey JSON → facts + ship/tryable, or silence. Tryable is a README+URL heuristic, not a live run. Does not call `gh`, write SQLite, or tick. See [`github_pack/README.md`](github_pack/README.md).
 - **github_feedback** — public issue/PR comments → facts, or silence. Bots, LGTM, and empty thanks fail closed. Does not write SQLite, post replies, survey releases/PRs, or load Influenzer. See [`github_feedback/README.md`](github_feedback/README.md).
@@ -148,14 +160,18 @@ Secrets never go in config. Platform accounts store `credential_ref` only (`env:
 | `influenzer angle` | One wearable draft from `state.db`, or silence. Does not publish. |
 | `influenzer verdict` | Hold or pass the current angle. Hold releases the one-story lock. Pass does not post. |
 | `influenzer campaign create` | Organic/paid plan (no spend) |
-| `influenzer-tick-all` | Score pending briefs; due-plan mutator (dry-run default) |
+| `influenzer account add/list` | Register existing project-scoped platform accounts using credential refs only; list accounts without secrets |
+| `influenzer policy create` | Create an immutable autopublish policy version with account/action scope and limits |
+| `influenzer grant activate` | Record a hash-bound activation grant for a policy version; does not enable live adapters |
+| `influenzer publish handoff/confirm` | Open an existing approved X plan for manual posting; confirm the manually published status URL with `--url`. No automatic posting. |
+| `influenzer-tick-all` | Score pending briefs; does not select, dispatch, or publish plans |
 | `influenzer-tick` / `influenzer tick-loop` | Always-on interval loop on a Mac mini. Scores every time; may `hom_pass` when a declared watch is due. `--once` is score-only unless `--pass-if-due`. |
 
 ## Platforms (v1 dry-run/contract)
 
 Separate handlers: X, Bluesky, Mastodon, LinkedIn, Instagram, Facebook Pages.
 
-Each dry-run create returns planned envelope fields for capabilities, official API selection note, media limits, rate/idempotency metadata, access/host requirements, and read-only readback/reconcile shape. Live canaries are ordered: Bluesky+Mastodon → X → LinkedIn → Meta.
+Each dry-run create returns planned envelope fields for capabilities, official API selection note, media limits, rate/idempotency metadata, access/host requirements, and a simulated readback/reconcile shape. These are contract metadata, not implemented network capabilities. All six shipped handlers reject live create and live readback; no live canaries are available in v1. Scheduler success tests using injected fake handlers exercise state transitions, not real platform publication.
 
 ## Skills
 
@@ -180,7 +196,9 @@ The canonical local gate is `uv run python -m unittest discover -s tests`.
 ## Safety
 
 - No Ads spend path.
-- No plaintext secrets in config/DB/logs/receipts.
+- No plaintext secrets in config/DB/logs/receipts. Use `influenzer account add --credential-ref env:NAME` (or `keychain:SERVICE/ACCOUNT`), never a raw token.
+- Scheduler authorization requires durable live intent (`scheduler.live_enabled=true`) and a current hash-bound grant: create the policy with `influenzer policy create`, then record the grant with `influenzer grant activate`. Neither enables live publication through v1 adapters; CLI ticks do not dispatch plans.
+- `influenzer publish handoff --project-id ID --plan-id ID` opens an existing approved X plan for a human to post. Only `influenzer publish confirm --project-id ID --plan-id ID --url https://x.com/HANDLE/status/STATUS_ID` records manual publication; opening the handoff alone does not claim publication.
 - No blind retry after ambiguous create — use `unknown` + reconcile.
 - Cross-project references are denied.
 - SSRF guard: HTTPS-only, host binding, private IP denial, redirect revalidation, size/type bounds.

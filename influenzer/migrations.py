@@ -198,7 +198,12 @@ def _recover_v5_pillars(conn: sqlite3.Connection) -> None:
         stored = dict(zip(fields, row))
         try:
             stored["disclosures"] = json.loads(stored["disclosures"])
-        except (TypeError, json.JSONDecodeError):
+            from .storage import _profile_hash_matches_pillars
+
+            empty = BrandProfile(**{**stored, "disclosures": tuple(stored["disclosures"]), "pillars": ()})
+            if _profile_hash_matches_pillars(empty):
+                continue
+        except (TypeError, ValueError, DomainError):
             continue
         events = conn.execute(
             "SELECT event_type, payload_json FROM domain_events WHERE project_id=? "

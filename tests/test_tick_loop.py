@@ -25,7 +25,7 @@ from influenzer.tick import (
     loop_ticks,
     main as tick_main,
 )
-from influenzer.tick_all import run_tick
+from influenzer.tick_all import main as tick_all_main, run_tick
 
 
 SHIP_PR = "https://github.com/mikolaj92/influenzer/pull/12"
@@ -62,6 +62,15 @@ class TickLoopTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.repo.close()
         self.tmp.cleanup()
+
+    def test_tick_all_help_does_not_offer_live_dispatch(self) -> None:
+        stdout = io.StringIO()
+        with patch("sys.stdout", stdout), self.assertRaises(SystemExit) as exit_ctx:
+            tick_all_main(["--help"])
+        self.assertEqual(exit_ctx.exception.code, 0)
+        help_text = " ".join(stdout.getvalue().split())
+        self.assertIn("does not dispatch or publish plans", help_text)
+        self.assertNotIn("authorize live mutation", help_text)
 
     def test_loop_ticks_runs_without_launchagent_and_honors_max_ticks(self) -> None:
         slept: list[float] = []
