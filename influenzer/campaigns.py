@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from influenzer.domain import Campaign, CampaignKind, CampaignStatus, DomainError
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 
 class CampaignError(DomainError):
@@ -44,7 +44,11 @@ def create_campaign(
 
 
 def persist_campaign(repo: StateRepository, campaign: Campaign) -> Campaign:
-    if repo.get_project(campaign.project_id) is None:
+    try:
+        missing = repo.get_project(campaign.project_id) is None
+    except StorageError as exc:
+        raise CampaignError(str(exc)) from exc
+    if missing:
         raise CampaignError(f"unknown project: {campaign.project_id}")
     if campaign.kind is CampaignKind.PAID and SPEND_PATHS:
         raise CampaignError("paid spend path is forbidden")

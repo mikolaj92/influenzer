@@ -1,9 +1,12 @@
 """Versioned SQLite schema for Influenzer's host-owned state database."""
 from __future__ import annotations
 
+import json
 import sqlite3
 
-SCHEMA_VERSION = 4
+from .domain import BrandProfile, DomainError
+
+SCHEMA_VERSION = 5
 
 
 class MigrationError(RuntimeError):
@@ -19,6 +22,7 @@ CREATE TABLE IF NOT EXISTS brand_profiles (
     project_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, voice TEXT NOT NULL,
     audience TEXT NOT NULL, maintainer TEXT NOT NULL, tone TEXT NOT NULL,
     disclosures_json TEXT NOT NULL, revision INTEGER NOT NULL, profile_hash TEXT NOT NULL,
+    pillars_json TEXT NOT NULL DEFAULT '[]',
     FOREIGN KEY(project_id) REFERENCES projects(project_id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS content_revisions (
@@ -144,6 +148,89 @@ CREATE TABLE IF NOT EXISTS hom_watch (
 );
 """
 
+_V5_SCHEMA = """
+ALTER TABLE brand_profiles ADD COLUMN pillars_json TEXT NOT NULL DEFAULT '[]';
+"""
+
+
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Add the profile pillars column to databases created before v5."""
+    kind = conn.execute(
+        "SELECT type FROM sqlite_master WHERE name = 'brand_profiles'"
+    ).fetchone()
+    if kind is None or kind[0] != "table":
+        raise MigrationError("state database is missing brand_profiles")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(brand_profiles)")}
+    if "pillars_json" not in columns:
+        try:
+            conn.executescript(_V5_SCHEMA)
+        except sqlite3.OperationalError as exc:
+            # Another autocommit connection may have added the column since
+            # our check. Accept only the schema this migration would create.
+            pillar = next(
+                (row for row in conn.execute("PRAGMA table_info(brand_profiles)")
+                 if row[1] == "pillars_json"),
+                None,
+            )
+            if pillar is None or (pillar[2].upper(), pillar[3], pillar[4]) != ("TEXT", 1, "'[]'"):
+                raise MigrationError("state database cannot add brand_profiles.pillars_json") from exc
+    pillar = next(
+        (row for row in conn.execute("PRAGMA table_info(brand_profiles)")
+         if row[1] == "pillars_json"), None,
+    )
+    if pillar is None or (pillar[2].upper(), pillar[3], pillar[4]) != ("TEXT", 1, "'[]'"):
+        raise MigrationError("state database has incompatible brand_profiles.pillars_json")
+    _recover_v5_pillars(conn)
+
+
+def _recover_v5_pillars(conn: sqlite3.Connection) -> None:
+    """Recover omitted pillars only from an event matching the entire profile."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name=? AND type=?", ("domain_events", "table")).fetchone() is None:
+        return
+    fields = ("project_id", "display_name", "voice", "audience", "maintainer", "tone",
+              "disclosures", "revision", "profile_hash")
+    rows = conn.execute(
+        "SELECT project_id, display_name, voice, audience, maintainer, tone, "
+        "disclosures_json, revision, profile_hash FROM brand_profiles WHERE pillars_json=?",
+        ("[]",),
+    ).fetchall()
+    for row in rows:
+        stored = dict(zip(fields, row))
+        try:
+            stored["disclosures"] = json.loads(stored["disclosures"])
+            from .storage import _profile_hash_matches_pillars
+
+            empty = BrandProfile(**{**stored, "disclosures": tuple(stored["disclosures"]), "pillars": ()})
+            if _profile_hash_matches_pillars(empty):
+                continue
+        except (TypeError, ValueError, DomainError):
+            continue
+        events = conn.execute(
+            "SELECT event_type, payload_json FROM domain_events WHERE project_id=? "
+            "AND event_type IN (?,?) ORDER BY event_id DESC",
+            (stored["project_id"], "project.created", "brand_profile.saved"),
+        )
+        for event_type, raw in events:
+            try:
+                payload = json.loads(raw)
+                candidate = payload.get("brand") if event_type == "project.created" else payload
+                if not isinstance(candidate, dict) or any(candidate.get(key) != value for key, value in stored.items()):
+                    continue
+                pillars = candidate.get("pillars")
+                if not isinstance(pillars, list) or not pillars:
+                    continue
+                brand = BrandProfile(**{**stored, "disclosures": tuple(stored["disclosures"]),
+                                        "pillars": tuple(pillars)})
+                if brand.with_hash().profile_hash != stored["profile_hash"]:
+                    continue
+            except (AttributeError, TypeError, ValueError, DomainError):
+                continue
+            conn.execute(
+                "UPDATE brand_profiles SET pillars_json=? WHERE project_id=? AND pillars_json=? AND profile_hash=?",
+                (json.dumps(pillars, ensure_ascii=False), stored["project_id"], "[]", stored["profile_hash"]),
+            )
+            break
+
 
 def current_version(conn: sqlite3.Connection) -> int:
     row = conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'").fetchone()
@@ -160,24 +247,17 @@ def migrate(conn: sqlite3.Connection) -> int:
         conn.executescript(_V2_SCHEMA)
         conn.executescript(_V3_SCHEMA)
         conn.executescript(_V4_SCHEMA)
-        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-        conn.commit()
-        return SCHEMA_VERSION
-    if version == 1:
+    elif version == 1:
         conn.executescript(_V2_SCHEMA)
         conn.executescript(_V3_SCHEMA)
         conn.executescript(_V4_SCHEMA)
-        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-        conn.commit()
-        return SCHEMA_VERSION
-    if version == 2:
+    elif version == 2:
         conn.executescript(_V3_SCHEMA)
         conn.executescript(_V4_SCHEMA)
-        conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
-        conn.commit()
-        return SCHEMA_VERSION
-    if version == 3:
+    elif version == 3:
         conn.executescript(_V4_SCHEMA)
+    if version <= 4:
+        _migrate_v5(conn)
         conn.execute("INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),))
         conn.commit()
     return SCHEMA_VERSION

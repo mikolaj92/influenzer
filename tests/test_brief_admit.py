@@ -1137,3 +1137,16 @@ class AdmitAndComposeTests(unittest.TestCase):
         self.assertEqual(score.verdict.value, "draft")
         cfg = load_config(str(self.home / "config.json"))
         self.assertFalse(cfg.scheduler_live_enabled)
+
+    def test_corrupt_pillars_json_is_silence_not_crash(self) -> None:
+        self.repo.conn.execute(
+            "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+            ('\"durable\"', "app-1"),
+        )
+        reason = open_story_reason(self.repo, "app-1")
+        self.assertIsNotNone(reason)
+        self.assertIn("pillars_json", reason)
+        out = admit_pack(self.repo, _other_ship_pack() | {"repo": REPO}, project_id="app-1", now=NOW)
+        self.assertEqual(out["status"], "noop")
+        self.assertIn("pillars_json", out["reason"])
+        self.assertEqual(self.repo.list_briefs("app-1"), [])

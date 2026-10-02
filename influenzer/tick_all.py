@@ -11,9 +11,10 @@ import argparse
 import json
 
 from influenzer.config import load_config
+from influenzer.envelope import fail
 from influenzer.fala_result import write_fala_result
 from influenzer.scheduler import tick
-from influenzer.storage import StateRepository, overlap_silence, try_acquire_tick_lock
+from influenzer.storage import StateRepository, StorageError, overlap_silence, try_acquire_tick_lock
 
 
 def run_tick(*, config_path: str | None = None, cli_live: bool = False) -> dict:
@@ -31,6 +32,8 @@ def run_tick(*, config_path: str | None = None, cli_live: bool = False) -> dict:
     try:
         with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
             return tick(repo, cfg, due=(), cli_live=bool(cli_live))
+    except StorageError as exc:
+        return fail(str(exc), published=False)
     finally:
         lock.close()
 

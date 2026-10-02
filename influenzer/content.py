@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from influenzer.domain import ContentRevision, ContentStatus, DomainError, content_hash, utc_now
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 
 class ContentError(DomainError):
@@ -38,7 +38,11 @@ def create_revision(
 
 
 def persist_revision(repo: StateRepository, revision: ContentRevision) -> ContentRevision:
-    if repo.get_project(revision.project_id) is None:
+    try:
+        missing = repo.get_project(revision.project_id) is None
+    except StorageError as exc:
+        raise ContentError(str(exc)) from exc
+    if missing:
         raise ContentError(f"unknown project: {revision.project_id}")
     repo.save_content_revision(revision)
     return revision

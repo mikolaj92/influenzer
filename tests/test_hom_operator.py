@@ -5722,6 +5722,96 @@ class TickBriefPathTests(unittest.TestCase):
         )
         self.assertFalse(out["mutated"])
 
+    def test_tick_after_reopen_gates_linkedin_on_persisted_pillars(self) -> None:
+        from influenzer.domain import Project
+
+        pillars = ("durable automation",)
+        self.repo.save_project(
+            Project.create(
+                project_id="app-pillars",
+                slug="apppillars",
+                name="Pillars",
+                display_name="Influenzer",
+                voice="product",
+                audience="builders",
+                maintainer="mikolaj92",
+                pillars=pillars,
+            )
+        )
+        self.repo.close()
+        self.repo = StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts")
+        stored = self.repo.get_project("app-pillars")
+        assert stored is not None
+        self.assertEqual(stored.brand.pillars, pillars)
+
+        matching = Brief.create(
+            project_id="app-pillars",
+            brief_id="b-pillar-match",
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            tryable=True,
+            story_kind=StoryKind.MAJOR,
+            facts=(
+                Fact(text="Durable automation makes recovery explicit"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        self.repo.save_brief(matching)
+        matched = tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
+        outcome = matched["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "draft")
+        self.assertEqual(outcome["arena"], "linkedin")
+        self.assertTrue(str(outcome.get("body") or "").startswith("Durable automation makes recovery explicit"))
+        draft = self.repo.get_operator_draft("app-pillars", "b-pillar-match")
+        assert draft is not None
+        self.assertEqual(draft.costume, "court")
+
+        unrelated = Brief.create(
+            project_id="app-pillars",
+            brief_id="b-pillar-miss",
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            tryable=True,
+            story_kind=StoryKind.MAJOR,
+            facts=(
+                Fact(text="The queue got a cleaner dashboard"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        self.repo.save_brief(unrelated)
+        missed = tick(self.repo, self.cfg, due=(), now="2026-08-13T06:00:00Z")
+        miss = missed["operator"]["outcomes"][0]
+        self.assertEqual(miss["arena"], "linkedin")
+        self.assertNotIn("body", miss)
+        self.assertIsNone(self.repo.get_operator_draft("app-pillars", "b-pillar-miss"))
+
+    def test_tick_corrupt_pillars_json_is_empty_brand_not_crash(self) -> None:
+        self.repo.conn.execute(
+            "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+            ('"durable"', "app-1"),
+        )
+        brief = Brief.create(
+            project_id="app-1",
+            brief_id="b-corrupt-pillars",
+            preferred_arena=ArenaId.LINKEDIN,
+            claims_ship=False,
+            tryable=True,
+            story_kind=StoryKind.MAJOR,
+            facts=(
+                Fact(text="Durable automation makes recovery explicit"),
+                Fact(text="Local tick scores briefs and emits a draft", artifact_url=SHIP_PR),
+            ),
+        )
+        self.repo.save_brief(brief)
+        out = tick(self.repo, self.cfg, due=(), now="2026-08-13T05:00:00Z")
+        self.assertEqual(out["status"], "ok")
+        outcome = out["operator"]["outcomes"][0]
+        self.assertEqual(outcome["verdict"], "kill")
+        self.assertEqual(outcome["reason"], "empty_brand")
+        self.assertNotIn("body", outcome)
+        self.assertIsNone(self.repo.get_operator_draft("app-1", "b-corrupt-pillars"))
+        self.assertFalse(out["mutated"])
+
     def test_cli_readme_demo_repo_root_emits_hn_angle(self) -> None:
         human = "Local tick scores briefs and emits a draft"
         ingest = main(

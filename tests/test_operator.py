@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from influenzer.adapters.base import AdapterRequest, run_adapter
@@ -463,6 +465,247 @@ class OperatorTests(unittest.TestCase):
             self.assertTrue(stored.brand.profile_hash)
         finally:
             reopened.close()
+
+    def test_cli_project_create_persists_pillars(self) -> None:
+        from influenzer.cli import main
+
+        code = main(
+            [
+                "--config",
+                str(self.home / "config.json"),
+                "project",
+                "create",
+                "--id",
+                "app-pillars",
+                "--slug",
+                "pillar-app",
+                "--name",
+                "Pillars",
+                "--display-name",
+                "Pillars",
+                "--voice",
+                "v",
+                "--audience",
+                "a",
+                "--maintainer",
+                "m",
+                "--kind",
+                "app",
+                "--pillar",
+                "local-first",
+                "--pillar",
+                "durable state",
+            ]
+        )
+        self.assertEqual(code, 0)
+        reopened = StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts")
+        try:
+            stored = reopened.get_project("app-pillars")
+            self.assertIsNotNone(stored)
+            assert stored is not None
+            self.assertEqual(stored.brand.pillars, ("local-first", "durable state"))
+            self.assertEqual(stored.brand.with_hash().profile_hash, stored.brand.profile_hash)
+        finally:
+            reopened.close()
+        shown = StringIO()
+        with redirect_stdout(shown):
+            show_code = main(
+                [
+                    "--config",
+                    str(self.home / "config.json"),
+                    "project",
+                    "show",
+                    "--id",
+                    "app-pillars",
+                ]
+            )
+        self.assertEqual(show_code, 0)
+        payload = json.loads(shown.getvalue())
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["brand"]["pillars"], ["local-first", "durable state"])
+
+    def test_cli_project_create_rejects_empty_or_too_many_pillars(self) -> None:
+        from influenzer.cli import main
+
+        empty = StringIO()
+        with redirect_stderr(empty):
+            empty_code = main(
+                [
+                    "--config",
+                    str(self.home / "config.json"),
+                    "project",
+                    "create",
+                    "--id",
+                    "app-empty-pillar",
+                    "--slug",
+                    "empty-pillar",
+                    "--name",
+                    "Empty",
+                    "--display-name",
+                    "Empty",
+                    "--voice",
+                    "v",
+                    "--audience",
+                    "a",
+                    "--maintainer",
+                    "m",
+                    "--pillar",
+                    "   ",
+                ]
+            )
+        self.assertEqual(empty_code, 1)
+        empty_payload = json.loads(empty.getvalue())
+        self.assertEqual(empty_payload["status"], "failed")
+        self.assertIn("pillars", empty_payload["reason"])
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            self.assertIsNone(repo.get_project("app-empty-pillar"))
+
+        too_many = StringIO()
+        with redirect_stderr(too_many):
+            too_many_code = main(
+                [
+                    "--config",
+                    str(self.home / "config.json"),
+                    "project",
+                    "create",
+                    "--id",
+                    "app-five-pillars",
+                    "--slug",
+                    "five-pillars",
+                    "--name",
+                    "Five",
+                    "--display-name",
+                    "Five",
+                    "--voice",
+                    "v",
+                    "--audience",
+                    "a",
+                    "--maintainer",
+                    "m",
+                    "--pillar",
+                    "one",
+                    "--pillar",
+                    "two",
+                    "--pillar",
+                    "three",
+                    "--pillar",
+                    "four",
+                    "--pillar",
+                    "five",
+                ]
+            )
+        self.assertEqual(too_many_code, 1)
+        too_many_payload = json.loads(too_many.getvalue())
+        self.assertEqual(too_many_payload["status"], "failed")
+        self.assertIn("at most 4 pillars", too_many_payload["reason"])
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            self.assertIsNone(repo.get_project("app-five-pillars"))
+
+    def test_cli_project_show_fails_closed_on_corrupt_pillars_json(self) -> None:
+        from influenzer.cli import main
+
+        create = main(
+            [
+                "--config",
+                str(self.home / "config.json"),
+                "project",
+                "create",
+                "--id",
+                "app-corrupt-show",
+                "--slug",
+                "corrupt-show",
+                "--name",
+                "Corrupt",
+                "--display-name",
+                "Corrupt",
+                "--voice",
+                "v",
+                "--audience",
+                "a",
+                "--maintainer",
+                "m",
+            ]
+        )
+        self.assertEqual(create, 0)
+        with StateRepository(self.home / "state.db", artifact_root=self.home / "artifacts") as repo:
+            repo.conn.execute(
+                "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+                ('"durable"', "app-corrupt-show"),
+            )
+        shown = StringIO()
+        with redirect_stderr(shown):
+            show_code = main(
+                [
+                    "--config",
+                    str(self.home / "config.json"),
+                    "project",
+                    "show",
+                    "--id",
+                    "app-corrupt-show",
+                ]
+            )
+        self.assertEqual(show_code, 1)
+        payload = json.loads(shown.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertIn("pillars_json", payload["reason"])
+
+    def test_cli_project_show_fails_closed_on_unmigratable_brand_profiles(self) -> None:
+        from influenzer.cli import main
+
+        self.repo.close()
+        import sqlite3
+
+        conn = sqlite3.connect(self.home / "state.db")
+        conn.execute("DROP TABLE brand_profiles")
+        conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+        conn.commit()
+        conn.close()
+        shown = StringIO()
+        with redirect_stderr(shown):
+            show_code = main(
+                [
+                    "--config",
+                    str(self.home / "config.json"),
+                    "project",
+                    "show",
+                    "--id",
+                    "app-1",
+                ]
+            )
+        self.assertEqual(show_code, 1)
+        payload = json.loads(shown.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertIn("brand_profiles", payload["reason"])
+
+    def test_cli_brief_ingest_fails_closed_on_corrupt_pillars_json(self) -> None:
+        from influenzer.cli import main
+
+        self.repo.conn.execute(
+            "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+            ('"durable"', "app-1"),
+        )
+        shown = StringIO()
+        with redirect_stderr(shown):
+            code = main(
+                [
+                    "--config",
+                    str(self.home / "config.json"),
+                    "brief",
+                    "ingest",
+                    "--project-id",
+                    "app-1",
+                    "--brief-id",
+                    "b-corrupt",
+                    "--story-kind",
+                    "major",
+                    "--fact",
+                    "operator emits drafts",
+                ]
+            )
+        self.assertEqual(code, 1)
+        payload = json.loads(shown.getvalue())
+        self.assertEqual(payload["status"], "failed")
+        self.assertIn("pillars_json", payload["reason"])
 
 
 if __name__ == "__main__":

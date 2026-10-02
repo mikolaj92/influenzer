@@ -574,21 +574,50 @@ def _court_fold_is_stall(text: str) -> bool:
     return bool(_PITCH_LINE_RE.search(cleaned) or _URL_IN_TEXT_RE.search(cleaned))
 
 
-def _court_insight(bits: CopyBits) -> str | None:
+_PILLAR_TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def _pillar_tokens(text: str) -> frozenset[str]:
+    return frozenset(_PILLAR_TOKEN_RE.findall(text.casefold()))
+
+
+def _insight_matches_pillar(insight: str, pillars: tuple[str, ...]) -> bool:
+    """Return whether an insight names one configured profile pillar.
+
+    A one-word pillar matches that word; a multi-word pillar requires all of
+    its words. This keeps a generic word in an unrelated post from activating
+    a profile while allowing normal punctuation and case differences.
+    """
+    insight_tokens = _pillar_tokens(insight)
+    for pillar in pillars:
+        pillar_tokens = _pillar_tokens(pillar)
+        if pillar_tokens and pillar_tokens <= insight_tokens:
+            return True
+    return False
+
+
+def _court_insight(bits: CopyBits, brand: BrandProfile | None = None) -> str | None:
     candidates = (bits.one_liner, *bits.rest)
+    pillars = brand.pillars if brand is not None else ()
     for text in candidates:
         if _court_fold_is_stall(text):
             continue
         if looks_like_linkedin_fold_overflow(text):
+            continue
+        if pillars and not _insight_matches_pillar(text, pillars):
             continue
         if text.strip():
             return text.strip()
     return None
 
 
-def _dress_linkedin(bits: CopyBits, score: Score) -> str | None:
-    """Court: win the ~210-char fold; insight first; pitch/CTA/URL in line one is silence."""
-    insight = _court_insight(bits)
+def _dress_linkedin(
+    bits: CopyBits,
+    score: Score,
+    brand: BrandProfile | None = None,
+) -> str | None:
+    """Court: win the ~210-char fold; configured profiles must name a pillar."""
+    insight = _court_insight(bits, brand)
     if insight is None:
         return None
     if looks_like_linkedin_fold_overflow(insight) or _court_fold_is_stall(insight):
@@ -878,7 +907,12 @@ def dress_brief(
     dresser = _DRESSERS.get(score.arena)
     if dresser is None:
         return None
-    body = _dress_hn(bits, score, brand) if score.arena is ArenaId.HN else dresser(bits, score)
+    if score.arena is ArenaId.HN:
+        body = _dress_hn(bits, score, brand)
+    elif score.arena is ArenaId.LINKEDIN:
+        body = _dress_linkedin(bits, score, brand)
+    else:
+        body = dresser(bits, score)
     if body is not None and _overflows_arena(score.arena, bits, body):
         return None
     if (
@@ -998,11 +1032,28 @@ def dress_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     try:
         brief = brief_from_mapping(brief_raw)
         score = score_from_mapping(score_raw)
+        brand_raw = payload.get("brand")
+        if brand_raw is not None and not isinstance(brand_raw, Mapping):
+            raise TypeError("brand must be a mapping")
+        brand = None
+        if isinstance(brand_raw, Mapping):
+            raw_pillars = brand_raw.get("pillars", ())
+            if not isinstance(raw_pillars, (list, tuple)):
+                raise TypeError("brand pillars must be a list")
+            pillars = tuple(raw_pillars)
+            brand = BrandProfile(
+                project_id=str(brand_raw.get("project_id") or brief.project_id),
+                display_name=str(brand_raw.get("display_name") or ""),
+                voice=str(brand_raw.get("voice") or ""),
+                audience=str(brand_raw.get("audience") or ""),
+                maintainer=str(brand_raw.get("maintainer") or ""),
+                pillars=pillars,
+            )
     except (HomError, ValueError, TypeError, KeyError):
         return _silence("undressable")
     now = payload.get("now")
     clock = now if isinstance(now, str) else None
-    draft = dress_brief(brief, score, now=clock)
+    draft = dress_brief(brief, score, now=clock, brand=brand)
     if draft is None:
         if score.verdict is Verdict.KILL:
             reason = "kill"
