@@ -22,9 +22,12 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
+import threading
 from collections.abc import Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -380,6 +383,102 @@ def _remove_gh_cwd(cwd: str | None) -> None:
     shutil.rmtree(cwd, ignore_errors=True)
 
 
+class GhCancellation:
+    """One look call owns only its children, including a spawn racing timeout."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._cancelled = False
+        self._child: subprocess.Popen | None = None
+
+    def spawn(self, argv: Sequence[str], **kwargs: Any) -> subprocess.Popen:
+        with self._lock:
+            if self._cancelled:
+                raise subprocess.TimeoutExpired(argv, 0)
+        # Popen may stall before returning a handle. Never hold the state
+        # lock across process creation: the deadline must still be able to win.
+        child = subprocess.Popen(argv, **kwargs)
+        with self._lock:
+            cancelled = self._cancelled
+            if not cancelled:
+                self._child = child
+        if cancelled:
+            _cleanup_gh_child(child)
+            raise subprocess.TimeoutExpired(argv, 0)
+        return child
+
+    def cancel(self) -> None:
+        with self._lock:
+            self._cancelled = True
+            child = self._child
+        if child is not None:
+            # Reaping can stall too. The deadline caller only requests it;
+            # the worker retains ownership of communication and pipe closure.
+            threading.Thread(target=_kill_gh_child, args=(child,), daemon=True).start()
+
+    def clear(self) -> None:
+        with self._lock:
+            self._child = None
+
+
+gh_cancellation: ContextVar[GhCancellation | None] = ContextVar("gh_cancellation", default=None)
+
+
+def _kill_gh_child(child: subprocess.Popen) -> None:
+    # start_new_session makes this PID the child's group, never the host's.
+    # CPython wait/communicate reap under this lock. Check ownership and
+    # signal atomically with respect to reaping, before the PID can be reused.
+    with child._waitpid_lock:
+        if child.returncode is None:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    child.wait()
+
+
+def _cleanup_gh_child(child: subprocess.Popen) -> None:
+    try:
+        _kill_gh_child(child)
+    finally:
+        _close_gh_pipes(child)
+
+
+def _close_gh_pipes(child: subprocess.Popen) -> None:
+    for pipe in (child.stdin, child.stdout, child.stderr):
+        if pipe is not None:
+            try:
+                pipe.close()
+            except OSError:
+                pass
+
+
+def _run_gh_child(
+    argv: Sequence[str], *, timeout: float, cwd: str, env: dict[str, str],
+    shell: bool,
+) -> subprocess.CompletedProcess:
+    cancellation = gh_cancellation.get() or GhCancellation()
+    child = cancellation.spawn(
+        argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd,
+        env=env, shell=shell, start_new_session=True,
+    )
+    try:
+        try:
+            stdout, stderr = child.communicate(timeout=timeout)
+        except BaseException:
+            # Match subprocess.run's exception safety, including interrupts.
+            # Cleanup failures must not replace the original exception.
+            try:
+                _cleanup_gh_child(child)
+            except BaseException:
+                pass
+            raise
+        return subprocess.CompletedProcess(argv, child.returncode, stdout, stderr)
+    finally:
+        _close_gh_pipes(child)
+        cancellation.clear()
+
+
 def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
     cwd: str | None = None
     try:
@@ -392,11 +491,9 @@ def run_gh(argv: Sequence[str], *, timeout: float = GH_TIMEOUT_S) -> GhCall:
         cwd = tempfile.mkdtemp(prefix="influenzer-gh-")
         if not isolated_gh_cwd(Path(cwd)):
             return GhCall(returncode=0, stdout="", stderr="")
-        completed = subprocess.run(
+        completed = _run_gh_child(
             child_argv,
-            capture_output=True,
             timeout=timeout,
-            check=False,
             cwd=cwd,
             shell=False,
             env=child_env,

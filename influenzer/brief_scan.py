@@ -39,8 +39,6 @@ is an error. Pending brief after a crash is score+angle only.
 from __future__ import annotations
 
 import json
-import os
-import signal
 import threading
 import time
 from collections.abc import Sequence
@@ -70,35 +68,32 @@ GH_HANG_TIMEOUT_S = 20.0
 assert GH_HANG_TIMEOUT_S < 300
 
 
-def _kill_lingering_gh() -> None:
-    """Best-effort: a timed-out gh child must not stay. Next tick goes."""
-    try:
-        os.killpg(0, signal.SIGKILL)
-    except (OSError, ProcessLookupError, PermissionError):
-        return
-
-
 def look_hard_gh(gh: GhRunner | None = None, *, timeout_s: float = GH_HANG_TIMEOUT_S) -> GhRunner:
     """One gh call may not hang the loop. After timeout: cisza, child gone."""
     from github_survey import run_gh
+    from github_survey.gh import GhCancellation, gh_cancellation
 
     inner = gh if gh is not None else run_gh
     deadline = max(0.1, float(timeout_s))
 
     def _hard(argv: Sequence[str]) -> GhCall:
         box: dict[str, Any] = {}
+        cancellation = GhCancellation()
 
         def _run() -> None:
+            token = gh_cancellation.set(cancellation)
             try:
                 box["call"] = inner(argv)
             except BaseException as exc:  # hang path must stay silent
                 box["exc"] = exc
+            finally:
+                gh_cancellation.reset(token)
 
         worker = threading.Thread(target=_run, name="influenzer-gh", daemon=True)
         worker.start()
         worker.join(deadline)
         if worker.is_alive():
-            _kill_lingering_gh()
+            cancellation.cancel()
             return GhCall(returncode=124, stdout="", stderr="gh timeout")
         exc = box.get("exc")
         if isinstance(exc, BaseException):

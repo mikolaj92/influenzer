@@ -219,13 +219,13 @@ class SurveySilenceTests(unittest.TestCase):
 
 class RunGhTests(unittest.TestCase):
     def test_run_gh_missing_binary_is_not_a_crash(self) -> None:
-        with patch("subprocess.run", side_effect=FileNotFoundError("gh")):
+        with patch("github_survey.gh._run_gh_child", side_effect=FileNotFoundError("gh")):
             call = run_gh(["repo", "view", REPO])
         self.assertTrue(call.missing)
         self.assertEqual(call.returncode, 127)
 
     def test_run_gh_timeout_is_not_a_crash(self) -> None:
-        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="gh", timeout=1)):
+        with patch("github_survey.gh._run_gh_child", side_effect=subprocess.TimeoutExpired(cmd="gh", timeout=1)):
             call = run_gh(["repo", "view", REPO])
         self.assertFalse(call.missing)
         self.assertEqual(call.returncode, 124)
@@ -246,7 +246,7 @@ class RunGhTests(unittest.TestCase):
 
     def test_run_gh_decode_error_is_empty_not_a_crash(self) -> None:
         with patch(
-            "subprocess.run",
+            "github_survey.gh._run_gh_child",
             side_effect=UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad"),
         ):
             call = run_gh(["repo", "view", REPO])
@@ -260,7 +260,7 @@ class RunGhTests(unittest.TestCase):
         completed = subprocess.CompletedProcess(
             args=["gh"], returncode=0, stdout=b"\xff\xfe not utf8", stderr=b""
         )
-        with patch("subprocess.run", return_value=completed):
+        with patch("github_survey.gh._run_gh_child", return_value=completed):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.returncode, 0)
         self.assertEqual(call.stdout, "")
@@ -292,7 +292,7 @@ class RunGhTests(unittest.TestCase):
         completed = subprocess.CompletedProcess(
             args=["gh"], returncode=0, stdout=b"not-json", stderr=b""
         )
-        with patch("subprocess.run", return_value=completed):
+        with patch("github_survey.gh._run_gh_child", return_value=completed):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.stdout, "not-json")
         data, reason = required_json(call)
@@ -320,7 +320,7 @@ class RunGhTests(unittest.TestCase):
             self.assertTrue(isolated_gh_cwd(cwd))
             return subprocess.CompletedProcess(args=["gh"], returncode=0, stdout=b"{}", stderr=b"")
 
-        with patch("subprocess.run", side_effect=fake_run):
+        with patch("github_survey.gh._run_gh_child", side_effect=fake_run):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.returncode, 0)
         self.assertEqual(call.stdout, "{}")
@@ -349,7 +349,7 @@ class RunGhTests(unittest.TestCase):
             raise AssertionError("gh must not spawn when cwd is not isolated")
 
         with patch("tempfile.mkdtemp", return_value=str(Path.home())), patch(
-            "subprocess.run", side_effect=fake_run
+            "github_survey.gh._run_gh_child", side_effect=fake_run
         ):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.returncode, 0)
@@ -373,7 +373,7 @@ class RunGhTests(unittest.TestCase):
             self.assertFalse(kwargs.get("shell", False))
             return subprocess.CompletedProcess(args=cmd, returncode=0, stdout=b"{}", stderr=b"")
 
-        with patch("subprocess.run", side_effect=fake_run):
+        with patch("github_survey.gh._run_gh_child", side_effect=fake_run):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.returncode, 0)
         self.assertEqual(seen, [["gh", "repo", "view", REPO]])
@@ -382,7 +382,7 @@ class RunGhTests(unittest.TestCase):
         def fake_run(*args, **kwargs):
             raise AssertionError("gh must not spawn a shell string or a bad slug")
 
-        with patch("subprocess.run", side_effect=fake_run):
+        with patch("github_survey.gh._run_gh_child", side_effect=fake_run):
             shell = run_gh("repo view owner/name; id")  # type: ignore[arg-type]
             bad = run_gh(["repo", "view", "owner/name; id"])
             injected = run_gh(["api", "repos/owner/name;id/readme"])
@@ -445,7 +445,7 @@ class RunGhTests(unittest.TestCase):
             ["api", "user"],
             ["api", f"repos/{REPO}/dispatches", "-X", "POST"],
         )
-        with patch("subprocess.run", side_effect=fake_run):
+        with patch("github_survey.gh._run_gh_child", side_effect=fake_run):
             for argv in writes:
                 with self.subTest(argv=argv):
                     self.assertFalse(allowlisted_gh_argv(["gh", *argv]))
@@ -501,7 +501,7 @@ class RunGhTests(unittest.TestCase):
                 "UNSAFE_PARENT": "do-not-inherit",
             },
             clear=True,
-        ), patch("subprocess.run", side_effect=fake_run):
+        ), patch("github_survey.gh._run_gh_child", side_effect=fake_run):
             call = run_gh(["repo", "view", REPO])
         self.assertEqual(call.returncode, 0)
         self.assertEqual(len(seen), 1)
@@ -517,7 +517,7 @@ class RunGhTests(unittest.TestCase):
             "AWS_SECRET_ACCESS_KEY": "host-secret",
         }
         with patch("github_survey.gh.gh_child_env", return_value=leak), patch(
-            "subprocess.run", side_effect=fake_run
+            "github_survey.gh._run_gh_child", side_effect=fake_run
         ):
             call = run_gh(["repo", "view", REPO])
         self.assertFalse(isolated_gh_env(leak))
