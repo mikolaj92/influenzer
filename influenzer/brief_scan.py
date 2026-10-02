@@ -60,7 +60,7 @@ from influenzer.playbook import (
 
 from influenzer.brief_admit import SOURCE, admit_pack, host_error, host_silence, open_story_reason
 from influenzer.domain import foreign_owner_reason, utc_now
-from influenzer.storage import StateRepository
+from influenzer.storage import StateRepository, StorageError
 
 # Harder and shorter than the always-on tick interval (300s). A hang is not auth.
 # The number is inlined so look does not import tick (tick → watch → pass → scan).
@@ -370,7 +370,10 @@ def scan_github(
     slug = repo_slug.strip()
     if invalid_repo_reason(slug):
         return host_silence("repo must be owner/name", project_id=project_id, repo_slug=slug)
-    project = repo.get_project(project_id)
+    try:
+        project = repo.get_project(project_id)
+    except StorageError as exc:
+        return host_silence(str(exc), project_id=project_id, repo_slug=slug)
     maintainer = project.brand.maintainer if project is not None else None
     foreign = foreign_owner_reason(slug, maintainer)
     if foreign:

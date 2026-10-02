@@ -64,7 +64,10 @@ def get_watch(repo: StateRepository) -> Watch | None:
     slug = str(row["repo"] or "").strip()
     if invalid_repo_reason(slug):
         return None
-    project = repo.get_project(row["project_id"])
+    try:
+        project = repo.get_project(row["project_id"])
+    except StorageError:
+        return None
     maintainer = project.brand.maintainer if project is not None else None
     if foreign_owner_reason(slug, maintainer):
         return None
@@ -83,7 +86,10 @@ def set_watch(
     bad = invalid_repo_reason(slug)
     if bad:
         return fail(bad, published=False)
-    project = repo.get_project(project_id)
+    try:
+        project = repo.get_project(project_id)
+    except StorageError as exc:
+        return fail(str(exc), published=False)
     if project is None:
         return fail("project not found", published=False)
     foreign = foreign_owner_reason(slug, project.brand.maintainer)
@@ -161,7 +167,10 @@ def interval_tick(
     if allow_hom_pass:
         watch = get_watch(repo)
         if watch is not None and not invalid_repo_reason(watch.repo_slug):
-            project = repo.get_project(watch.project_id)
+            try:
+                project = repo.get_project(watch.project_id)
+            except StorageError:
+                return tick(repo, cfg, due=(), cli_live=cli_live, now=clock)
             maintainer = project.brand.maintainer if project is not None else None
             if foreign_owner_reason(watch.repo_slug, maintainer):
                 return tick(repo, cfg, due=(), cli_live=cli_live, now=clock)
@@ -194,15 +203,18 @@ def run_watched_tick(
     """One interval step against state.db. Does not open runtime.db."""
     cfg = load_config(config_path)
     cfg.home.mkdir(parents=True, exist_ok=True)
-    with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
-        return interval_tick(
-            repo,
-            cfg,
-            allow_hom_pass=allow_hom_pass,
-            cli_live=cli_live,
-            gh=gh,
-            now=now,
-        )
+    try:
+        with StateRepository(cfg.state_db, artifact_root=cfg.home / "artifacts") as repo:
+            return interval_tick(
+                repo,
+                cfg,
+                allow_hom_pass=allow_hom_pass,
+                cli_live=cli_live,
+                gh=gh,
+                now=now,
+            )
+    except StorageError as exc:
+        return fail(str(exc), published=False)
 
 
 __all__ = [

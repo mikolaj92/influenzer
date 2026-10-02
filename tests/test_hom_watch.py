@@ -20,7 +20,7 @@ from influenzer.cli import setup_parser
 from influenzer.config import Config, write_config
 from influenzer.domain import Project
 from influenzer.hom import Brief, Fact
-from influenzer.hom_watch import get_watch, interval_tick, loop_status, set_watch, show_watch
+from influenzer.hom_watch import get_watch, interval_tick, loop_status, run_watched_tick, set_watch, show_watch
 from influenzer.host import HostPower
 from influenzer.playbook import StoryKind
 from influenzer.storage import StateRepository
@@ -322,6 +322,52 @@ class HomWatchTests(unittest.TestCase):
         self.assertNotIn("scan", out)
         self.assertEqual(fake.calls, [])
         self.assertEqual(self.repo.list_briefs("app-1"), [])
+        self.assertFalse(out.get("published", False))
+
+    def test_corrupt_pillars_json_watch_is_silence_not_crash(self) -> None:
+        set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        self.repo.conn.execute(
+            "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+            ('"durable"', "app-1"),
+        )
+        self.assertIsNone(get_watch(self.repo))
+        shown = show_watch(self.repo)
+        self.assertEqual(shown["status"], "noop")
+        self.assertEqual(shown["reason"], "no_watch")
+        refused = set_watch(self.repo, project_id="app-1", repo_slug=REPO, now=NOW)
+        self.assertEqual(refused["status"], "failed")
+        self.assertIn("pillars_json", refused["reason"])
+        self.repo.save_brief(
+            Brief.create(
+                project_id="app-1",
+                brief_id="manual-1",
+                facts=(Fact(text="operator emits drafts", artifact_url=SHIP_PR),),
+                story_kind=StoryKind.MAJOR,
+                claims_ship=True,
+                tryable=True,
+                source="cli",
+            )
+        )
+        out, fake = self._tick()
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual(out["operator"]["processed"], 1)
+        self.assertNotIn("scan", out)
+        self.assertEqual(fake.calls, [])
+        self.assertFalse(out.get("published", False))
+
+    def test_watched_tick_fails_closed_on_unmigratable_brand_profiles(self) -> None:
+        import sqlite3
+
+        self.repo.close()
+        conn = sqlite3.connect(self.home / "state.db")
+        conn.execute("DROP TABLE brand_profiles")
+        conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+        conn.commit()
+        conn.close()
+        out = run_watched_tick(config_path=str(self.home / "config.json"))
+        self.assertEqual(out["status"], "failed")
+        self.assertIn("brand_profiles", out["reason"])
+        self.assertFalse(out["ok"])
         self.assertFalse(out.get("published", False))
 
     def test_inbound_foreign_repo_link_does_not_expand_watch(self) -> None:

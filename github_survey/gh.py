@@ -426,10 +426,14 @@ gh_cancellation: ContextVar[GhCancellation | None] = ContextVar("gh_cancellation
 
 def _kill_gh_child(child: subprocess.Popen) -> None:
     # start_new_session makes this PID the child's group, never the host's.
-    try:
-        os.killpg(child.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
+    # CPython wait/communicate reap under this lock. Check ownership and
+    # signal atomically with respect to reaping, before the PID can be reused.
+    with child._waitpid_lock:
+        if child.returncode is None:
+            try:
+                os.killpg(child.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
     child.wait()
 
 

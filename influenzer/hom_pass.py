@@ -42,13 +42,13 @@ from typing import Any
 
 from influenzer.config import Config, load_config
 from influenzer.domain import utc_now
-from influenzer.envelope import noop, ok
+from influenzer.envelope import fail, noop, ok
 from influenzer.fala_result import write_fala_result
 from influenzer.hom_feedback import collect_and_admit
 from influenzer.hom_outbox import emit_angle
 from influenzer.scan_due import DEFAULT_WINDOW_DAYS, scan_due_reason, scan_github_if_due
 from influenzer.scheduler import tick
-from influenzer.storage import StateRepository, overlap_silence, try_acquire_tick_lock
+from influenzer.storage import StateRepository, StorageError, overlap_silence, try_acquire_tick_lock
 
 
 def _look_effect(look: dict[str, Any]) -> dict[str, Any]:
@@ -167,11 +167,13 @@ def main(argv: list[str] | None = None) -> int:
                 now=args.now,
                 window_days=args.window_days,
             )
-        print(json.dumps(out, sort_keys=True))
-        write_fala_result(out, reaction_kind="hom.pass")
-        return 0
+    except StorageError as exc:
+        out = fail(str(exc), published=False)
     finally:
         lock.close()
+    print(json.dumps(out, sort_keys=True))
+    write_fala_result(out, reaction_kind="hom.pass")
+    return 0
 
 
 if __name__ == "__main__":

@@ -176,6 +176,17 @@ class HomOutboxTests(unittest.TestCase):
         self.assertEqual(out["reason"], "no_draft")
         self.assertFalse(out["published"])
 
+    def test_corrupt_pillars_json_is_silence_not_crash(self) -> None:
+        self.repo.conn.execute(
+            "UPDATE brand_profiles SET pillars_json=? WHERE project_id=?",
+            ('\"durable\"', "app-1"),
+        )
+        out = emit_angle(self.repo, project_id="app-1")
+        self.assertEqual(out["status"], "noop")
+        self.assertIn("pillars_json", out["reason"])
+        self.assertTrue(out["empty"])
+        self.assertFalse(out["published"])
+
     def test_one_wearable_draft_is_one_packet_not_a_costume_prefix(self) -> None:
         body = f"Show HN: Local tick scores briefs\n\n{SHIP_PR}"
         draft = _put_draft(

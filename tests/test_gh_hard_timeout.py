@@ -92,6 +92,44 @@ class HardGhTimeoutTests(unittest.TestCase):
                 caller.join(2)
                 self.assertTrue(finished.wait(2))
 
+    def test_delayed_cancellation_does_not_signal_reaped_child(self) -> None:
+        from github_survey.gh import GhCancellation, _kill_gh_child
+
+        entered = threading.Event()
+        release = threading.Event()
+        finished = threading.Event()
+        cancellation = GhCancellation()
+        child = cancellation.spawn(
+            [sys.executable, "-c", "print('done')"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+        )
+
+        def delayed_cleanup(actual):
+            entered.set()
+            release.wait()
+            try:
+                _kill_gh_child(actual)
+            finally:
+                finished.set()
+
+        with patch("github_survey.gh._kill_gh_child", side_effect=delayed_cleanup), patch(
+            "github_survey.gh.os.killpg",
+        ) as killpg:
+            try:
+                cancellation.cancel()
+                self.assertTrue(entered.wait(2))
+                child.communicate(timeout=2)
+                cancellation.clear()
+                self.assertEqual(child.returncode, 0)
+                release.set()
+                self.assertTrue(finished.wait(2))
+                killpg.assert_not_called()
+            finally:
+                release.set()
+                self.assertTrue(finished.wait(2))
+                child.stdout.close()
+                child.stderr.close()
+
     def test_communication_exception_cleans_actual_child(self) -> None:
         for error in (OSError("pipe failure"), KeyboardInterrupt()):
             with self.subTest(error=type(error).__name__):
@@ -164,7 +202,7 @@ class HardGhTimeoutTests(unittest.TestCase):
         result = []
 
         def spawn(argv, **kwargs):
-            delay = 60 if argv[2] == "owner/hung" else 0.5
+            delay = 60 if argv[-1] == "owner/hung" else 0.5
             child = popen(
                 [sys.executable, "-c", f"import time; time.sleep({delay}); print('ok')"],
                 **kwargs,

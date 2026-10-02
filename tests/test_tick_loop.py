@@ -319,6 +319,21 @@ class TickLoopTests(unittest.TestCase):
         self.assertNotIn("LaunchAgents", script_text)
         self.assertNotIn(".plist", script_text)
 
+    def test_tick_all_fails_closed_on_unmigratable_brand_profiles(self) -> None:
+        import sqlite3
+
+        self.repo.close()
+        conn = sqlite3.connect(self.home / "state.db")
+        conn.execute("DROP TABLE brand_profiles")
+        conn.execute("UPDATE schema_meta SET value='4' WHERE key='schema_version'")
+        conn.commit()
+        conn.close()
+        out = run_tick(config_path=str(self.home / "config.json"))
+        self.assertEqual(out["status"], "failed")
+        self.assertIn("brand_profiles", out["reason"])
+        self.assertFalse(out["ok"])
+        self.assertFalse(out.get("published", False))
+
 
 class HostFitnessTests(unittest.TestCase):
     def test_linux_bat_sysfs_is_a_laptop(self) -> None:
