@@ -1,0 +1,9 @@
+{
+  "url": "https://memory.example.com",
+  "team_id": "YOUR_EXISTING_TEAM_ID",
+  "agent_id": "YOUR_SEPARATE_PRIVATE_INFLUENZER_AGENT_ID",
+  "user_id": "YOUR_AUTHENTICATED_OWNER_ID",
+  "service_id": "default",
+  "user_key_env": "TDAI_MEMORY_USER_KEY",
+  "api_key_env": "TDAI_MEMORY_API_KEY"
+}

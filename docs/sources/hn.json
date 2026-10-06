@@ -1,0 +1,6 @@
+{
+  "source_id": "hn-top",
+  "provider": "hn",
+  "target": "topstories",
+  "limit": 30
+}

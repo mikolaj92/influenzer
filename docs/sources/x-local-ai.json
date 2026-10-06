@@ -1,0 +1,6 @@
+{
+  "source_id": "x-local-ai",
+  "provider": "x_search",
+  "target": "\"local AI\"",
+  "limit": 20
+}

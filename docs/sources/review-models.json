@@ -1,0 +1,15 @@
+{
+  "base_url": "http://localhost:8000/v1",
+  "interpretation_model": "YOUR_MODEL",
+  "decision": {
+    "protocol": "decisions",
+    "url": "https://decisions.example.com/v1/decisions",
+    "model": "GLM-5.3-Flash-EXL3",
+    "min_confidence": 0.5,
+    "timeout_seconds": 120
+  },
+  "api_key_env": null,
+  "max_posts": 30,
+  "reasoning_effort": "low",
+  "json_mode": true
+}
