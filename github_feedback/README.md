@@ -12,7 +12,9 @@ ours), an empty repo or a repo without a README, or only noise is a silent
 envelope, not a crash. Watch on private is fail-closed, not a 404 loop.
 Workshop is a public README.
 README/comments/JSON over the hard byte limit is an empty look, not a
-feast. 50MB in `state.db` is silence. The loop lives.
+feast. The serialized JSON payload limit is 50 MiB (52 428 800 bytes),
+not a SQLite file size limit. Payloads above it are rejected; equality is
+allowed. The loop lives.
 
 Does **not**: briefs, drafts, `state.db`, scoring, publishing, arenas,
 tick, live social, posting replies, surveying releases/PRs, or running

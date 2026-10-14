@@ -15,7 +15,6 @@ is a public README.
 An archived or disabled repo is dead. Watch on a museum is silence.
 Do not launch a museum.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
-50MB in state.db is silence. The loop lives.
 Pad gh (auth, network, rate, including secondary rate limits) is empty,
 not death of the loop. Survey
 returns empty and the interval sleeps. Provider fail-closed, not a
