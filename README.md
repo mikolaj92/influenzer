@@ -175,6 +175,11 @@ Each dry-run create returns planned envelope fields for capabilities, official A
 
 ## Skills
 
+The Hermes plugin registers all 15 cards below from the explicit `SKILLS` registry
+in `__init__.py`: five operator skills and ten arena skills. Each registered name
+matches its `skills/influenzer-*/SKILL.md` card. Arena skills guide drafting;
+they do not enable live publication.
+
 - `influenzer-profile`
 - `influenzer-content`
 - `influenzer-campaign`

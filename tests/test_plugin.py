@@ -54,11 +54,29 @@ class PluginRegistrationTests(unittest.TestCase):
         module.register(ctx)
         self.assertEqual(ctx.cli_commands[0][0], "influenzer")
         skill_names = [name for name, _path, _desc in ctx.skills]
-        on_disk = sorted(path.parent.name for path in (PLUGIN_ROOT / "skills").glob("influenzer-*/SKILL.md"))
-        self.assertEqual(skill_names, on_disk)
-        self.assertEqual(len(skill_names), 15)
-        for _name, path, description in ctx.skills:
-            self.assertTrue(path.exists(), path)
+        expected = {
+            f"influenzer-{suffix}"
+            for suffix in (
+                "profile", "content", "campaign", "publish", "hom",
+                "x", "linkedin", "youtube", "shorts", "github", "hn", "reddit",
+                "newsletter", "discord", "bluesky",
+            )
+        }
+        on_disk = set((PLUGIN_ROOT / "skills").glob("influenzer-*/SKILL.md"))
+        self.assertEqual(set(skill_names), expected)
+        self.assertEqual(len(skill_names), len(expected))
+        self.assertEqual({path for _name, path, _desc in ctx.skills}, on_disk)
+        readme = (PLUGIN_ROOT / "README.md").read_text(encoding="utf-8")
+        skills_section = readme.split("## Skills\n", 1)[1].split("\n## ", 1)[0]
+        documented = {
+            name for index, name in enumerate(skills_section.split("`"))
+            if index % 2 and name.startswith("influenzer-")
+        }
+        self.assertEqual(documented, expected)
+        for name, path, description in ctx.skills:
+            self.assertEqual(path, PLUGIN_ROOT / "skills" / name / "SKILL.md")
+            self.assertTrue(path.is_file(), path)
+            self.assertEqual(path.read_text(encoding="utf-8").splitlines()[0], f"# {name}")
             self.assertTrue(description.strip())
 
     def test_cli_parser_registers_subcommands(self) -> None:
