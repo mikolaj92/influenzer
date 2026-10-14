@@ -5,21 +5,27 @@ from pathlib import Path
 from influenzer import cli
 
 
-def _registered_skills() -> tuple[tuple[str, Path, str], ...]:
-    base = Path(__file__).parent / "skills"
-    registered: list[tuple[str, Path, str]] = []
-    for path in sorted(base.glob("influenzer-*/SKILL.md")):
-        name = path.parent.name
-        description = next(
-            (
-                line.strip()
-                for line in path.read_text(encoding="utf-8").splitlines()
-                if line.strip() and not line.startswith("#")
-            ),
-            name,
-        )
-        registered.append((name, path, description))
-    return tuple(registered)
+SKILLS = (
+    ("profile", "Manage one Project BrandProfile at a time."),
+    ("content", "Create project-scoped immutable content revisions."),
+    ("campaign", "Plan organic and paid campaigns without spend."),
+    ("publish", "Inspect policy-gated publish plans and scheduler intent."),
+    (
+        "hom",
+        "I am Influenzer. I use this skill whenever I choose an angle, an arena, "
+        "or whether to ship a post at all.",
+    ),
+    ("x", "Play X: replies in rising threads, not a posting calendar."),
+    ("linkedin", "Play LinkedIn: dwell and the ICP graph, not likes."),
+    ("youtube", "Play YouTube long-form: packaging, retention, and Suggested."),
+    ("shorts", "Play Shorts, TikTok, and Reels: hooks, completion, and loops."),
+    ("github", "Play GitHub: README conversion and star velocity in a window."),
+    ("hn", "Play Hacker News: a tryable Show HN with human backstory."),
+    ("reddit", "Play Reddit: one named subreddit with its own rules."),
+    ("newsletter", "Play the newsletter: an owned list, habit, and recommendations."),
+    ("discord", "Play Discord: co-op structure, not member count."),
+    ("bluesky", "Play Bluesky: niche packs, custom feeds, and artifact URLs."),
+)
 
 
 def register(ctx):
@@ -30,5 +36,7 @@ def register(ctx):
         cli.handle_cli,
         description="Local multi-project social operator",
     )
-    for name, path, description in _registered_skills():
-        ctx.register_skill(name, path, description=description)
+    base = Path(__file__).parent / "skills"
+    for suffix, description in SKILLS:
+        name = f"influenzer-{suffix}"
+        ctx.register_skill(name, base / name / "SKILL.md", description=description)
