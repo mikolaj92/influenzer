@@ -11,8 +11,8 @@ README+URL is not tryable. An empty repo or a repo with no README is
 not a website; that is not “README without a GIF”. A private repo is not
 a website, even when the owner is ours. Workshop is a public README.
 README/comments/JSON
-over the hard byte limit is an empty look, not a feast. 50MB in
-`state.db` is silence.
+over the hard byte limit is an empty look, not a feast. Serialized JSON
+payloads over 50 MiB (52 428 800 bytes) are rejected.
 
 Does **not**: call `gh`, write SQLite, tick, publish, or know drafts,
 arenas, or `state.db`. `import github_pack` does not import Influenzer

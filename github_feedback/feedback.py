@@ -10,7 +10,6 @@ A fact is a short excerpt + comment/issue URL. One excerpt per thread.
 The rest stays on GitHub. A whole thread in state.db is silence, not storage.
 This is retention, not a timeout.
 README/comments/JSON over the hard byte limit is an empty look, not a feast.
-50MB in state.db is silence. The loop lives.
 Pad gh (auth, network, rate) is empty, not death of the loop. Feedback
 returns empty and the interval sleeps. Provider fail-closed, not a
 crash-in-the-middle-of-state.

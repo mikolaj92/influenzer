@@ -7,8 +7,8 @@ Public GitHub signals → JSON.
 owner is ours), an empty window, or a repo with no tree / no README is a
 silent envelope, not a crash. Watch on private is fail-closed, not a 404
 loop. Workshop is a public README. README/comments/JSON over the hard
-byte limit is an empty look, not a feast. 50MB in `state.db` is silence.
-The loop lives. Look does not run the project.
+byte limit is an empty look, not a feast. Serialized JSON payloads over
+50 MiB (52 428 800 bytes) are rejected. The loop lives. Look does not run the project.
 Launching on watch is silence. Tryable is a README+URL heuristic.
 Code in look is untrusted.
 
