@@ -196,7 +196,7 @@ uv run python -m unittest discover -s tests
 uv run python tools/hygiene_check.py .
 ```
 
-The canonical local gate is `uv run python -m unittest discover -s tests`.
+Tests use Python's standard-library unittest; no dev extra is required.
 
 ## Safety
 
