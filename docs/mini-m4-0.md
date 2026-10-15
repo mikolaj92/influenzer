@@ -9,7 +9,7 @@ The laptop sleeps. The tick belongs on mini-m4-0.
 From that checkout:
 
 ```bash
-influenzer watch set --project-id app-1 --repo owner/name
+influenzer watch set --project-id app-1 --repo you/name
 contrib/always-on-tick.sh
 # or:
 uv run influenzer-tick --interval 300
