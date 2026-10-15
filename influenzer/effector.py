@@ -33,11 +33,7 @@ def echo(request: Mapping[str, Any]) -> dict[str, Any]:
     return envelope.ok(status="echo", echo=dict(request))
 
 
-# Look/pass/angle stay on this dry-run catalog. Live is grant+intent on the
-# scheduler path, not a flag that flips these names into publishers.
-_LOOK_PASS_ANGLE = frozenset(
-    {"score_brief", "look", "pass", "angle", "hom_pass", "hom_outbox"}
-)
+_DRY_RUN_ONLY = frozenset({"score_brief"})
 
 
 def score_brief(request: Mapping[str, Any]) -> dict[str, Any]:
@@ -82,13 +78,7 @@ def _handler_name(request: Mapping[str, Any]) -> str | None:
 
 
 def _dry_run(request: Mapping[str, Any]) -> bool:
-    """Read dry-run with authored input taking precedence over config.
-
-    Look/pass/angle cannot leave dry-run. ``live_enabled`` is not an override.
-    Live stays a separate grant+intent on the scheduler path.
-    """
-
-    if _handler_name(request) in _LOOK_PASS_ANGLE:
+    if _handler_name(request) in _DRY_RUN_ONLY:
         return True
     input_data = request.get("input")
     if isinstance(input_data, Mapping) and "dry_run" in input_data:

@@ -24,9 +24,12 @@ class EnvelopeTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
 
     def test_unknown_handler_and_malformed_output_fail_closed(self) -> None:
-        unknown = effector.run({"handler": "not-allowlisted"})
-        self.assertFalse(unknown["ok"])
-        self.assertEqual(unknown["reason"], "effector_boundary_failed")
+        for name in ("not-allowlisted", "look", "pass", "angle", "hom_pass", "hom_outbox"):
+            with self.subTest(handler=name):
+                unknown = effector.run({"handler": name})
+                self.assertFalse(unknown["ok"])
+                self.assertEqual(unknown["reason"], "effector_boundary_failed")
+                self.assertEqual(unknown["error"], "unknown handler")
 
         with patch.object(effector, "resolve", return_value=lambda request: ["not", "an", "object"]):
             malformed = effector.run({"handler": "noop"})
@@ -40,27 +43,23 @@ class EnvelopeTests(unittest.TestCase):
         self.assertEqual(result["reason"], "effector_boundary_failed")
         self.assertFalse(result["mutated"])
 
-    def test_look_pass_angle_stay_dry_run_even_when_live_enabled(self) -> None:
-        """Look/pass/angle cannot leave dry-run. live_enabled is not an override."""
-
+    def test_score_brief_stays_dry_run_even_when_live_enabled(self) -> None:
         def planned(_request):
             return {"status": "ok", "ok": True, "mutated": False, "published": False}
 
-        for name in ("score_brief", "look", "pass", "angle", "hom_pass", "hom_outbox"):
-            with self.subTest(handler=name):
-                with patch.object(effector, "resolve", return_value=planned):
-                    result = effector.run(
-                        {
-                            "handler": name,
-                            "input": {"dry_run": False, "live_enabled": True},
-                            "config": {"dry_run": False, "scheduler_live_enabled": True},
-                            "dry_run": False,
-                        }
-                    )
-                self.assertTrue(result["ok"], result)
-                self.assertTrue(result["dry_run"])
-                self.assertFalse(result["mutated"])
-                self.assertFalse(result.get("published", False))
+        with patch.object(effector, "resolve", return_value=planned):
+            result = effector.run(
+                {
+                    "handler": "score_brief",
+                    "input": {"dry_run": False, "live_enabled": True},
+                    "config": {"dry_run": False, "scheduler_live_enabled": True},
+                    "dry_run": False,
+                }
+            )
+        self.assertTrue(result["ok"], result)
+        self.assertTrue(result["dry_run"])
+        self.assertFalse(result["mutated"])
+        self.assertFalse(result.get("published", False))
 
     def test_secret_keys_and_credential_references_are_redacted(self) -> None:
         secret = "sentinel-secret"
