@@ -1,15 +1,13 @@
 # Hop onto mini-m4-0
 
-I hop onto **mini-m4-0**, the always-on Mac mini, and start the existing dry-run tick from the checkout that already has `uv` and `state.db`. This repo does not SSH or deploy.
-
-The laptop sleeps. The tick belongs on mini-m4-0.
+Start the existing dry-run tick on **mini-m4-0**, the always-on Mac mini, from the checkout that already has `uv` and `state.db`. This repo does not SSH or deploy.
 
 ## Keep the tick up
 
 From that checkout:
 
 ```bash
-influenzer watch set --project-id app-1 --repo owner/name
+influenzer watch set --project-id app-1 --repo you/name
 contrib/always-on-tick.sh
 # or:
 uv run influenzer-tick --interval 300
