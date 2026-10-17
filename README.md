@@ -73,6 +73,296 @@ uv run influenzer --config /tmp/influenzer/config.json angle
 
 `tick-all` scores pending briefs every run (draft or explicit kill/changelog-only). It selects no due plans from `state.db` and does not dispatch or publish plans, even with `scheduler.live_enabled=true`. `influenzer-tick-all --live` is ignored. The scheduler's Python API can dispatch explicitly supplied `DueWork` items with durable live intent and a current grant; the CLI always supplies `due=()`. Shipped adapters reject that `dry_run=False` dispatch without platform mutation, and the scheduler records failed plans/attempts. `scheduler.live_enabled=true` does not unlock live organic publication.
 
+## External observations (read-only)
+
+Read many configured sources through datasource-kit's `run_ingest`. RSS/Atom
+uses feedparser; Hacker News uses its public Firebase API. One provider can
+serve multiple source IDs. These reads do not create briefs or publish posts.
+
+```bash
+uv run influenzer source read --profile docs/sources/rss.json
+uv run influenzer source read --profile docs/sources/hn.json
+uv run influenzer source history --id hn-top
+uv run influenzer source reports --id hn-top
+```
+
+Profiles specify `source_id`, `provider`, `target`, and optional `limit` (1–500).
+HN targets: `topstories`, `newstories`, `beststories`. RSS targets: HTTP(S) URLs.
+
+X reads use the hosted [x-md](https://github.com/pc-style/x-md) versioned JSON API,
+not a local scraper, and require no X credentials:
+
+```bash
+uv run influenzer source read --profile docs/sources/x-paulg.json
+uv run influenzer source read --profile docs/sources/x-local-ai.json
+```
+
+`x_profile` targets a public handle without `@`; `x_search` targets a public
+search query (`feed=latest`). Limit: at most 100. Each read fetches **one page**
+and reports `next_cursor`, `upstream_source` and `upstream_cache`; it does not
+walk pagination or claim full search coverage. Cached observations are not
+necessarily fresh upstream measurements. Responses with warnings or Firecrawl
+web-index fallback are recorded as failed bounded reads, not genuine empty
+feeds. HTTP failures (including 429/503) are reported without automatic retries.
+Hosted search has shared quotas (documented as 10 live requests/IP/15 minutes),
+so avoid frequent polling. Only public handles/queries: the hosted service sees
+them. x-md is read-only and does not implement our optional Publisher.
+History lives in `observations.db` beside `state.db`, with content-addressed raw
+responses in `source-artifacts/`. Each run appends snapshots, including changed
+metrics, rather than overwriting earlier observations. Missing metrics are
+unknown, not zero. Reports and snapshots are committed together.
+
+Reports describe a **bounded feed**, not complete platform coverage: available
+feed entries, truncation, warnings, run ID and observation time. Empty feeds
+and failed reads are distinct. A failed read returns exit code 1 and preserves
+previous history; one read attempt by default. HN item failure makes that bounded
+read fail rather than persisting a misleading partial sample. Feed polling
+re-observes current items intentionally; it is not a historical backfill or
+checkpointed stream. The kit owns ingest mechanics; source identity, records
+and interpretation stay in Influenzer. Trend inference and automatic scheduling
+of these reads are not implemented yet.
+
+## Local AI radar
+
+Enable the bounded evidence digest in the existing workspace:
+
+```bash
+cp docs/sources/radar-local-ai.json ~/.hermes/influenzer/radar.json
+uv run influenzer radar
+# Existing tick also collects due radar sources:
+uv run influenzer-tick --interval 300
+```
+
+`radar.json` owns source configuration, a minimum 900-second read interval
+(default six hours), and an explicit project target. `project.id` here is a
+report target, not automatic creation of a domain Project. `topics` describes
+the source interests; it does not filter records or decide actions by keyword
+overlap. The old `need_terms` keyword gate is not part of the review profile.
+The last successful or failed attempt prevents immediate repeat requests.
+`radar-latest.json` stores coverage, deduplicated evidence and raw references.
+Failed/stale latest reads are excluded. **The radar neither classifies needs
+nor proposes an action:** `decision=null`, `decision_status=not_evaluated`.
+
+Interpretation and decisions belong exclusively to `review`. The legacy lexical
+heuristic exists only in `review evaluate` as a comparison baseline; it is never
+a model fallback. No independent-author verification or trend claim. The digest
+does not create briefs, drafts or publications. No second scheduler, no automatic
+retries. CLI calls must not overlap a running tick's radar read.
+
+## LLM interpretation → GB10 decision (manual, no execution)
+
+Add a `models` object to workspace `radar.json` (shape:
+[`docs/sources/review-models.json`](docs/sources/review-models.json)).
+`base_url`/`interpretation_model` configure the generative LLM through an
+OpenAI-compatible provider. **`decision` configures GB10 separately:** explicit
+`https://decisions.example.com/v1/decisions` placeholder URL (replace for your deployment), returned model identity
+`GLM-5.3-Flash-EXL3`, timeout and `min_confidence` (default 0.5).
+The old Plumb `/v1/systemone` and `decision_model` chat-completion configurations
+are rejected. There is no Plumb, generative or heuristic decision fallback.
+
+The request uses `model`, JSON-string `input`, one `questions` entry with
+`id/type/question/options`, `prompt_format_version=1` and
+`chat_template_kwargs={"enable_thinking":false}`. The response must identify
+`object=decisions`, the requested model, protocol version and question. Runtime
+transport is one fixed `/usr/bin/curl` call (no retries, redirects or proxy),
+with a 1MB response bound. httpx is injectable only for protocol tests,
+not a runtime transport fallback.
+
+A key is read only from `api_key_env`; never stored. `json_mode=false` is an
+explicit interpretation-provider compatibility setting. Plain JSON or a single
+explicit JSON fence is accepted; both are strictly validated.
+
+```bash
+uv run influenzer radar
+uv run influenzer review run --project-id EXISTING_PROJECT_ID
+# Explicit separate app scope, using the same collected evidence:
+uv run influenzer review run --project-id EXISTING_APP_ID --profile app-profile.json
+uv run influenzer review list --project-id EXISTING_PROJECT_ID
+uv run influenzer review verdict --project-id EXISTING_PROJECT_ID \
+  --id PROPOSAL_ID --value useful --reason "Worth checking" --actor YOUR_NAME
+```
+
+### TencentDB application records — separate from personal memory
+
+The existing deployment is **TencentDB Agent Memory v2**, not a newly provisioned
+SQL database. `influenzer/tencent_records.py` uses its actual
+`/v3/conversation/add` and `/v3/conversation/query` L0 APIs for exact JSON records:
+content-addressed sessions, bounded chunks, SHA-256 verification and readback.
+It does not use semantic search as an exact read, `/capture`, atomic-note
+extraction, or the knowledge API (which registers external services).
+
+Configure `radar.json.records` using
+[`docs/sources/tencent-records.example.json`](docs/sources/tencent-records.example.json).
+The **separately provisioned private app agent** owns these records; the
+credential's authenticated owner ID must still match the user key. Sources are
+untrusted application data, not claims about that owner. Assistant-only L0
+messages do not trigger user-round extraction in the inspected v2 handler.
+They may still be indexed by the backend: agent scope, not message role or
+base64 encoding, is the isolation boundary. Keep credentials in the existing
+`TDAI_MEMORY_USER_KEY`/`TDAI_MEMORY_API_KEY` environment, never JSON or Git.
+The namespace must be provisioned explicitly; a missing scope (404) is an error,
+not permission to silently create or write into personal memory.
+
+**Boundary:** TencentDB retains full review/research/approval/verdict packages.
+The existing local journal still provides transactional execution claims and
+old history; immutable source artifacts remain in its SHA-256 store.
+This is **not** a migration of all `state.db`/`observations.db`, nor a distributed
+claim service. The L0 API assigns message IDs and lacks caller-keyed CAS;
+read-before-write suppresses identical sequential writes but is not distributed
+idempotency. No automatic HTTP retries or redirects. A storage failure retains
+the local result, reports `record.status=unconfirmed`, and makes CLI exit 1;
+it does not turn a successful model result into a skip or call models again.
+
+### Explicitly approved research → cited result → separate verdict
+
+`useful` is not execution permission. `research authorize` requires a specific
+successful **case** whose action is `research`, a concrete question, retained
+source records, actor and reason. Sources have `evidence_id/content/url/raw_ref`;
+`raw_ref` is a SHA-256 artifact registered in the existing workspace. Code
+verifies source content against the immutable artifact at authorization and
+again before execution. It never fetches model-selected URLs or executes
+instructions found in a source.
+
+```bash
+uv run influenzer research authorize --project-id EXISTING_PROJECT_ID \
+  --proposal-id CASE_PROPOSAL_ID --question "What exactly needs checking?" \
+  --sources retained-sources.json --actor YOUR_NAME --reason "Explicit research permission"
+uv run influenzer research run --project-id EXISTING_PROJECT_ID --id AUTHORIZATION_ID
+uv run influenzer research list --project-id EXISTING_PROJECT_ID
+uv run influenzer research verdict --project-id EXISTING_PROJECT_ID \
+  --id RESULT_ID --value useful --actor YOUR_NAME --reason "Why this answers the question"
+# Agent assessment is labelled, not attributed to the owner:
+# ... --actor Alfred --provisional
+```
+
+Research is **one LLM call → one JSON**, not an autonomous browsing/agent loop.
+Each finding selects source fragment IDs; code reconstructs exact citations,
+URLs and raw references. Empty findings require a named uncertainty and return
+`insufficient_evidence`, not empty success. Invalid references/model errors fail
+closed. Atomic claims preserve completed, failed and interrupted snapshots;
+identical replay makes zero additional model calls. Configuration changes create
+a new snapshot, not a silent retry. Source correctness, claim entailment and
+semantic usefulness still need operator assessment. Result verdicts have their
+own IDs and optional `provisional=true`; they never authorize publishing.
+
+The collecting tick invokes **neither research nor models**. No research path
+creates briefs, drafts, schedules, publication plans or posts. Live operator
+measurements are intentionally not included in this public repository.
+
+### Explicit project scope
+
+Review requires a profile bound to an existing Project's **ID and kind**:
+`id`, `kind`, `audience`, `problem`, `capabilities`, `not_offered`, optional
+`topics`. Missing scope is rejected before model calls; an empty capabilities
+list explicitly means no documented solution capability, not a guess that the
+project can solve it. Builder and app are separate Projects/profiles. The builder
+example covers local inference, hardware, performance, privacy and workflows;
+it does not pretend to be an offline-PDF app. The app example is
+[`docs/sources/project-documents.example.json`](docs/sources/project-documents.example.json);
+it is not a registered or deployed application.
+
+A capability entry is `{"claim":"...","artifact_digest":"SHA256","quote":"..."}`.
+The immutable artifact must exist in the workspace's existing artifact store,
+have correct SHA-256 bytes and contain the exact quote. This is provenance,
+**not proof the claim is true or applicable to a need**. No automatic scraping,
+capability inference or second registry. `material/reply/product` without any
+documented capability is a named contract failure, never rewritten to research;
+`product` also requires an app Project.
+
+### One need case = one decision
+
+The LLM classifies all selected records: question/problem/request,
+advertisement, success, joke or other. Its single JSON has `items` and `cases`.
+Each case describes **one concrete need** and its `evidence_ids`. Only statements
+about the same problem may merge, not just similar keywords. The host validates
+that cases partition all need items exactly once, with no non-need, duplicate or
+unknown references. No needs means `no_needs`, zero cases and **zero GB10 calls**;
+this is not a model's intentional skip.
+
+Code owns lossless source spans (up to 800 characters, without semantic filtering).
+The interpreter selects a short `fragment_id`, **never rewrites quote text**.
+Each span also carries its full SHA-256, content hash, source ID and offsets;
+short-ID collisions fail closed. IDs are stable for unchanged source content,
+independent of feed order. Unknown/foreign IDs, duplicate items and retyped quote
+fields are rejected. Code restores the exact source bytes, preserving `You`
+and `&amp;` without whitespace/fuzzy repair. This validates provenance,
+**not semantic classification or grouping correctness**.
+
+GB10 receives one case, only its interpretations/source records, the bound
+project scope and coverage. One `choice` question per case selects
+`skip/research/product/material/reply`; it generates **zero text tokens**.
+`evidence_scope=validated_case_not_model_selected` means the host binds exact
+case citations, not that GB10 generated them. `reason_source=protocol_receipt`
+identifies host receipt text, not a model-generated explanation. No third LLM
+call for an invented rationale. A review has `decision=null` and `cases` with
+individual decisions, statuses, snapshots and proposal IDs; no batch-wide action.
+
+The host validates exact model/question identity, option vocabulary, finite
+probabilities, total mass, argmax, `label_mass` and `usage.completion_tokens=0`.
+Confidence is derived from the selected probability; `label_mass` is retained
+as full-vocabulary label probability, not used as a calibrated acceptance gate.
+Below `min_confidence`, or on a tied argmax, the case is `abstained` with
+`decision=null` (`decision_uncertain`). These scores are not independently
+calibrated probabilities of correctness. Transport/contract errors are `failed`
+with `decision=null`, named stage/cause and no fallback. One failed case does
+not erase another completed decision. Review counters are
+`cases/proposed/failed/abstained/incomplete`. Any failed/incomplete case makes the
+review `partial` (CLI exit 1); otherwise any abstention means exit 2, successful
+proposals or no needs exit 0. Abstention/failure is **not skip**.
+
+Atomic claims and the operational history remain in `state.db`'s existing domain
+journal; no schema migration. When `radar.json.records` is configured, full review
+snapshots (including case proposals/evidence/audits) are also retained and exactly
+read-verified in the existing TencentDB service. See the persistence boundary below. Input snapshots, prompt version/text,
+requested and returned model IDs, GB10's complete request/response,
+probabilities, outputs, tokens and latency are retained. `review run` updates
+`review-latest.json` on success, failure or abstention, not just success.
+`review list` returns individual case proposals (plus legacy proposals, with
+original snapshots), not the review wrapper. `review verdict --id` addresses
+one case's proposal ID; it cannot approve the whole batch. `useful` assesses a
+recommendation, not permission to execute. `executed` is an operator report
+about external work, not a command. No briefs/drafts/publications are created.
+
+A review makes **one LLM batch + one GB10 question per concrete case**
+(at most 30 posts/30 cases and 100KB source evidence). HTTP retries are disabled.
+Atomic claims protect the review and each case; identical failed, interrupted,
+abstained or completed snapshots do not call models again. Failures need explicit
+investigation before changing inputs/configuration. A changed snapshot is a new
+review. Case IDs are content-derived from project/need/evidence, not a semantic
+cross-read deduplication system: stable need tracking and re-evaluation policy
+remain separate future work. No embedding or fuzzy grouping fallback. Newest published records
+are selected when the sample exceeds 30 (observation time for undated records);
+selection/truncation counts are retained. No keyword or punctuation filtering.
+This bounded sample is not representative. The collecting tick does **not**
+automatically call models. The interpretation provider receives public posts;
+the configured GB10 decision endpoint receives interpretations and project profile/scope.
+Historical proposals made by older protocols remain in the journal with their
+original snapshots; historical Plumb decisions are not re-labelled as GB10 results.
+
+Compare a saved proposal with reviewer-labelled cases without model requests:
+
+```bash
+uv run influenzer review evaluate \
+  --proposal ~/.hermes/influenzer/review-evaluation-proposal.json \
+  --labels /path/to/your-review-labels.json
+```
+
+Supply your own reviewer-labelled cases; private operator labels and live
+measurements are excluded from publication. Counts are TP/FP/FN/TN for concrete
+needs; monetary cost stays unknown unless pricing is available. Need detection
+is not project relevance or decision usefulness, and protocol tests do not
+validate semantic quality. The existing legacy brief/draft path remains separate;
+this change does not replace its downstream angle/form decisions or add an
+approval-to-execution bridge.
+
+**Failure privacy:** review interpretation, per-case decision and research
+failures retain only the exception type in `failure_class`/`failure_message`,
+never the exception text, which may contain private endpoints, credentials or
+provider response details. This applies to returned results, local journal
+records and TencentDB retention. Input snapshots and deliberate model/protocol
+audits remain retained application data; this is not general payload redaction.
+Existing historical records are not rewritten by this change.
+
 ## Always-on tick (Mac mini)
 
 The 24/7 operator stays up on an **always-on host** (a Mac mini or similar), not a laptop LaunchAgent. There is no plist in this repo. This repo does not SSH or deploy; a human starts the process on the box that already has `state.db`. On **mini-m4-0**, hop on and start the existing dry-run tick: [`docs/mini-m4-0.md`](docs/mini-m4-0.md).

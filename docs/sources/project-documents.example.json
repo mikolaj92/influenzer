@@ -1,0 +1,9 @@
+{
+  "id": "YOUR_EXISTING_APP_PROJECT_ID",
+  "kind": "app",
+  "audience": "Osoby pracujące z prywatnymi dokumentami PDF",
+  "problem": "Ekstrakcja tekstu i organizacja dokumentów PDF bez przesyłania ich do chmury",
+  "capabilities": [],
+  "not_offered": ["Doradztwo sprzętowe", "Generowanie obrazów", "Gwarantowany OCR bez sprawdzonego wdrożenia"],
+  "topics": ["offline documents", "private PDF"]
+}

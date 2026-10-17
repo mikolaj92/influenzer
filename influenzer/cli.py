@@ -47,6 +47,51 @@ def setup_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--config", help="path to config.json")
     sub = parser.add_subparsers(dest="command")
 
+    review = sub.add_parser("review", help="interpret evidence then one GB10 /v1/decisions choice per need case; no execution")
+    review_sub = review.add_subparsers(dest="review_command", required=True)
+    evaluate = review_sub.add_parser("evaluate", help="replay saved proposal against explicit labels; no model calls")
+    evaluate.add_argument("--proposal", required=True)
+    evaluate.add_argument("--labels", required=True)
+    for operation in ("run", "list", "verdict"):
+        action = review_sub.add_parser(operation)
+        action.add_argument("--project-id", required=True)
+        if operation == "run":
+            action.add_argument("--profile", help="explicit project scope JSON; otherwise radar.json project")
+        if operation == "verdict":
+            action.add_argument("--id", required=True, help="proposal ID")
+            action.add_argument("--value", required=True, choices=("useful", "not_useful", "executed", "abandoned"))
+            action.add_argument("--reason", required=True)
+            action.add_argument("--actor", required=True)
+
+    research = sub.add_parser("research", help="explicitly authorize one cited research result; no publication")
+    research_sub = research.add_subparsers(dest="research_command", required=True)
+    for operation in ("authorize", "run", "list", "verdict"):
+        action = research_sub.add_parser(operation)
+        action.add_argument("--project-id", required=True)
+        if operation == "authorize":
+            action.add_argument("--proposal-id", required=True)
+            action.add_argument("--question", required=True)
+            action.add_argument("--sources", required=True, help="JSON list of source records with verified raw_ref artifacts")
+            action.add_argument("--actor", required=True)
+            action.add_argument("--reason", required=True)
+        elif operation == "run":
+            action.add_argument("--id", required=True, help="authorization ID")
+        elif operation == "verdict":
+            action.add_argument("--id", required=True, help="result ID")
+            action.add_argument("--value", required=True, choices=("useful", "not_useful", "abandoned"))
+            action.add_argument("--actor", required=True)
+            action.add_argument("--reason", required=True)
+            action.add_argument("--provisional", action="store_true", help="agent assessment, not the owner's verdict")
+
+    sub.add_parser("radar", help="collect due sources and write an evidence digest; never publishes")
+    source = sub.add_parser("source", help="read external sources; never publishes")
+    source_sub = source.add_subparsers(dest="source_command", required=True)
+    source_read = source_sub.add_parser("read")
+    source_read.add_argument("--profile", required=True, help="source JSON configuration")
+    for operation in ("history", "reports"):
+        view = source_sub.add_parser(operation)
+        view.add_argument("--id", required=True, help="source ID")
+
     init = sub.add_parser("init", help="create local workspace home")
     init.add_argument("--home", help="workspace directory")
 
@@ -291,6 +336,98 @@ def handle_cli(args: argparse.Namespace) -> int:
     if getattr(args, "version", False):
         print(__version__)
         return 0
+
+    if args.command == "review":
+        from influenzer.model_review import proposals, record_verdict, review_latest
+        try:
+            if args.review_command == "evaluate":
+                from influenzer.review_evaluation import lexical_category, measure
+                proposal = json.loads(Path(args.proposal).read_text())
+                labels = json.loads(Path(args.labels).read_text())
+                evidence = {e["evidence_id"]: e for e in proposal["snapshot"]["evidence"]}
+                cases = [{**c, "heuristic_need": lexical_category(evidence[c["evidence_id"]]["content"]) is not None}
+                         for c in labels["cases"]]
+                result = {**measure(cases, proposal), "reviewer": labels.get("reviewer"), "label_status": labels.get("label_status")}
+            elif args.review_command == "run":
+                scope = json.loads(Path(args.profile).read_text()) if args.profile else None
+                result = review_latest(load_config(args.config).home, project_id=args.project_id, project_scope=scope)
+            else:
+                with _repo(args) as repo:
+                    if args.review_command == "list":
+                        result = proposals(repo, args.project_id)
+                    else:
+                        result = record_verdict(repo, project_id=args.project_id, proposal_id=args.id,
+                                                verdict=args.value, reason=args.reason, actor=args.actor)
+            print(json.dumps(result, sort_keys=True, ensure_ascii=False))
+            if isinstance(result, dict) and (result.get("record") or {}).get("status") == "unconfirmed":
+                return 1
+            if isinstance(result, dict) and result.get("status") == "abstained":
+                return 2
+            return 1 if isinstance(result, dict) and result.get("status") in {"failed", "incomplete", "partial"} else 0
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            return _fail(str(exc))
+
+    if args.command == "research":
+        from influenzer.model_review import OpenAIModels, ReviewConfig
+        from influenzer.research import (
+            authorize_research,
+            record_result_verdict,
+            research_results,
+            run_research,
+        )
+        from influenzer.tencent_records import retain_record
+        try:
+            cfg = load_config(args.config)
+            radar_config = json.loads((cfg.home / "radar.json").read_text())
+            research_result: dict
+            with _repo(args) as repo:
+                if args.research_command == "authorize":
+                    research_result = authorize_research(repo, project_id=args.project_id, proposal_id=args.proposal_id,
+                        question=args.question, sources=json.loads(Path(args.sources).read_text()), actor=args.actor, reason=args.reason)
+                elif args.research_command == "list":
+                    research_result = {"results": research_results(repo, args.project_id)}
+                elif args.research_command == "verdict":
+                    research_result = record_result_verdict(repo, project_id=args.project_id, result_id=args.id, value=args.value,
+                        actor=args.actor, reason=args.reason, provisional=args.provisional)
+                else:
+                    models = ReviewConfig.model_validate(radar_config["models"])
+                    research_result = run_research(repo, project_id=args.project_id, authorization_id=args.id,
+                                          client=OpenAIModels(models), model=models.interpretation_model,
+                                          configuration={k: v for k, v in models.model_dump().items() if k not in {"decision", "max_posts"}})
+            if radar_config.get("records") and args.research_command != "list":
+                research_result = {**research_result, "record": retain_record(radar_config["records"], research_result)}
+            print(json.dumps(research_result, ensure_ascii=False, sort_keys=True))
+            failed = research_result.get("status") in {"failed", "incomplete", "insufficient_evidence"}
+            unconfirmed = (research_result.get("record") or {}).get("status") == "unconfirmed"
+            return 1 if failed or unconfirmed else 0
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            return _fail(str(exc))
+
+    if args.command == "radar":
+        from influenzer.radar import run_radar
+        try:
+            result = run_radar(load_config(args.config).home)
+            print(json.dumps(result, sort_keys=True))
+            return 1 if result["status"] == "partial" else 0
+        except (ValueError, TypeError, KeyError, OSError) as exc:
+            return _fail(str(exc))
+
+    if args.command == "source":
+        from influenzer.sources import ObservationStore, Source, observe, read_url
+        cfg = load_config(args.config)
+        try:
+            with ObservationStore(cfg.home / "observations.db") as store:
+                if args.source_command == "read":
+                    source = Source(**json.loads(Path(args.profile).read_text()))
+                    result = observe(source, store, read=read_url)
+                    code = 0 if result["status"] == "ok" else 1
+                else:
+                    result = getattr(store, args.source_command)(args.id)
+                    code = 0
+                print(json.dumps(result, sort_keys=True))
+                return code
+        except (ValueError, TypeError, OSError) as exc:
+            return _fail(str(exc))
 
     if args.command == "init":
         cfg = load_config(args.config)

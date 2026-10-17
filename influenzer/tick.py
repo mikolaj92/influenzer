@@ -156,6 +156,12 @@ def main(
         return 0
 
     def tick_once() -> dict[str, Any]:
+        if (cfg.home / "radar.json").exists():
+            from influenzer.radar import run_radar
+            try:
+                run_radar(cfg.home)
+            except (ValueError, TypeError, KeyError, OSError) as exc:
+                print(json.dumps({"radar_status": "failed", "reason": str(exc)}), file=sys.stderr)
         return run_watched_tick(
             config_path=args.config,
             cli_live=bool(args.live),

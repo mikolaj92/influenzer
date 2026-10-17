@@ -1,0 +1,17 @@
+{
+  "interval_seconds": 21600,
+  "project": {
+    "id": "builder-local-ai",
+    "kind": "builder",
+    "audience": "Osoby samodzielnie uruchamiające i rozwijające lokalne AI",
+    "problem": "Praktyczne poznawanie i uruchamianie lokalnego AI: sprzęt, inferencja, wydajność, prywatność i przepływy pracy offline, w tym dokumenty. Profil buildera, nie oferta aplikacji dokumentowej.",
+    "capabilities": [],
+    "not_offered": ["Sprzedaż sprzętu", "Hosting inferencji", "Gotowa aplikacja OCR/PDF", "Niezweryfikowane gwarancje wydajności lub prywatności"],
+    "topics": ["local AI", "local LLM", "ollama", "llama.cpp", "offline AI"]
+  },
+  "sources": [
+    {"source_id": "x-local-ai", "provider": "x_search", "target": "\"local AI\"", "limit": 20},
+    {"source_id": "x-local-llm-needs", "provider": "x_search", "target": "\"local LLM\" (help OR how OR problem)", "limit": 20},
+    {"source_id": "hn-rss", "provider": "rss", "target": "https://news.ycombinator.com/rss", "limit": 30}
+  ]
+}

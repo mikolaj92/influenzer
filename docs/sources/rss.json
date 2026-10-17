@@ -1,0 +1,6 @@
+{
+  "source_id": "hn-rss",
+  "provider": "rss",
+  "target": "https://news.ycombinator.com/rss",
+  "limit": 30
+}

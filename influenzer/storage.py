@@ -355,6 +355,26 @@ class StateRepository:
             return list(self.conn.execute("SELECT * FROM domain_events ORDER BY event_id"))
         return list(self.conn.execute("SELECT * FROM domain_events WHERE project_id=? ORDER BY event_id", (project_id,)))
 
+    def claim_radar_review(self, project_id: str, payload: dict) -> dict | None:
+        """Claim once, atomically; interrupted/failed inputs require explicit reconciliation."""
+        with self.transaction() as conn:
+            self._require_project(conn, project_id)
+            for event in reversed(self.events(project_id)):
+                previous = json.loads(event["payload_json"])
+                if event["event_type"] in {"radar.review_started", "radar.review_completed", "radar.review_failed", "radar.research_completed"} and previous.get("proposal_id") == payload["proposal_id"]:
+                    return previous
+            self._event(project_id, "radar.review_started", payload, conn=conn)
+        return None
+
+    def record_radar_event(self, project_id: str, event_type: str, payload: dict) -> None:
+        """Append model-review evidence and operator feedback to the domain journal."""
+        if event_type not in {"radar.review_started", "radar.review_completed", "radar.review_failed", "radar.review_verdict",
+                              "radar.research_authorized", "radar.research_completed", "radar.research_verdict"}:
+            raise ValueError("unsupported radar event")
+        with self.transaction() as conn:
+            self._require_project(conn, project_id)
+            self._event(project_id, event_type, payload, conn=conn)
+
     def record_github_look(self, project_id: str, repo_slug: str, *, started_at: str) -> None:
         """Mark this git look in progress. Distinct from github.scanned (done)."""
         with self.transaction() as c:
